@@ -28,6 +28,22 @@ node "I:/Claude code/haikou-obake/serve.js"
 | 1〜6 / ホイール | 仕掛けの選択 |
 | Esc | ポーズ |
 
+### スマホ・タブレット（横向き）
+
+| 操作 | 動作 |
+|---|---|
+| 左下のスティック | 移動（端まで倒すとダッシュ） |
+| 画面をなぞる | 視点 |
+| 😱 | おどかす |
+| 👻 | すりぬけ（押しているあいだ） |
+| ⬆ | 浮く |
+| 📍 | 選んだ仕掛けを置く |
+| 🛠 | おばけ工房 |
+| 下のならび | 仕掛けを選ぶ（タップ） |
+
+端末を判定して自動で切り替わります。スマホでは懐中電灯のライトを2本、
+解像度・塵・材料の数を落として軽くしています（PCは5本・フル画質）。
+
 材料は近づくと自動で拾える。
 
 ## 今できること（第1段階）
@@ -58,6 +74,7 @@ node "I:/Claude code/haikou-obake/serve.js"
 | `src/util.js` | 数学、AABB 当たり判定、ウェイポイント経路探索 |
 | `src/sky.js` | 夜空・星・月 |
 | `src/audio.js` | WebAudio による効果音合成 |
+| `src/touch.js` | スマホ・タブレットのタッチ操作 |
 | `src/data.js` | 材料・仕掛け・おばけ・人間・ランクの定義（**バランス調整はここ**） |
 | `serve.js` | ローカル静的サーバ（127.0.0.1 のみ） |
 | `devshot.js` | 開発用スクリーンショット保存（`POST /__shot?n=名前`） |
@@ -68,3 +85,8 @@ node "I:/Claude code/haikou-obake/serve.js"
 - 体育館・運動場
 - 仕掛けとおばけの追加、おばけの合成
 - セーブ／ロード
+
+## 公開先
+
+- 本番: <https://haikou-obake-daisakusen.vercel.app/>（GitHub に push すると自動更新）
+- 予備: <https://yanoken10.github.io/haikou-obake/>
