@@ -818,8 +818,11 @@ if (isTouchDevice()) {
       ["下のならび", "仕掛けをえらぶ（タップ）"],
     ].map((r) => "<div><b>" + r[0] + "</b>" + r[1] + "</div>").join("");
   }
-  const sub = document.querySelector(".sbox .sub");
-  if (sub) sub.textContent = "〜 心霊スポット荒らしを、ぜんぶ追い出せ 〜";
+  const th = document.getElementById("touchHint");
+  if (th) {
+    th.style.display = "block";
+    th.innerHTML = "左下のまるで移動、画面をなぞって見まわす。<br>右下のボタンで おどかす・すりぬけ・うく・仕掛けを置く。";
+  }
 } else {
   const keys = document.querySelector(".keys");
   if (keys) {

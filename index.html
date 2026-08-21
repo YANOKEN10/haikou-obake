@@ -142,7 +142,7 @@ canvas{display:block}
 #screen.off{display:none}
 .sbox{width:min(660px,92vw);text-align:center;padding:26px;max-height:96dvh;overflow:auto}
 .sbox h1{font-size:clamp(28px,6.6vw,52px);margin:0 0 4px;color:var(--ink);text-shadow:0 0 26px rgba(169,123,255,.65)}
-.sbox .sub{color:var(--spook);font-size:15px;margin-bottom:18px}
+.sbox > .sub{color:var(--spook);font-size:15px;margin-bottom:18px}
 .keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 14px;
   text-align:left;font-size:13px;color:var(--muted);margin:14px 0 20px;
   background:rgba(255,255,255,.04);border:1px solid var(--edge);border-radius:12px;padding:14px 18px}
@@ -161,9 +161,11 @@ canvas{display:block}
 /* ============ タッチ操作（スマホ・タブレット） ============ */
 #touch{position:fixed;inset:0;z-index:8;display:none;pointer-events:none}
 body.touch #touch{display:block}
-body.touch{touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;
+body.touch{overscroll-behavior:none;-webkit-user-select:none;user-select:none;
   -webkit-tap-highlight-color:transparent}
-body.touch canvas{touch-action:none}
+body.touch canvas, body.touch #app, body.touch .hud{touch-action:none}
+body.touch #screen, body.touch #pause{touch-action:pan-y}
+body.touch .hpanel, body.touch .namelist, body.touch .cwrap{-webkit-overflow-scrolling:touch}
 
 #stick{position:absolute;left:16px;bottom:16px;width:126px;height:126px;border-radius:50%;
   border:2px solid rgba(169,123,255,.45);background:rgba(12,10,26,.4);pointer-events:auto}
@@ -218,7 +220,7 @@ body.touch.portrait #rotate{display:flex}
   .card .cost{font-size:10.5px} .card .stat{font-size:9.5px}
   .ctab{padding:5px 12px;font-size:13px}
   .sbox{padding:14px}
-  .sbox h1{font-size:30px} .sbox .sub{font-size:12px;margin-bottom:10px}
+  .sbox h1{font-size:30px} .sbox > .sub{font-size:12px;margin-bottom:10px}
   .keys{padding:8px 12px;font-size:11px;gap:3px 10px;margin:9px 0 12px}
   #startBtn{font-size:17px;padding:9px 36px}
   .credit{display:none}
@@ -302,7 +304,7 @@ body.touch #craftClose{display:block}
 @media (max-height:560px){
   .sbox{padding:10px 14px}
   .sbox h1{font-size:25px;margin-bottom:2px}
-  .sbox .sub{font-size:11.5px;margin-bottom:6px}
+  .sbox > .sub{font-size:11.5px;margin-bottom:6px}
   .hometabs{margin:7px 0 7px;gap:6px}
   .htab{padding:5px 12px;font-size:12.5px;border-radius:9px}
   /* 高さは下の flex に任せる */
@@ -367,7 +369,7 @@ body.touch #craftClose{display:block}
 }
 .hpanel{min-height:0}
 .hpanel.on{display:flex; flex-direction:column; flex:1 1 auto; min-height:0; overflow:auto}
-.sbox h1, .sbox .sub, .hometabs, .credit{flex:none}
+.sbox h1, .sbox > .sub, .hometabs, .credit{flex:none}
 
 /* スクロールバーが出るときは、細く目立たない見た目にする */
 *{scrollbar-width:thin;scrollbar-color:rgba(169,123,255,.45) transparent}
@@ -381,7 +383,7 @@ body.touch #craftClose{display:block}
   .sbox{padding:14px 20px}
   .keys{grid-template-columns:repeat(auto-fit,minmax(132px,1fr))}
   .sbox h1{font-size:clamp(22px,4.4vw,38px);margin-bottom:2px}
-  .sbox .sub{font-size:13px;margin-bottom:8px}
+  .sbox > .sub{font-size:13px;margin-bottom:8px}
   .hometabs{margin:9px 0 9px}
   .htab{padding:6px 15px;font-size:14px}
   .keys{padding:9px 13px;font-size:12px;gap:3px 12px;margin:9px 0 12px}
@@ -399,9 +401,56 @@ body.touch #craftClose{display:block}
   .sbox h1{font-size:clamp(19px,3.6vw,28px)}
   /* 操作説明を横に詰めて行数を減らす */
   .keys{grid-template-columns:repeat(auto-fit,minmax(116px,1fr))}
-  .sbox .sub{font-size:11.5px;margin-bottom:6px}
+  .sbox > .sub{font-size:11.5px;margin-bottom:6px}
   .keys{font-size:11px;gap:2px 10px;margin:7px 0 9px;padding:7px 11px}
   .credit{display:none}
+}
+
+/* ============ スマホ横向き：スクロールなしで1画面に収める ============ */
+@media (max-height:480px){
+  .sbox{padding:8px 14px}
+  .sbox h1{font-size:21px;margin-bottom:0}
+  .sbox > .sub{font-size:10px;margin-bottom:4px}
+  .hometabs{margin:5px 0 5px;gap:5px}
+  .htab{padding:4px 11px;font-size:11.5px;border-radius:8px}
+  .hpanel{overflow:auto}
+  .who{font-size:10.5px;margin-bottom:5px;line-height:1.4}
+  .bigbtn{font-size:14px;padding:7px 0;margin-bottom:5px;border-radius:9px}
+  .bigbtn.sub{font-size:12.5px;padding:6px 0}
+  .savecard{padding:5px 9px;font-size:10px;line-height:1.45;margin-bottom:6px}
+  .savecard .t{font-size:11.5px;margin-bottom:1px}
+  /* 操作説明はタッチ端末では出さない（画面のボタンに絵が描いてある） */
+  body.touch .keys{display:none}
+  body.touch #loading{display:none}
+  .touchhint{font-size:10px;color:#7a72a8;line-height:1.6;margin-top:4px}
+  .namelist{max-height:96px;gap:4px}
+  .namerow{padding:4px 8px;border-radius:8px}
+  .namerow .nm{font-size:12.5px}
+  .namerow .meta{font-size:9px;line-height:1.35}
+  .namerow .del{width:24px;height:24px;font-size:12px}
+  .namenew input{font-size:13px;padding:5px 8px;border-radius:8px}
+  .namenew button{font-size:12.5px;padding:5px 11px;border-radius:8px}
+  .note{font-size:9px;margin-top:3px;line-height:1.45}
+  .namenew{gap:6px}
+  .who{margin-bottom:4px}
+  .msg{font-size:10.5px;min-height:14px}
+  .subtabs{margin-bottom:5px;gap:4px}
+  .stab{padding:3px 10px;font-size:11px}
+  .stats{grid-template-columns:repeat(4,1fr);gap:4px}
+  .stat{padding:3px 6px} .stat .k{font-size:8.5px} .stat .v{font-size:12px}
+  .stat .v small{font-size:9px}
+  .rankbig{font-size:14px;margin-bottom:2px}
+  .credit{display:none}
+}
+/* さらに狭い端末（iPhone SE 横 など） */
+@media (max-height:400px){
+  .sbox h1{font-size:18px}
+  .sbox > .sub{display:none}
+  .hometabs{margin:4px 0}
+  .bigbtn{font-size:13px;padding:6px 0;margin-bottom:4px}
+  .savecard{font-size:9.5px}
+  .namelist{max-height:74px}
+  .stats{grid-template-columns:repeat(5,1fr)}
 }
 </style>
 </head>
@@ -494,6 +543,7 @@ body.touch #craftClose{display:block}
       <button class="bigbtn" id="btnContinue">▶ つづきから始める</button>
       <button class="bigbtn sub" id="btnNew">さいしょから始める</button>
       <div class="keys" id="keysBox"></div>
+      <div class="touchhint" id="touchHint" style="display:none"></div>
       <div id="loading"></div>
     </div>
 

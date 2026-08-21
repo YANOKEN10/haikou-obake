@@ -41,8 +41,11 @@ export class TouchControls {
     if (mq.addEventListener) mq.addEventListener("change", () => this.checkOrientation());
 
     // ピンチズームや引っぱって更新を止める
+    // 画面をなぞる操作をさまたげるのは、ゲーム中だけにする。
+    // ホーム画面やメニューでは、ふつうにスクロールできないと詰んでしまう。
     document.addEventListener("touchmove", (e) => {
-      if (!game.ui.craftOpen) e.preventDefault();
+      if (!game.started || game.paused || game.ui.craftOpen) return;
+      e.preventDefault();
     }, { passive: false });
     document.addEventListener("gesturestart", (e) => e.preventDefault());
     document.addEventListener("dblclick", (e) => e.preventDefault());
