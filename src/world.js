@@ -108,7 +108,7 @@ export function buildWorld(scene, opts = {}) {
   for (const r of ROOMS) {
     const cx = (r.x1 + r.x2) / 2, cz = (RZ1 + RZ2) / 2;
     rooms.push({ ...r, cx, cz, z1: RZ1, z2: RZ2, doorX: cx, doorZ: RZ2 });
-    furnish(mb, col, props, spawnSpots, r, cx, cz);
+    furnish(mb, col, props, spawnSpots, r, cx, cz, opts);
     for (let k = 0; k < 3; k++) spawnSpots.push({ x: rand(r.x1 + 1.4, r.x2 - 1.4), z: rand(RZ1 + 1.4, RZ2 - 1.4), room: r.name });
   }
   rooms.push({ id: "hall", name: "廊下", cx: 0, cz: -2, x1: BX1, x2: BX2, z1: HZ1, z2: HZ2, kind: "hall" });
@@ -155,6 +155,7 @@ export function buildWorld(scene, opts = {}) {
     colliders: col, nav, rooms, spawnSpots, props, lightSpots,
     exit: EXIT_POINT, entry: HUMAN_ENTRY, staticMesh, triangles: mb.triangles,
     bounds: { x1: -46, x2: 46, z1: -18, z2: 44 },
+    northOutsideZ: RZ1 - 1.6,
     roomAt(x, z) {
       if (z > 1.6) return "中庭";
       if (z >= -0.2 && x > EH.x1 && x < EH.x2) return "昇降口";
@@ -176,26 +177,29 @@ function windowRow(from, to, w, pitch, y1, y2) {
 // ============================================================
 //  部屋ごとの家具
 // ============================================================
-function furnish(mb, col, props, spawnSpots, r, cx, cz) {
+function furnish(mb, col, props, spawnSpots, r, cx, cz, opts) {
   const W = r.x2 - r.x1;
 
   if (r.kind === "class" || r.kind === "staff") {
-    mb.box(cx, 1.75, RZ1 + 0.3, Math.min(W - 2.2, 7), 1.3, 0.14, C.board, { jitter: 0.04 });
-    mb.box(cx, 1.05, RZ1 + 0.36, Math.min(W - 2.2, 7), 0.1, 0.22, C.wood, { jitter: 0.05 });
-    mb.box(cx, 0.12, RZ1 + 1.6, 3.0, 0.22, 1.4, C.wood, { jitter: 0.05 });
+    // 黒板は西側の壁。北の窓をふさがないようにする
+    const bw = Math.min(RZ2 - RZ1 - 2.4, 6.4);
+    const bz = (RZ1 + RZ2) / 2;
+    mb.box(r.x1 + 0.3, 1.75, bz, 0.14, 1.3, bw, C.board, { jitter: 0.04 });
+    mb.box(r.x1 + 0.36, 1.05, bz, 0.22, 0.1, bw, C.wood, { jitter: 0.05 });
+    mb.box(r.x1 + 1.5, 0.12, bz, 1.4, 0.22, 3.0, C.wood, { jitter: 0.05 });
+    const face = -Math.PI / 2;                 // 西を向く
     for (let i = 0; i < 3; i++)
-      for (let j = 0; j < 4; j++) {
-        const dx = cx + (i - 1) * 2.4 + rand(-0.18, 0.18);
-        const dz = RZ1 + 3.8 + j * 1.85 + rand(-0.15, 0.15);
-        if (dz > RZ2 - 1.1) continue;
-        const rot = rand(-0.35, 0.35);
+      for (let j = 0; j < 3; j++) {
+        const dx = r.x1 + 3.4 + i * 1.9 + rand(-0.15, 0.15);
+        const dz = bz - 2.4 + j * 2.4 + rand(-0.18, 0.18);
+        if (dx > r.x2 - 1.2) continue;
+        const rot = face + rand(-0.3, 0.3);
         desk(mb, col, dx, dz, rot);
-        if (Math.random() < 0.5) chair(mb, col, dx, dz + 0.95, rot + rand(-0.8, 0.8));
+        if (Math.random() < 0.5) chair(mb, col, dx + 0.95, dz, rot + rand(-0.8, 0.8));
       }
-    for (let x = r.x1 + 1.0; x < r.x2 - 1.2; x += 1.0) {
-      if (Math.abs(x - cx) < 1.3) continue;
-      mb.box(x, 0.9, RZ2 - 0.55, 0.9, 1.8, 0.6, C.locker, { jitter: 0.12 });
-      col.add(x - 0.45, RZ2 - 0.9, x + 0.45, RZ2 - 0.25, 0, 1.8, "wall");
+    for (let z = RZ1 + 1.2; z < RZ2 - 1.2; z += 1.0) {
+      mb.box(r.x2 - 0.55, 0.9, z, 0.6, 1.8, 0.9, C.locker, { jitter: 0.12 });
+      col.add(r.x2 - 0.9, z - 0.45, r.x2 - 0.25, z + 0.45, 0, 1.8, "wall");
     }
   }
 
@@ -254,6 +258,12 @@ function furnish(mb, col, props, spawnSpots, r, cx, cz) {
     mb.box(cx + 1.2, 1.9, RZ2 - 0.78, 3.0, 0.9, 0.08, 0x2a3138, { jitter: 0.03 });
     col.add(cx - 0.3, RZ2 - 1.3, cx + 2.7, RZ2 - 0.7, 0, 0.9, "furn");
     spawnSpots.push({ x: cx + 1, z: RZ2 - 1.7, room: r.name });
+    // 隠し要素：どこかの個室にひとつだけ落ちている
+    if (opts && opts.poopRoom === r.id) {
+      const st = Math.floor(rand(0, 3));
+      const px = r.x1 + 1.2 + st * 1.7 - 0.42;
+      props.push(makePoop(px, RZ1 + 1.6));
+    }
   }
 
   if (r.kind === "stair") {
@@ -560,4 +570,25 @@ function scatterYardDetail(mb) {
     const x = rand(-41, 41), z = rand(-13.6, -0.4);
     mb.box(x, 0.19, z, rand(0.3, 1.3), 0.02, rand(0.3, 1.3), 0x4a4a42, { jitter: 0.5, rotY: rand(0, 3.14) });
   }
+}
+
+// ============================================================
+//  隠し要素②：どこかのトイレに、ひとつだけ
+// ============================================================
+function makePoop(x, z) {
+  const g = new THREE.Group();
+  const m = new THREE.MeshLambertMaterial({ color: 0x6b4526, emissive: 0x1a0f06, emissiveIntensity: 0.35 });
+  for (let i = 0; i < 3; i++) {
+    const r = 0.11 - i * 0.028;
+    const c = new THREE.Mesh(new THREE.ConeGeometry(r, 0.075, 10), m);
+    c.position.y = 0.035 + i * 0.062;
+    g.add(c);
+  }
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.026, 8, 6), m);
+  tip.position.y = 0.225; g.add(tip);
+  g.position.set(x, 0.62, z);
+  return {
+    mesh: g, kind: "poop", x, z, found: false,
+    update(dt, t) { g.rotation.y = Math.sin(t * 0.6) * 0.15; },
+  };
 }

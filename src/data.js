@@ -94,30 +94,35 @@ export const GHOSTS = {
 export const HUMAN_TYPES = [
   {
     id: "youtuber", name: "配信者ユウキ", color: 0x4cc9ff, courage: 130, speed: 2.6,
+    sex: "m", hair: 0x2b2228, blazer: 0x2c3555, trim: 0x8fa8d8,
     idle: ["はいどーもー、心霊スポット来てまーす", "今日はガチのやつ来ましたよ", "コメント欄、静かすぎん？", "これ絶対なんかいるって"],
     scared: ["え、いま撮れた？撮れた？", "うわああああカメラカメラ！", "スタッフー！スタッフいない！"],
     flee: ["高評価と登録よろしくうううう！！", "無理無理無理無理帰る帰る"],
   },
   {
     id: "gal", name: "ギャルのミク", color: 0xff5a9e, courage: 80, speed: 3.0,
+    sex: "f", hair: 0x6b4a2f, blazer: 0x34305c, trim: 0xff9ec4, skirt: 0x8e3f66,
     idle: ["まじ埃やば、髪やられる", "え、ここ電波ある？", "つーかなんで来たんだっけ"],
     scared: ["は？！は？！なんかいた！", "やだやだやだ無理ィ！", "ネイル取れた！！"],
     flee: ["もう二度と来ないから！！", "ママーーー！！"],
   },
   {
     id: "otaku", name: "オカルト部・田所", color: 0x7ce85a, courage: 150, speed: 2.2,
+    sex: "m", hair: 0x1f1a1c, blazer: 0x2a3d33, trim: 0x9fd8a8,
     idle: ["ふむ…この澱んだ空気…本物ですね", "霊障の兆候は…まだ", "みなさん、記録は正確に"],
     scared: ["き、記録します！記録しますから！", "しゅ、出現条件が理論と違う…！", "ま、待ってこれ論文になる"],
     flee: ["撤退！これは学術的撤退です！", "資料が！資料だけでも！"],
   },
   {
     id: "couple", name: "ビビり彼氏ケンタ", color: 0xffc63d, courage: 55, speed: 3.2,
+    sex: "m", hair: 0x3a2a1e, blazer: 0x4a3a24, trim: 0xffd98a,
     idle: ["お、俺は全然平気だけどさ", "ほら、あれ、ただの風だって", "先に行っていいよ、俺、後ろ守るから"],
     scared: ["ひっ", "いや今の聞いた？聞いたよね？", "俺は見てない、何も見てない"],
     flee: ["ごめん！マジでごめん！", "車！車のとこで待ってる！"],
   },
   {
     id: "granny", name: "近所の岩井さん", color: 0xd8b4ff, courage: 165, speed: 1.8,
+    sex: "f", hair: 0x8a8a92, blazer: 0x4a3f63, trim: 0xd8b4ff, skirt: 0x574a70, elderly: true,
     idle: ["まだ取り壊さんのかねぇ、ここ", "うちの子もここ通っとってねぇ", "あら、この花壇まだ生きとる"],
     scared: ["あらまあ", "ほう、おばけさんかい", "元気があってよろしい"],
     flee: ["また来るからねぇ", "はいはい、帰りますよ"],

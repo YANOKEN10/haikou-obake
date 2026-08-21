@@ -266,3 +266,79 @@ export class FloatText {
     if (this.life <= 0) { this.dead = true; this.scene.remove(this.sprite); this.mat.map.dispose(); this.mat.dispose(); }
   }
 }
+
+// ============================================================
+//  隠し要素①：赤いワンピースの女の子
+//   誰もいない部屋にいるとき、窓の外をスーッと横切る。
+//   音もなく、数秒で消える。気づけた人だけのごほうび。
+// ============================================================
+export class RedLady {
+  constructor(scene) {
+    this.g = new THREE.Group();
+    const dress = new THREE.MeshLambertMaterial({ color: 0x8e1220, emissive: 0x2a0207, emissiveIntensity: 0.5 });
+    const skin = new THREE.MeshLambertMaterial({ color: 0xd9c3b4, emissive: 0x2a2226, emissiveIntensity: 0.3 });
+    const hairM = new THREE.MeshLambertMaterial({ color: 0x0b0a0d });
+
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.34, 1.15, 12), dress);
+    body.position.y = 0.72; this.g.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.155, 12, 10), skin);
+    head.position.y = 1.45; this.g.add(head);
+    // 顔をおおう長い黒髪
+    const hair = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.86, 0.28), hairM);
+    hair.position.set(0, 1.20, -0.01); this.g.add(hair);
+    const front = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.30, 0.06), hairM);
+    front.position.set(0, 1.46, 0.13); this.g.add(front);
+    const armL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.5, 0.07), skin);
+    armL.position.set(-0.2, 1.02, 0.02); this.g.add(armL);
+    const armR = armL.clone(); armR.position.x = 0.2; this.g.add(armR);
+
+    this.g.visible = false;
+    scene.add(this.g);
+    this.scene = scene;
+    this.t = 0;
+    this.cool = 70;            // 最初はしばらく出ない
+    this.active = false;
+  }
+
+  // 出てよい状況か（誰もいない部屋にひとりでいる）
+  canAppear(world, player, humans) {
+    if (!world.isIndoors(player.x, player.z)) return false;
+    const room = world.roomAt(player.x, player.z);
+    if (room === "廊下" || room === "昇降口" || room === "中庭") return false;
+    for (const h of humans) if (!h.out && dist(h.x, h.z, player.x, player.z) < 22) return false;
+    return true;
+  }
+
+  update(dt, world, player, humans) {
+    if (this.active) {
+      this.t += dt;
+      const p = this.t / 5.2;
+      if (p >= 1) { this.active = false; this.g.visible = false; return null; }
+      this.g.position.x = this.from + (this.to - this.from) * p;
+      // 出はじめと終わりは、すうっと薄れる
+      const fade = Math.min(1, Math.min(p, 1 - p) * 5);
+      this.g.traverse((o) => { if (o.material) { o.material.transparent = true; o.material.opacity = 0.9 * fade; } });
+      this.g.rotation.y = this.face + Math.sin(this.t * 0.7) * 0.05;
+      this.g.position.y = Math.sin(this.t * 3.1) * 0.012;   // 足を動かさず、すべるように
+      return null;
+    }
+
+    this.cool -= dt;
+    if (this.cool > 0) return null;
+    if (!this.canAppear(world, player, humans)) return null;
+    if (Math.random() > dt * 0.35) return null;              // ごくたまに
+
+    // 北側の窓の外を、プレイヤーの正面あたりで横切らせる
+    const z = world.northOutsideZ;
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    this.from = player.x - dir * 9;
+    this.to = player.x + dir * 9;
+    this.g.position.set(this.from, 0, z);
+    this.face = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+    this.g.visible = true;
+    this.active = true;
+    this.t = 0;
+    this.cool = 150 + Math.random() * 180;                   // 次はずっと先
+    return "appeared";
+  }
+}

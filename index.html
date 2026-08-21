@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1">
 <title>廃校おばけ大作戦</title>
 <meta name="description" content="廃校に住みつくおばけを操作して、心霊スポット目当てで来た人間たちを驚かせ、校門の外へ追い出す3人称オープンワールド・サバイバルホラー（ちょっぴりコメディ）。">
 <meta name="theme-color" content="#1a1436">
@@ -37,7 +37,11 @@
   --px:"Silkscreen",monospace;
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;overflow:hidden;background:var(--void);color:var(--ink);font-family:var(--jp)}
+html,body{margin:0;height:100%;height:100dvh;overflow:hidden;background:var(--void);color:var(--ink);font-family:var(--jp)}
+#app{position:fixed;inset:0}
+/* ノッチや丸角を避ける余白 */
+.hud,#screen,#pause,#craft{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.hud{box-sizing:border-box}
 canvas{display:block}
 #app{position:fixed;inset:0}
 .hud{position:fixed;inset:0;pointer-events:none;z-index:5}
@@ -136,7 +140,7 @@ canvas{display:block}
 #screen{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;
   background:radial-gradient(120% 90% at 50% 20%,#241a52 0%,#0c0a1c 55%,#04030a 100%)}
 #screen.off{display:none}
-.sbox{width:min(660px,92vw);text-align:center;padding:26px;max-height:96vh;overflow:auto}
+.sbox{width:min(660px,92vw);text-align:center;padding:26px;max-height:96dvh;overflow:auto}
 .sbox h1{font-size:clamp(28px,6.6vw,52px);margin:0 0 4px;color:var(--ink);text-shadow:0 0 26px rgba(169,123,255,.65)}
 .sbox .sub{color:var(--spook);font-size:15px;margin-bottom:18px}
 .keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 14px;
@@ -359,7 +363,7 @@ body.touch #craftClose{display:block}
 /* ホーム画面の箱そのものはスクロールさせず、中のパネルだけを可変にする */
 .sbox{
   display:flex; flex-direction:column;
-  max-height:94vh; overflow:hidden;
+  max-height:calc(var(--vvh, 94dvh) - 26px); overflow:hidden;
 }
 .hpanel{min-height:0}
 .hpanel.on{display:flex; flex-direction:column; flex:1 1 auto; min-height:0; overflow:auto}

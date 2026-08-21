@@ -50,6 +50,11 @@ function roundRect(g, x, y, w, h, r) {
   g.closePath();
 }
 
+// 人間の大きさ（1.0 が以前。おばけと同じく小さめにして、廊下を広く見せる）
+export const HUMAN_SCALE = 0.72;
+// 目の高さ（腰高の窓ごしでも相手が見えるよう、下がりすぎないようにする）
+export const EYE_Y = Math.max(1.05, 1.35 * HUMAN_SCALE);
+
 export class Human {
   constructor(scene, world, type, x, z) {
     this.world = world;
@@ -58,7 +63,7 @@ export class Human {
     this.x = x; this.z = z; this.y = 0;
     this.yaw = Math.PI;
     this.vx = 0; this.vz = 0;
-    this.radius = 0.38;
+    this.radius = 0.38 * HUMAN_SCALE;
 
     this.fear = 0;
     this.maxFear = type.courage;
@@ -82,37 +87,85 @@ export class Human {
     scene.add(this.group);
 
     this.bubble = makeBubble();
-    this.bubble.sprite.position.y = 2.55;
+    this.bubble.sprite.position.y = 1.95 * HUMAN_SCALE + 0.55;
     this.group.add(this.bubble.sprite);
   }
 
   build(color) {
+    const T = this.type;
     const skin = new THREE.MeshLambertMaterial({ color: 0xe8c39e });
-    const cloth = new THREE.MeshLambertMaterial({ color });
+    const blazer = new THREE.MeshLambertMaterial({ color: T.blazer || color });
+    const trim = new THREE.MeshLambertMaterial({ color: T.trim || color });
     const dark = new THREE.MeshLambertMaterial({ color: 0x2b2f3a });
+    const shirtMat = new THREE.MeshLambertMaterial({ color: 0xf0f2f6 });
+    this.skin = skin;
 
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.66, 0.28), cloth);
-    torso.position.y = 1.15; this.group.add(torso);
+    // 転んだり破けたりするので、体はひとつの入れ物にまとめて傾けられるようにする
+    this.body = new THREE.Group();
+    this.body.scale.setScalar(HUMAN_SCALE);
+    this.group.add(this.body);
+
+    // 白シャツ（上着が破けると出てくる）
+    const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.62, 0.25), shirtMat);
+    shirt.position.y = 1.15; this.body.add(shirt);
+
+    // 制服の上着
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.66, 0.29), blazer);
+    torso.position.y = 1.15; this.body.add(torso);
+    this.torso = torso;
+    // えり
+    const collar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.31), trim);
+    collar.position.y = 1.44; this.body.add(collar);
+    this.collar = collar;
+    // ネクタイ／リボン
+    const tie = new THREE.Mesh(
+      T.sex === "f" ? new THREE.BoxGeometry(0.16, 0.09, 0.06) : new THREE.BoxGeometry(0.07, 0.26, 0.06), trim);
+    tie.position.set(0, T.sex === "f" ? 1.37 : 1.28, 0.16); this.body.add(tie);
+
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.19, 12, 10), skin);
-    head.position.y = 1.62; this.group.add(head);
+    head.position.y = 1.62; this.body.add(head);
     this.head = head;
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), new THREE.MeshLambertMaterial({ color: 0x30262a }));
-    hair.position.y = 1.64; this.group.add(hair);
+    // 髪（女子は長め）
+    const hairMat = new THREE.MeshLambertMaterial({ color: T.hair || 0x30262a });
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.205, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), hairMat);
+    hair.position.y = 1.64; this.body.add(hair);
+    if (T.sex === "f") {
+      const back = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.34, 0.14), hairMat);
+      back.position.set(0, 1.47, -0.13); this.body.add(back);
+    }
 
-    this.armL = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.55, 0.11), cloth);
-    this.armR = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.55, 0.11), cloth);
-    this.armL.position.set(-0.31, 1.16, 0); this.armR.position.set(0.31, 1.16, 0);
+    this.armL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, 0.12), blazer);
+    this.armR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, 0.12), blazer);
+    this.armL.position.set(-0.32, 1.16, 0); this.armR.position.set(0.32, 1.16, 0);
     this.armL.geometry.translate(0, -0.22, 0); this.armR.geometry.translate(0, -0.22, 0);
-    this.group.add(this.armL, this.armR);
+    this.body.add(this.armL, this.armR);
+    // 破けたときに出てくる素肌の腕
+    this.bareL = new THREE.Mesh(new THREE.BoxGeometry(0.115, 0.5, 0.115), skin);
+    this.bareR = new THREE.Mesh(new THREE.BoxGeometry(0.115, 0.5, 0.115), skin);
+    this.bareL.position.copy(this.armL.position); this.bareR.position.copy(this.armR.position);
+    this.bareL.geometry.translate(0, -0.2, 0); this.bareR.geometry.translate(0, -0.2, 0);
+    this.bareL.visible = this.bareR.visible = false;
+    this.body.add(this.bareL, this.bareR);
 
-    this.legL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.72, 0.14), dark);
-    this.legR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.72, 0.14), dark);
+    // 下半身：女子はスカート、男子はズボン
+    if (T.sex === "f") {
+      const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.36, 0.34, 12), new THREE.MeshLambertMaterial({ color: T.skirt || 0x574a70 }));
+      skirt.position.y = 0.72; this.body.add(skirt);
+      this.skirt = skirt;
+    }
+    this.legL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.72, 0.14), T.sex === "f" ? skin : dark);
+    this.legR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.72, 0.14), T.sex === "f" ? skin : dark);
     this.legL.position.set(-0.12, 0.82, 0); this.legR.position.set(0.12, 0.82, 0);
     this.legL.geometry.translate(0, -0.3, 0); this.legR.geometry.translate(0, -0.3, 0);
-    this.group.add(this.legL, this.legR);
+    this.body.add(this.legL, this.legR);
+    // 上履き
+    for (const s2 of [-0.12, 0.12]) {
+      const sh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.09, 0.24), new THREE.MeshLambertMaterial({ color: 0xe8e2d0 }));
+      sh.position.set(s2, 0.06, 0.03); this.body.add(sh);
+      if (s2 < 0) this.shoeL = sh; else this.shoeR = sh;
+    }
 
-    // 懐中電灯（光そのものは Game 側のライトプールが受けもつ。
-    //   端末ごとに灯す本数を変えられるようにするため）
+    // 懐中電灯（光は Game 側のライトプールが受けもつ）
     this.sway = 0;
     this.torchHot = false;
 
@@ -122,11 +175,120 @@ export class Human {
     );
     beam.rotation.x = Math.PI / 2;
     beam.position.set(0.3, 1.05, 3.6);
-    this.group.add(beam);
+    this.body.add(beam);
     this.beam = beam;
+
+    // 転倒・破裂の演出用
+    this.gag = null; this.gagT = 0;
+    this.stars = null;
   }
 
   speak(text, dur = 3.2) { this.line = text; this.talkT = dur; }
+
+  // ==========================================================
+  //  こわがったときの、ちょっと笑えるリアクション
+  //   女子 → ド派手に一回転して尻もち、頭に星、上履きが飛ぶ
+  //   男子 → 上着が弾けとんで、下のランニングシャツ姿で逃げる
+  // ==========================================================
+  startGag(strength) {
+    if (this.gagT > 0) return null;
+    const f = this.type.sex === "f";
+    // よほど怖がったときだけ
+    if (strength < 26 || Math.random() > (f ? 0.55 : 0.5)) return null;
+    this.gag = f ? "tumble" : "burst";
+    this.gagT = f ? 2.1 : 1.5;
+    if (f) {
+      this.shoeFly = { x: rand(-1, 1), y: 3.4, z: rand(-1, 1), t: 0 };
+      this.makeStars();
+      return choice(["すってんころりん！", "いたーい！", "こ、腰が…！"]);
+    }
+    // 上着が弾けとぶ
+    this.torso.visible = false;
+    this.collar.visible = false;
+    this.armL.visible = this.armR.visible = false;
+    this.bareL.visible = this.bareR.visible = true;
+    this.burstPieces = [];
+    for (let i = 0; i < 6; i++) {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.05),
+        new THREE.MeshLambertMaterial({ color: this.type.blazer || 0x334 }));
+      p.position.set(0, 1.2, 0);
+      p.userData.v = { x: rand(-2.6, 2.6), y: rand(2.4, 4.4), z: rand(-2.6, 2.6),
+                       rx: rand(-9, 9), rz: rand(-9, 9) };
+      this.body.add(p);
+      this.burstPieces.push(p);
+    }
+    return choice(["うわああ服がァ！", "やぶけたァ！", "もう知らん！！"]);
+  }
+
+  makeStars() {
+    if (this.stars) return;
+    const g = new THREE.Group();
+    for (let i = 0; i < 5; i++) {
+      const s = new THREE.Mesh(new THREE.OctahedronGeometry(0.075, 0),
+        new THREE.MeshBasicMaterial({ color: 0xffe14d }));
+      s.userData.a = (i / 5) * Math.PI * 2;
+      g.add(s);
+    }
+    g.position.y = 1.05;
+    this.group.add(g);
+    this.stars = g;
+  }
+
+  // リアクションの動きを進める
+  updateGag(dt, t) {
+    if (this.gagT <= 0) {
+      if (this.gag) this.endGag();
+      return;
+    }
+    this.gagT -= dt;
+    const p = this.gag === "tumble" ? 1 - this.gagT / 2.1 : 1 - this.gagT / 1.5;
+
+    if (this.gag === "tumble") {
+      // 一回転して尻もち → よろよろ起き上がる
+      const spin = Math.min(1, p / 0.35);
+      const up = p > 0.72 ? (p - 0.72) / 0.28 : 0;
+      this.body.rotation.x = (Math.PI * 0.55) * spin * (1 - up);
+      this.body.rotation.z = Math.sin(p * 14) * 0.16 * (1 - up);
+      this.body.position.y = -0.34 * spin * (1 - up);
+      if (this.stars) {
+        this.stars.visible = p < 0.8;
+        this.stars.position.y = 1.05 - 0.3 * spin * (1 - up);
+        this.stars.children.forEach((s) => {
+          const a = s.userData.a + t * 5.5;
+          s.position.set(Math.cos(a) * 0.34, Math.sin(a * 2) * 0.05, Math.sin(a) * 0.34);
+          s.rotation.y = t * 4;
+        });
+      }
+      if (this.shoeFly && this.shoeR) {
+        this.shoeFly.t += dt;
+        const ft = this.shoeFly.t;
+        this.shoeR.position.set(0.12 + this.shoeFly.x * ft, 0.06 + this.shoeFly.y * ft - 5 * ft * ft, 0.03 + this.shoeFly.z * ft);
+        this.shoeR.rotation.x = ft * 12;
+      }
+    } else {
+      // のけぞってから、脱兎のごとく
+      this.body.rotation.x = -Math.sin(Math.min(1, p / 0.3) * Math.PI) * 0.5;
+      if (this.burstPieces) {
+        for (const q of this.burstPieces) {
+          const v = q.userData.v;
+          q.position.x += v.x * dt; q.position.z += v.z * dt;
+          q.position.y += v.y * dt; v.y -= 9.5 * dt;
+          q.rotation.x += v.rx * dt; q.rotation.z += v.rz * dt;
+          if (q.position.y < 0.05) { q.position.y = 0.05; v.y = 0; v.x *= 0.7; v.z *= 0.7; }
+        }
+      }
+    }
+  }
+
+  endGag() {
+    this.body.rotation.set(0, 0, 0);
+    this.body.position.y = 0;
+    if (this.stars) { this.group.remove(this.stars); this.stars = null; }
+    if (this.shoeR) { this.shoeR.position.set(0.12, 0.06, 0.03); this.shoeR.rotation.x = 0; }
+    if (this.burstPieces) { for (const q of this.burstPieces) this.body.remove(q); this.burstPieces = null; }
+    this.gag = null;
+    // 上着は破けたまま（そのほうがおかしい）ので戻さない
+  }
 
   // --- 移動先を決める ---------------------------------------
   goTo(x, z) {
@@ -192,6 +354,9 @@ export class Human {
       this.state = "panic"; this.stateT = clamp(eff / 22, 1.0, 3.2);
       this.speak(choice(this.type.scared), 3.0);
     }
+    // ときどき、ド派手なリアクションが出る
+    const gagLine = this.startGag(eff);
+    if (gagLine) { this.speak(gagLine, 3.2); this.stateT = Math.max(this.stateT, 2.0); }
     return eff;
   }
 
@@ -210,7 +375,7 @@ export class Human {
     const ang = Math.atan2(px - this.x, pz - this.z);
     let diff = Math.abs(((ang - this.yaw + Math.PI) % (Math.PI * 2)) - Math.PI);
     if (diff > 1.05 && d > 2.4) return false;
-    return this.world.colliders.lineOfSight(this.x, this.z, px, pz, 1.35, 0.7);
+    return this.world.colliders.lineOfSight(this.x, this.z, px, pz, EYE_Y, 0.7);
   }
 
   // ==========================================================
@@ -224,6 +389,7 @@ export class Human {
     this.fear = Math.max(this.fearFloor || 0, this.fear - dt * 0.85);  // ゆっくり落ち着く（が完全には戻らない）
 
     let speed = this.type.speed;
+    if (this.gagT > 0 && this.gag === "tumble") speed = 0;   // 転んでいるあいだは動けない
     let wantX = null, wantZ = null;
 
     switch (this.state) {
@@ -291,7 +457,7 @@ export class Human {
       this.vz = lerp(this.vz, 0, clamp(dt * 9, 0, 1));
     }
 
-    const r = w.colliders.resolve(this.x + this.vx * dt, this.z + this.vz * dt, this.radius, 1.0);
+    const r = w.colliders.resolve(this.x + this.vx * dt, this.z + this.vz * dt, this.radius, 1.0 * HUMAN_SCALE);
     if (r.hit) {
       // 引っかかったら経路を引き直す
       this.stuck = (this.stuck || 0) + dt;
@@ -304,6 +470,7 @@ export class Human {
       this.yaw = angleLerp(this.yaw, Math.atan2(this.vx, this.vz), clamp(dt * 7, 0, 1));
     this.walkPhase += dt * (2.5 + mv * 2.2);
 
+    this.updateGag(dt, t);
     this.render(dt, t, mv, ctx);
   }
 
@@ -312,11 +479,15 @@ export class Human {
     this.group.position.set(this.x, this.y, this.z);
     this.group.rotation.y = this.yaw;
 
-    const sw = Math.sin(this.walkPhase) * clamp(mv * 0.32, 0, 1.1);
-    this.legL.rotation.x = sw; this.legR.rotation.x = -sw;
-    this.armL.rotation.x = -sw * 0.8 - (panic ? 2.2 : 0);
-    this.armR.rotation.x = sw * 0.8 - (panic ? 2.2 : 0);
-    this.head.position.y = 1.62 + (panic ? Math.abs(Math.sin(t * 22)) * 0.035 : 0);
+    // 転倒中は手足の動きを演出側にゆずる（ふきだしなどは動かし続ける）
+    if (!(this.gagT > 0 && this.gag === "tumble")) {
+      const sw = Math.sin(this.walkPhase) * clamp(mv * 0.32, 0, 1.1);
+      this.legL.rotation.x = sw; this.legR.rotation.x = -sw;
+      const armSwing = -sw * 0.8 - (panic ? 2.2 : 0);
+      this.armL.rotation.x = armSwing; this.armR.rotation.x = sw * 0.8 - (panic ? 2.2 : 0);
+      this.bareL.rotation.x = armSwing; this.bareR.rotation.x = sw * 0.8 - (panic ? 2.2 : 0);
+      this.head.position.y = 1.62 + (panic ? Math.abs(Math.sin(t * 22)) * 0.035 : 0);
+    }
 
     // 懐中電灯は少しふらつく／パニックで乱れる
     const sway = panic ? Math.sin(t * 13) * 0.9 : Math.sin(t * 1.1 + this.walkPhase * 0.2) * 0.28;
@@ -334,7 +505,7 @@ export class Human {
         drawBubble(this.bubble, this.name, txt, this.fear / this.maxFear * 100, "#" + new THREE.Color(this.type.color).getHexString());
         this._lastTxt = txt; this._lastFear = this.fear;
       }
-      this.bubble.sprite.position.y = 2.5 + Math.sin(t * 2 + this.x) * 0.05;
+      this.bubble.sprite.position.y = 1.95 * HUMAN_SCALE + 0.55 + Math.sin(t * 2 + this.x) * 0.05;
     }
   }
 }

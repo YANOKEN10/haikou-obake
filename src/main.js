@@ -6,8 +6,8 @@ import { Home } from "./home.js";
 import * as S from "./save.js";
 import { Cloud } from "./cloud.js";
 import { Player } from "./player.js";
-import { Human } from "./human.js";
-import { Pickup, Trap, Summon, FloatText } from "./entities.js";
+import { Human, HUMAN_SCALE } from "./human.js";
+import { Pickup, Trap, Summon, FloatText, RedLady } from "./entities.js";
 import { UI } from "./ui.js";
 import { Audio } from "./audio.js";
 import { MATERIALS, TRAPS, GHOSTS, HUMAN_TYPES, RANKS } from "./data.js";
@@ -109,8 +109,12 @@ class Game {
     this.texts = [];
 
     this.resize = () => {
-      // 画面回転の途中などで 0 が返ることがあるので必ず 1 以上にする
-      const w = Math.max(1, innerWidth || 1), h = Math.max(1, innerHeight || 1);
+      // スマホはブラウザのバーで見える高さが変わるので、実際に見えている大きさを使う
+      const vv = window.visualViewport;
+      let w = Math.max(1, (vv ? vv.width : innerWidth) || innerWidth || 1);
+      let h = Math.max(1, (vv ? vv.height : innerHeight) || innerHeight || 1);
+      w = Math.round(w); h = Math.round(h);
+      document.documentElement.style.setProperty("--vvh", h + "px");
       if (w === this._w && h === this._h) return;
       this._w = w; this._h = h;
       this.renderer.setSize(w, h);
@@ -118,13 +122,19 @@ class Game {
       this.camera.updateProjectionMatrix();
     };
     addEventListener("resize", this.resize);
+    if (window.visualViewport) {
+      visualViewport.addEventListener("resize", this.resize);
+      visualViewport.addEventListener("scroll", this.resize);
+    }
     addEventListener("orientationchange", () => setTimeout(this.resize, 300));
   }
 
   // --- 初期化 ------------------------------------------------
   build() {
     const t0 = performance.now();
-    this.world = buildWorld(this.scene, { dust: this.q.dust });
+    // 隠し要素：どのトイレに置くかは毎回ランダム
+    const toilets = ["toilet"];
+    this.world = buildWorld(this.scene, { dust: this.q.dust, poopRoom: choice(toilets) });
 
     this.sky = buildSky(this.scene);
 
@@ -161,6 +171,8 @@ class Game {
       l.target = tgt;
       this.torchPool.push(l);
     }
+
+    this.redLady = new RedLady(this.scene);
 
     this.player = new Player(this.scene, this.world);
     this.player.x = 0; this.player.z = 16;
@@ -476,6 +488,23 @@ class Game {
       if (this.waveTimer <= 0) { this.spawnWave(); this.waveTimer = 26; }
     } else this.waveTimer = 26;
 
+    // --- 隠し要素 -------------------------------------------
+    if (this.redLady && this.redLady.update(dt, w, p, this.humans) === "appeared") {
+      this.audio.tone(70, 1.6, "sine", 0.05, 55);
+      this.bump("redLady");
+      if (!this.sawRedLady) { this.sawRedLady = true; this.ui.toast("⋯窓の外を、なにかが通った気がした", "bad"); }
+    }
+    for (const pr of w.props) {
+      if (pr.kind !== "poop" || pr.found) continue;
+      if (dist(pr.x, pr.z, p.x, p.z) > 1.6) continue;
+      pr.found = true;
+      this.bump("poop");
+      this.audio.laugh();
+      this.ui.toast("💩 見つけてしまった…（誰のだ）", "gold");
+      this.texts.push(new FloatText(this.scene, "うわっ", pr.x, 1.6, pr.z, "#c9a06a", 1.8));
+      for (let i = 0; i < 4; i++) this.dropAt("onnen", pr.x, pr.z);
+    }
+
     // --- 懐中電灯ライトプール（プレイヤーに近い人だけ灯す） --
     const lit = this.humans
       .filter((h) => !h.out)
@@ -487,10 +516,11 @@ class Game {
       const h = e.h;
       const c = Math.cos(h.yaw), sn = Math.sin(h.yaw);
       // 手もとの位置（体のローカル座標 0.3, 1.1, 0.25 をワールドへ）
-      l.position.set(h.x + 0.3 * c + 0.25 * sn, 1.1, h.z - 0.3 * sn + 0.25 * c);
+      const S = HUMAN_SCALE;
+      l.position.set(h.x + 0.3 * S * c + 0.25 * S * sn, 1.1 * S, h.z - 0.3 * S * sn + 0.25 * S * c);
       // 照らす先（ふらつきぶんを横にずらす）
-      const ax = 0.3 + (h.sway || 0) * 2.4;
-      l.target.position.set(h.x + ax * c + 8 * sn, h.torchAimY !== undefined ? h.torchAimY : 0.55, h.z - ax * sn + 8 * c);
+      const ax = (0.3 + (h.sway || 0) * 2.4) * S;
+      l.target.position.set(h.x + ax * c + 8 * sn, (h.torchAimY !== undefined ? h.torchAimY : 0.55) * S, h.z - ax * sn + 8 * c);
       l.target.updateMatrixWorld();
       l.intensity = h.torchHot ? 26 : 20;
     }
@@ -740,6 +770,7 @@ window.game = game;
 game.build();
 game.loop(performance.now());
 
+game.resize();
 game.cloud = new Cloud();
 game.home = new Home(game);
 game.cloud.restore().then((ok) => {

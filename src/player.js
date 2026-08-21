@@ -4,6 +4,9 @@ import { clamp, lerp, angleLerp } from "./util.js";
 // ============================================================
 //  プレイヤー（おばけ）と3人称カメラ
 // ============================================================
+// おばけの大きさ（1.0 が以前の大きさ。人間より小さくして、こそこそ感を出す）
+export const GHOST_SCALE = 0.62;
+
 export class Player {
   constructor(scene, world) {
     this.world = world;
@@ -12,9 +15,9 @@ export class Player {
     this.yaw = Math.PI;
     this.camYaw = Math.PI;
     this.camPitch = 0.18;
-    this.camDist = 6.0;
-    this.curDist = 6.0;
-    this.radius = 0.42;
+    this.camDist = 4.4;
+    this.curDist = 4.4;
+    this.radius = 0.42 * GHOST_SCALE;
 
     this.phase = 100;
     this.phasing = false;
@@ -25,10 +28,11 @@ export class Player {
     this.stamina = 100;
 
     this.group = new THREE.Group();
+    this.group.scale.setScalar(GHOST_SCALE);
     this.build();
     scene.add(this.group);
 
-    this.light = new THREE.PointLight(0x9fd8ff, 1.6, 14, 1.6);
+    this.light = new THREE.PointLight(0x9fd8ff, 1.6, 12, 1.6);
     this.light.position.set(0, 1.4, 0);
     this.group.add(this.light);
   }
@@ -147,11 +151,11 @@ export class Player {
 
     // --- 上下 ----------------------------------------------
     const up = input.k("Space") ? 1 : input.k("KeyC") ? -1 : 0;
-    const hover = 1.5 + Math.sin(t * 1.9) * 0.07;
-    if (up !== 0) this.vy = lerp(this.vy, up * 3.4, clamp(9 * dt, 0, 1));
+    const hover = 1.02 + Math.sin(t * 1.9) * 0.05;
+    if (up !== 0) this.vy = lerp(this.vy, up * 2.6, clamp(9 * dt, 0, 1));
     else this.vy = lerp(this.vy, (hover - this.y) * 3.2, clamp(6 * dt, 0, 1));
-    const ceilY = w.isIndoors(this.x, this.z) ? 2.75 : 5.4;
-    this.y = clamp(this.y + this.vy * dt, 0.55, ceilY);
+    const ceilY = w.isIndoors(this.x, this.z) ? 2.55 : 5.0;
+    this.y = clamp(this.y + this.vy * dt, 0.38, ceilY);
 
     // --- 移動と衝突 ----------------------------------------
     let nx = this.x + this.vx * dt;
@@ -185,7 +189,7 @@ export class Player {
   }
 
   applyPose(dt, t, moving) {
-    this.group.position.set(this.x, this.y - 1.1, this.z);
+    this.group.position.set(this.x, this.y - 1.1 * GHOST_SCALE, this.z);
     this.group.rotation.y = this.yaw;
 
     const p = this.scarePose > 0 ? Math.min(1, this.scarePose * 2.2) : 0;
@@ -220,7 +224,7 @@ export class Player {
   }
 
   updateCamera(dt, camera) {
-    const tx = this.x, ty = this.y + 0.75, tz = this.z;
+    const tx = this.x, ty = this.y + 0.48, tz = this.z;
     const cp = Math.cos(this.camPitch), sp = Math.sin(this.camPitch);
     const dx = Math.sin(this.camYaw) * cp, dz = Math.cos(this.camYaw) * cp;
     const col = this.world.colliders;
@@ -229,20 +233,20 @@ export class Player {
     let d = this.camDist;
     for (let s = 0.5; s <= this.camDist; s += 0.15) {
       const px = tx - dx * s, pz = tz - dz * s, py = ty + sp * s;
-      if (this.blockedAt(px, py, pz, 0.3)) { d = Math.max(1.15, s - 0.42); break; }
+      if (this.blockedAt(px, py, pz, 0.26)) { d = Math.max(0.95, s - 0.36); break; }
     }
     this.curDist = lerp(this.curDist, d, clamp(dt * (d < this.curDist ? 24 : 6), 0, 1));
 
     // 近づくほど少し高い位置から見下ろして、おばけが隠れにくいようにする
-    const tight = clamp(1 - (this.curDist - 1.15) / (this.camDist - 1.15), 0, 1);
-    const lift = tight * 0.55;
+    const tight = clamp(1 - (this.curDist - 0.95) / (this.camDist - 0.95), 0, 1);
+    const lift = tight * 0.42;
 
     camera.position.set(
       tx - dx * this.curDist,
-      ty + sp * this.curDist + 0.35 + lift,
+      ty + sp * this.curDist + 0.26 + lift,
       tz - dz * this.curDist
     );
-    camera.lookAt(tx, ty + 0.15 - lift * 0.25, tz);
+    camera.lookAt(tx, ty + 0.10 - lift * 0.25, tz);
 
     // それでも壁ごしになるときは、輪郭を手前に描く
     const hidden = this.occluded(camera.position, tx, ty, tz);
