@@ -74,6 +74,7 @@ export function buildWorld(scene, opts = {}) {
     floors: FLOORS,
     floorOf(y) { return Math.max(0, Math.min(FLOORS - 1, Math.round(y / FLOOR_H))); },
     // その位置が階段の吹き抜けの中か（おばけはここで上下に移動できる）
+    stairCenterX(x) { return (x < 0 ? (ST_W.x1 + ST_W.x2) : (ST_E.x1 + ST_E.x2)) / 2; },
     inStairShaft(x, z) {
       if (z < RZ1 - 0.3 || z > RZ2 + 0.3) return false;
       return (x > ST_W.x1 && x < ST_W.x2) || (x > ST_E.x1 && x < ST_E.x2);
@@ -182,26 +183,56 @@ function buildFloor(ctx, f) {
 //  階段（吹き抜けでつながる）
 // ============================================================
 function buildStairs(ctx, r, f, y0) {
-  const { mb, col, props, spawnSpots } = ctx;
-  const x0 = r.x1 + 0.8, x1 = r.x2 - 0.8;
-  // 上の階へ上がる段
+  const { mb, col, spawnSpots } = ctx;
+  const cx = (r.x1 + r.x2) / 2;
+  const zS = RZ2 - 1.4;              // 手前（廊下側）の踊り場
+  const zN = RZ1 + 1.3;              // 奥（北側）の折り返し
+  const half = FLOOR_H / 2;
+  const N = 9;                        // 1本あたりの段数
+
+  // 折り返しの踊り場（奥）
+  mb.slab(r.x1 + 0.6, zN - 1.4, r.x2 - 0.6, zN + 0.2, y0 + half, 0.24, C.concrete, { jitter: 0.06 });
+  col.add(r.x1 + 0.6, zN - 1.4, r.x2 - 0.6, zN + 0.2, y0, y0 + half, "stair");
+
   if (f < FLOORS - 1) {
-    for (let i = 0; i < STAIR_STEPS; i++) {
-      const y = y0 + (i + 1) * (FLOOR_H / STAIR_STEPS);
-      const z = stairZ0 + i * 0.42;
-      mb.box((x0 + x1) / 2, y - 0.09, z, x1 - x0, 0.18, 0.42, C.concrete, { jitter: 0.06 });
-      col.add(x0, z - 0.21, x1, z + 0.21, y0, y, "stair");
+    // 上り①：手前 → 奥（西半分）
+    for (let i = 0; i < N; i++) {
+      const t = (i + 1) / N;
+      const z = zS - (zS - zN) * (i / N);
+      const y = y0 + half * t;
+      mb.box(cx - 1.65, y - 0.09, z, 3.0, 0.18, (zS - zN) / N + 0.06, C.concrete, { jitter: 0.07 });
+      col.add(cx - 3.15, z - 0.4, cx - 0.15, z + 0.4, y0, y, "stair");
+    }
+    // 上り②：奥 → 手前（東半分）
+    for (let i = 0; i < N; i++) {
+      const t = (i + 1) / N;
+      const z = zN + (zS - zN) * (i / N);
+      const y = y0 + half + half * t;
+      mb.box(cx + 1.65, y - 0.09, z, 3.0, 0.18, (zS - zN) / N + 0.06, C.concrete, { jitter: 0.07 });
+      col.add(cx + 0.15, z - 0.4, cx + 3.15, z + 0.4, y0, y, "stair");
+    }
+    // 中央の仕切り壁（低め）
+    mb.box(cx, y0 + half * 0.6, (zS + zN) / 2, 0.18, half * 1.2, zS - zN - 1.0, C.wallDark, { jitter: 0.06 });
+    // 手すり
+    for (const sx of [-3.2, -0.35, 0.35, 3.2]) {
+      for (let i = 0; i <= N; i += 2) {
+        const t = i / N;
+        const west = sx < 0;
+        const z = west ? zS - (zS - zN) * t : zN + (zS - zN) * t;
+        const y = y0 + (west ? half * t : half + half * t);
+        mb.box(cx + sx, y + 0.5, z, 0.06, 1.0, 0.06, C.metal, { jitter: 0.12 });
+      }
     }
   }
-  // 手すり
-  for (const sx of [x0, x1]) {
-    for (let i = 0; i < STAIR_STEPS; i += 2) {
-      const y = y0 + (i + 1) * (FLOOR_H / STAIR_STEPS);
-      mb.box(sx, y + 0.45, stairZ0 + i * 0.42, 0.06, 0.9, 0.06, C.metal, { jitter: 0.1 });
-    }
-  }
-  // 上の階へ行けない場合は「結界」でふさぐ（いまは無し。全階つながっている）
-  spawnSpots.push({ x: (x0 + x1) / 2, z: RZ2 - 1.2, y: y0, floor: f });
+  spawnSpots.push({ x: cx, z: zS, y: y0, floor: f });
+}
+
+// 階段のどのあたりにいるかで、床の高さを返す（おばけが自然に上り下りするため）
+export function stairSurface(x, z, cx) {
+  const zS = RZ2 - 1.4, zN = RZ1 + 1.3;
+  const t = Math.max(0, Math.min(1, (zS - z) / (zS - zN)));
+  const half = FLOOR_H / 2;
+  return x < cx ? half * t : half + half * (1 - t);
 }
 
 // ============================================================

@@ -1,6 +1,6 @@
 import * as THREE from "../lib/three.module.js";
 import { clamp, lerp, angleLerp } from "./util.js";
-import { FLOOR_H, FLOORS } from "./world.js";
+import { FLOOR_H, FLOORS, stairSurface } from "./world.js";
 
 // ============================================================
 //  プレイヤー（おばけ）と3人称カメラ
@@ -132,9 +132,12 @@ export class Player {
       mag = Math.min(1, Math.hypot(mx, mz));
     }
 
+    // 画面の奥へ進む向き＝カメラが見ている方向。その右手が「右」。
+    //   mz: -1 が前（W・スティック上）、mx: +1 が右（D・スティック右）
     const cos = Math.cos(this.camYaw), sin = Math.sin(this.camYaw);
-    const dirX = mx * cos - mz * sin;
-    const dirZ = mx * sin + mz * cos;
+    const fwd = -mz, rgt = mx;
+    const dirX = fwd * sin - rgt * cos;
+    const dirZ = fwd * cos + rgt * sin;
 
     this.dashing = (input.k("ShiftLeft") || input.dash) && mag > 0 && this.stamina > 1;
     if (this.dashing) this.stamina = Math.max(0, this.stamina - dt * 26);
@@ -157,7 +160,17 @@ export class Player {
     // いま何階にいるか（階段の途中では、近いほうの階に落ち着く）
     this.floor = clamp(Math.round((this.y - 1.02) / FLOOR_H), 0, FLOORS - 1);
     const base = indoors ? this.floor * FLOOR_H : 0;
-    const hover = base + 1.02 + Math.sin(t * 1.9) * 0.05;
+    let hover = base + 1.02 + Math.sin(t * 1.9) * 0.05;
+    if (inShaft) {
+      // 階段では、段の高さに沿って自然に上り下りする（奥へ進むと上へ）
+      const rel = stairSurface(this.x, this.z, w.stairCenterX(this.x));
+      let best = null;
+      for (let f = 0; f < FLOORS; f++) {
+        const cand = f * FLOOR_H + rel + 1.02;
+        if (best === null || Math.abs(cand - this.y) < Math.abs(best - this.y)) best = cand;
+      }
+      hover = clamp(best, 1.02, (FLOORS - 1) * FLOOR_H + 1.02);
+    }
     if (up !== 0) this.vy = lerp(this.vy, up * 3.0, clamp(9 * dt, 0, 1));
     else this.vy = lerp(this.vy, (hover - this.y) * 3.2, clamp(6 * dt, 0, 1));
     let lo = 0.38, hi = 5.0;
