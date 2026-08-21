@@ -25,8 +25,11 @@ const YARD = { x1: -42, x2: 42, z1: 0, z2: 34 };   // 中庭
 const WR = { x: 26, z1: 9, z2: 26, w: 3.2 };       // 渡り廊下
 const ANNEX = { x1: 20, x2: 33, z1: 26, z2: 33 };  // 渡り廊下の先の別棟
 
-export const EXIT_POINT = { x: 0, z: 41 };
-export const HUMAN_ENTRY = { x: 0, z: 37 };
+const FIELD = { x1: -48, x2: 48, z1: 36, z2: 72 };            // 運動場
+const GYM = { x1: -46, x2: -18, z1: 40, z2: 64, h: 9.2 };     // 体育館
+const GYM_DOOR = { z: 50, w: 2.6 };                            // 体育館の入口（東面）
+export const EXIT_POINT = { x: 0, z: 79 };                     // 正門の外
+export const HUMAN_ENTRY = { x: 0, z: 76 };
 export const floorY = (f) => f * FLOOR_H;
 
 // 階段の段の位置（上下階で同じ形）
@@ -47,6 +50,8 @@ export function buildWorld(scene, opts = {}) {
   buildYard(ctx, opts.dust || 700);
   buildWatariRouka(ctx);
   for (let f = 0; f < FLOORS; f++) buildFloor(ctx, f);
+  buildField(ctx);
+  buildGym(ctx);
   buildEntranceHall(ctx);
   buildRoof(ctx);
 
@@ -64,7 +69,7 @@ export function buildWorld(scene, opts = {}) {
   return {
     colliders: col, nav, rooms, spawnSpots, props, lightSpots,
     exit: EXIT_POINT, entry: HUMAN_ENTRY, staticMesh, triangles: mb.triangles,
-    bounds: { x1: -46, x2: 46, z1: -18, z2: 44 },
+    bounds: { x1: -52, x2: 52, z1: -18, z2: 82 },
     northOutsideZ: RZ1 - 1.6,
     floors: FLOORS,
     floorOf(y) { return Math.max(0, Math.min(FLOORS - 1, Math.round(y / FLOOR_H))); },
@@ -75,6 +80,8 @@ export function buildWorld(scene, opts = {}) {
     },
     roomAt(x, z, y) {
       if (z > 1.6) {
+        if (x > GYM.x1 && x < GYM.x2 && z > GYM.z1 && z < GYM.z2) return "体育館";
+        if (z > 34.5) return "運動場";
         if (x > WR.x - WR.w && x < WR.x + WR.w && z > WR.z1 && z < WR.z2) return "渡り廊下";
         if (x > ANNEX.x1 && x < ANNEX.x2 && z > ANNEX.z1 && z < ANNEX.z2) return "部室棟";
         return "中庭";
@@ -87,6 +94,8 @@ export function buildWorld(scene, opts = {}) {
       return label + " 廊下";
     },
     isIndoors(x, z) { return z < 0.2 && z > RZ1 - 0.2 && x > BX1 && x < BX2; },
+    inGym(x, z) { return x > GYM.x1 && x < GYM.x2 && z > GYM.z1 && z < GYM.z2; },
+    gymCeil: GYM.h - 1.0,
     update(dt, t) { for (const p of props) if (p.update) p.update(dt, t); },
   };
 }
@@ -598,9 +607,22 @@ function linkNav(ctx) {
   nav.addNode(WR.x, ANNEX.z1 + 1.6, 0, "部室棟", 0.24);
   nav.addNode(ANNEX.x1 + 5.5, ANNEX.z1 + 3.4, 0, "部室棟", 0.24);
   nav.addNode(ANNEX.x2 - 5.5, ANNEX.z1 + 3.4, 0, "部室棟", 0.24);
-  for (let x = -36; x <= 36; x += 9) nav.addNode(x, 37.2, 0, "校門前", 0);
-  for (let x = -30; x <= 30; x += 10) nav.addNode(x, 41.5, 0, "校門前", 0);
-  for (const z of [33, 35, 37.5, EXIT_POINT.z]) nav.addNode(EXIT_POINT.x, z, 0, "校門", 0);
+  // 中庭の門を出たところ
+  for (let x = -36; x <= 36; x += 9) nav.addNode(x, 37.2, 0, "運動場", 0);
+  for (const z of [33, 35]) nav.addNode(0, z, 0, "校門", 0);
+  // 運動場（体育館の中は避ける）
+  for (let x = FIELD.x1 + 5; x <= FIELD.x2 - 5; x += 7)
+    for (let z = 41; z <= FIELD.z2 - 4; z += 6.5) {
+      if (x > GYM.x1 - 2.5 && x < GYM.x2 + 2.5 && z > GYM.z1 - 2.5 && z < GYM.z2 + 2.5) continue;
+      nav.addNode(x, z, 0, "運動場", 0);
+    }
+  // 体育館の入口の前と中
+  nav.addNode(GYM.x2 + 2.4, GYM_DOOR.z, 0, "運動場", 0);
+  nav.addNode(GYM.x2 - 1.6, GYM_DOOR.z, 0, "体育館", 0.24);
+  for (let x = GYM.x1 + 6; x < GYM.x2 - 2; x += 6)
+    for (let z = GYM.z1 + 6; z < GYM.z2 - 7; z += 6) nav.addNode(x, z, 0, "体育館", 0.24);
+  // 正門とその外
+  for (const z of [FIELD.z2 - 3, FIELD.z2 + 1.5, EXIT_POINT.z]) nav.addNode(EXIT_POINT.x, z, 0, "正門", 0);
 }
 
 // 階段の上下をつなぐ（autoLink は同じ階しか結ばないので、あとから手で結ぶ）
@@ -916,4 +938,183 @@ function makePoop(x, y, z) {
   tip.position.y = 0.225; g.add(tip);
   g.position.set(x, y, z);
   return { mesh: g, kind: "poop", x, z, found: false, update(dt, t) { g.rotation.y = Math.sin(t * 0.6) * 0.15; } };
+}
+
+// ============================================================
+//  運動場
+// ============================================================
+function buildField(ctx) {
+  const { mb, col, rooms, spawnSpots, props } = ctx;
+  const F = FIELD;
+
+  // 土のグラウンド（タイルに分けて色ムラを出す）
+  for (let x = F.x1; x < F.x2; x += 8)
+    for (let z = F.z1; z < F.z2; z += 8)
+      mb.slab(x, z, Math.min(x + 8, F.x2), Math.min(z + 8, F.z2), 0.02, 0.3, 0x5e5340, { jitter: 0.32 });
+
+  // トラックの白線（消えかけた楕円）
+  const cxT = 15, czT = 54, rx = 27, rz = 13;
+  for (const k of [1, 0.72]) {
+    for (let i = 0; i < 96; i++) {
+      const a = (i / 96) * Math.PI * 2;
+      const x = cxT + Math.cos(a) * rx * k, z = czT + Math.sin(a) * rz * k;
+      if (x < F.x1 + 2 || x > F.x2 - 2) continue;
+      mb.box(x, 0.18, z, 1.4, 0.025, 0.14, 0x8e8a7c, { jitter: 0.45, rotY: a + Math.PI / 2 });
+    }
+  }
+  // スタートライン
+  for (let i = 0; i < 5; i++) mb.box(cxT - 26 + i * 0.02, 0.18, czT + rz - 1 + i * 1.4, 0.16, 0.025, 1.2, 0x9a9688, { jitter: 0.3 });
+
+  // 外周のフェンスと正門
+  fence(mb, col, F.x1, F.z1, F.x1, F.z2);
+  fence(mb, col, F.x2, F.z1, F.x2, F.z2);
+  fence(mb, col, F.x1, F.z2, -5, F.z2);
+  fence(mb, col, 5, F.z2, F.x2, F.z2);
+  // 中庭のフェンスの東西の外側（校門の左右）はそのまま活かす
+  fence(mb, col, F.x1, F.z1, -42, F.z1);
+  fence(mb, col, 42, F.z1, F.x2, F.z1);
+  for (const gx of [-5.2, 5.2]) {
+    mb.box(gx, 1.8, F.z2, 0.7, 3.6, 0.7, C.stone, { jitter: 0.05 });
+    col.add(gx - 0.35, F.z2 - 0.35, gx + 0.35, F.z2 + 0.35, 0, 3.6, "wall");
+  }
+  mb.box(0, 3.5, F.z2, 11.2, 0.35, 0.35, C.metal, { jitter: 0.06 });
+  mb.box(-3.4, 2.5, F.z2 + 0.1, 1.2, 1.6, 0.12, 0x6b5334, { jitter: 0.05 });  // 校名の札
+
+  // サッカーゴール
+  for (const [gz, dir] of [[F.z1 + 6, 1], [F.z2 - 6, -1]]) {
+    const gx = 15;
+    for (const sx of [-3.4, 3.4]) {
+      mb.box(gx + sx, 1.2, gz, 0.14, 2.4, 0.14, 0xd8d6cc, { jitter: 0.08 });
+      col.add(gx + sx - 0.1, gz - 0.1, gx + sx + 0.1, gz + 0.1, 0, 2.4, "wall");
+    }
+    mb.box(gx, 2.36, gz, 7.0, 0.14, 0.14, 0xd8d6cc, { jitter: 0.06 });
+    for (let i = 0; i <= 8; i++) mb.box(gx - 3.4 + i * 0.85, 1.2, gz + dir * 0.9, 0.04, 2.3, 0.04, 0xb0b6bc, { jitter: 0.2 });
+  }
+
+  // バックネット
+  for (let i = 0; i <= 10; i++) mb.box(-14 + i * 2.0, 2.4, F.z1 + 3, 0.09, 4.8, 0.09, C.fence, { jitter: 0.1 });
+  mb.wall(-14, F.z1 + 3, 6, F.z1 + 3, 0.2, 4.6, 0.05, 0x4a5057, { jitter: 0.08 });
+  col.add(-14.3, F.z1 + 2.7, 6.3, F.z1 + 3.3, 0, 4.8, "wall");
+
+  // 砂場と百葉箱
+  mb.slab(30, 40, 38, 46, 0.16, 0.2, 0xb0a184, { jitter: 0.2 });
+  for (const e of [[30, 40, 38, 40], [30, 46, 38, 46], [30, 40, 30, 46], [38, 40, 38, 46]])
+    mb.wall(e[0], e[1], e[2], e[3], 0.02, 0.3, 0.2, C.wood, { jitter: 0.1 });
+  mb.box(42, 1.3, 60, 0.9, 0.9, 0.9, 0xd8d6cc, { jitter: 0.06 });
+  for (const dx of [-0.35, 0.35]) for (const dz of [-0.35, 0.35]) mb.box(42 + dx, 0.42, 60 + dz, 0.09, 0.85, 0.09, C.wood);
+  col.add(41.4, 59.4, 42.6, 60.6, 0, 1.8, "wall");
+
+  // 外周の木立
+  for (const t of [[-44, 68, 1.2], [-30, 69, 1.0], [8, 69.5, 1.15], [30, 69, 1.05], [45, 66, 1.1],
+                   [45, 44, 1.0], [45, 52, 0.9], [-46, 38, 1.0]]) {
+    tree(mb, col, t[0], t[1], t[2]);
+    spawnSpots.push({ x: t[0] + 2.2, z: t[1] - 2, y: 0, floor: 0 });
+  }
+  // 雑草と小石
+  for (let i = 0; i < 200; i++) {
+    const x = rand(F.x1 + 1, F.x2 - 1), z = rand(F.z1 + 1, F.z2 - 1);
+    if (x > GYM.x1 - 1 && x < GYM.x2 + 1 && z > GYM.z1 - 1 && z < GYM.z2 + 1) continue;
+    const h = rand(0.03, 0.1);
+    mb.box(x, 0.18 + h / 2, z, rand(0.25, 0.8), h, rand(0.25, 0.8), 0x4e5540, { jitter: 0.45, rotY: rand(0, 3.14) });
+  }
+  for (let i = 0; i < 34; i++) spawnSpots.push({ x: rand(F.x1 + 3, F.x2 - 3), z: rand(F.z1 + 3, F.z2 - 3), y: 0, floor: 0 });
+
+  rooms.push({ id: "field", name: "運動場", floor: 0, cx: 16, cz: 54, y: 0,
+    x1: F.x1, x2: F.x2, z1: F.z1, z2: F.z2, kind: "field", label: "運動場" });
+}
+
+// ============================================================
+//  体育館
+// ============================================================
+function buildGym(ctx) {
+  const { mb, col, rooms, spawnSpots, props, lightSpots } = ctx;
+  const G = GYM, H = G.h;
+  const cx = (G.x1 + G.x2) / 2, cz = (G.z1 + G.z2) / 2;
+
+  // 板張りの床（コートの線を引く）
+  for (let x = G.x1; x < G.x2; x += 6)
+    for (let z = G.z1; z < G.z2; z += 6)
+      mb.slab(x, z, Math.min(x + 6, G.x2), Math.min(z + 6, G.z2), 0.24, 0.3, 0x9a7a4e, { jitter: 0.16 });
+  // コートの白線
+  const cL = { x1: G.x1 + 3, x2: G.x2 - 3, z1: G.z1 + 3, z2: G.z2 - 3 };
+  for (const e of [[cL.x1, cL.z1, cL.x2, cL.z1], [cL.x1, cL.z2, cL.x2, cL.z2],
+                   [cL.x1, cL.z1, cL.x1, cL.z2], [cL.x2, cL.z1, cL.x2, cL.z2],
+                   [cL.x1, cz, cL.x2, cz]]) {
+    mb.wall(e[0], e[1], e[2], e[3], 0.26, 0.285, 0.12, 0xe0dcc8, { jitter: 0.14 });
+  }
+  for (let i = 0; i < 40; i++) {
+    const a = (i / 40) * Math.PI * 2;
+    mb.box(cx + Math.cos(a) * 2.4, 0.27, cz + Math.sin(a) * 2.4, 0.34, 0.02, 0.12, 0xe0dcc8, { jitter: 0.2, rotY: a });
+  }
+
+  // 壁（東面に入口、南北の高いところに窓）
+  const winRow = windowRow(G.x1 + 3, G.x2 - 3, 3.2, 5.0, 5.4, 7.6);
+  wallWithHoles(mb, col, { axis: "x", fixed: G.z1, from: G.x1, to: G.x2, y1: 0, y2: H, thick: 0.3, color: 0x8e8676, holes: winRow });
+  wallWithHoles(mb, col, { axis: "x", fixed: G.z2, from: G.x1, to: G.x2, y1: 0, y2: H, thick: 0.3, color: 0x8e8676, holes: winRow });
+  wallWithHoles(mb, col, { axis: "z", fixed: G.x1, from: G.z1, to: G.z2, y1: 0, y2: H, thick: 0.3, color: 0x8e8676 });
+  wallWithHoles(mb, col, {
+    axis: "z", fixed: G.x2, from: G.z1, to: G.z2, y1: 0, y2: H, thick: 0.3, color: 0x8e8676,
+    holes: [{ a: GYM_DOOR.z - GYM_DOOR.w, b: GYM_DOOR.z + GYM_DOOR.w, y1: 0, y2: 3.0 }],
+  });
+  // 屋根と梁
+  tiled(mb, G.x1, G.z1, G.x2, G.z2, H, 0.36, 0x4f4c46, 7);
+  for (let z = G.z1 + 3; z < G.z2; z += 4.2) {
+    mb.box(cx, H - 0.55, z, G.x2 - G.x1 - 0.6, 0.22, 0.3, 0x5f5a50, { jitter: 0.08 });
+    for (const sx of [-0.32, 0.32]) mb.box(cx + (G.x2 - G.x1) * sx, H - 1.1, z, 0.18, 0.9, 0.18, 0x5f5a50, { jitter: 0.1 });
+  }
+  // 入口のひさし
+  mb.box(G.x2 + 0.9, 3.2, GYM_DOOR.z, 2.0, 0.28, 4.4, 0x6f6a5f, { jitter: 0.05 });
+  for (const dz of [-1.8, 1.8]) mb.box(G.x2 + 1.7, 1.6, GYM_DOOR.z + dz, 0.2, 3.2, 0.2, 0x5d5952);
+
+  // 舞台（南のはし）
+  const stZ = G.z2 - 5.5;
+  mb.box(cx, 0.85, stZ + 2.6, G.x2 - G.x1 - 1.2, 1.2, 5.2, 0x7a5f3a, { jitter: 0.08 });
+  col.add(G.x1 + 0.6, stZ, G.x2 - 0.6, G.z2 - 0.4, 0, 1.45, "wall");
+  mb.box(cx, 1.5, stZ, G.x2 - G.x1 - 1.2, 0.1, 0.3, 0x5a4326, { jitter: 0.06 });
+  // 舞台の緞帳（左右に開いたまま、ぼろぼろ）
+  props.push(makeCurtain(G.x1 + 3.5, 4.2, stZ - 0.2, 5.2));
+  props.push(makeCurtain(G.x2 - 3.5, 4.2, stZ - 0.2, 5.2));
+  mb.box(cx, 6.9, stZ - 0.25, G.x2 - G.x1 - 1.0, 0.9, 0.24, 0x6b2230, { jitter: 0.1 });
+
+  // バスケットゴール（片方は傾いている）
+  for (const [gz, tilt] of [[G.z1 + 2.2, 0], [stZ - 2.0, 0.22]]) {
+    mb.box(cx, 3.5, gz, 3.0, 1.9, 0.12, 0xdedad0, { jitter: 0.05, rotY: 0 });
+    mb.box(cx, 3.0, gz + 0.34, 1.2, 0.08, 0.7, 0xd8721f, { jitter: 0.06 });
+    mb.box(cx, 5.0, gz - 0.2, 0.16, 2.4, 0.16, C.metal, { jitter: 0.08 });
+    if (tilt) mb.box(cx + 1.2, 2.6, gz + 0.5, 2.2, 0.1, 0.5, 0xdedad0, { jitter: 0.1, rotY: tilt });
+  }
+
+  // 肋木（ろくぼく）
+  for (let z = G.z1 + 5; z < stZ - 3; z += 0.42) {
+    mb.box(G.x1 + 0.5, 1.7, z, 0.4, 0.09, 0.09, 0xa07f4e, { jitter: 0.14 });
+  }
+  col.add(G.x1 + 0.3, G.z1 + 4.6, G.x1 + 0.8, stZ - 2.8, 0, 3.4, "wall");
+
+  // 積み上げたマットと跳び箱
+  for (let i = 0; i < 5; i++) mb.box(G.x2 - 3.4, 0.42 + i * 0.24, G.z1 + 4.2, 3.0, 0.22, 1.4, choice([0x3f5a7a, 0x6b3a44]), { jitter: 0.1 });
+  col.add(G.x2 - 5.0, G.z1 + 3.4, G.x2 - 1.8, G.z1 + 5.0, 0, 1.7, "wall");
+  for (let i = 0; i < 6; i++) mb.box(G.x1 + 4.0, 0.4 + i * 0.3, G.z1 + 4.0, 1.6 - i * 0.13, 0.28, 1.0 - i * 0.06, 0xa8804a, { jitter: 0.08 });
+  col.add(G.x1 + 3.1, G.z1 + 3.4, G.x1 + 4.9, G.z1 + 4.6, 0, 2.2, "wall");
+
+  // 転がったボールと、床のよごれ
+  for (let i = 0; i < 5; i++) {
+    props.push(makeBall(rand(G.x1 + 4, G.x2 - 4), 0.36, rand(G.z1 + 5, stZ - 2)));
+  }
+  grime(mb, G.x1 + 1, G.z1 + 1, G.x2 - 1, stZ - 1, 0.06, 0.5);
+  props.push(makeCobweb(G.x1 + 1.0, H - 1.4, G.z1 + 1.0, 1.6));
+  props.push(makeCobweb(G.x2 - 1.0, H - 1.4, G.z1 + 1.0, 1.6));
+
+  for (const z of [G.z1 + 5, cz, stZ - 2]) lightSpots.push({ x: cx, y: H - 0.7, z, floor: 0 });
+  for (let i = 0; i < 8; i++) spawnSpots.push({ x: rand(G.x1 + 2, G.x2 - 2), z: rand(G.z1 + 2, stZ - 1), y: 0.24, floor: 0 });
+
+  rooms.push({ id: "gym", name: "体育館", floor: 0, cx, cz: cz - 2, y: 0.24,
+    x1: G.x1, x2: G.x2, z1: G.z1, z2: G.z2, kind: "gym", label: "体育館" });
+}
+
+// 転がったボール
+function makeBall(x, y, z) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10),
+    new THREE.MeshLambertMaterial({ color: choice([0xd8721f, 0xc9c4b4, 0x7a4a3a]) }));
+  m.position.set(x, y, z);
+  return { mesh: m, kind: "ball", x, z, update(dt, t) { m.rotation.y = t * 0.2; } };
 }

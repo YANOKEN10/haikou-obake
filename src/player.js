@@ -164,6 +164,8 @@ export class Player {
     if (indoors) {
       lo = inShaft ? 0.38 : base + 0.38;
       hi = inShaft ? FLOORS * FLOOR_H - 0.7 : base + 2.55;
+    } else if (w.inGym && w.inGym(this.x, this.z)) {
+      hi = w.gymCeil;                       // 体育館は天井が高い
     }
     this.y = clamp(this.y + this.vy * dt, lo, hi);
     this.inShaft = inShaft;

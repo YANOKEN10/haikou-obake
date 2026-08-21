@@ -12,7 +12,7 @@ import { UI } from "./ui.js";
 import { Audio } from "./audio.js";
 import { MATERIALS, TRAPS, GHOSTS, HUMAN_TYPES, RANKS } from "./data.js";
 import { clamp, rand, randi, choice, dist } from "./util.js";
-const FLOOR_HEIGHT_HALF = 2.6;
+const FLOOR_HEIGHT_HALF = 3.2;
 
 // ============================================================
 //  入力
