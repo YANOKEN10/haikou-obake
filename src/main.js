@@ -690,10 +690,11 @@ class Game {
 
   async pullFromCloud() {
     if (!this.cloud || !this.cloud.signedIn) return { ok: false, why: "ログインしていません" };
-    const row = await this.cloud.pull();
-    if (!row || !row.payload || !row.payload.profile) return { ok: false, why: "クラウドにまだ記録がありません" };
-    const p = row.payload.profile;
-    p.name = p.name || "クラウド";
+    const r = await this.cloud.pull();
+    if (!r.ok) return r;
+    if (!r.payload || !r.payload.profile) return { ok: false, why: "あずけた記録がまだありません" };
+    const p = r.payload.profile;
+    p.name = p.name || (this.cloud.name || "クラウド");
     S.saveProfile(p);
     S.setCurrent(p.name);
     this.profile = S.getProfile(p.name);
@@ -723,15 +724,10 @@ game.build();
 game.loop(performance.now());
 
 game.cloud = new Cloud();
-const cameBack = game.cloud.captureFromUrl();
 game.home = new Home(game);
-if (game.cloud.signedIn) {
-  game.cloud.loadUser().then(() => { if (game.home.tab === "login") game.home.renderLogin(); });
-}
-if (cameBack) {
-  game.home.show("login");
-  game.home.showSub("mail");
-}
+game.cloud.restore().then((ok) => {
+  if (ok && game.home.tab === "login" && game.home.sub === "mail") game.home.renderLogin();
+});
 document.getElementById("loading").textContent =
   "廃校の準備完了（" + game.world.triangles.toLocaleString() + " 面 / " + game.buildMs + "ms）";
 game.home.show("play");

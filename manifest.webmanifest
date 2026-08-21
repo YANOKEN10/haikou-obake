@@ -1,0 +1,18 @@
+{
+  "name": "廃校おばけ大作戦",
+  "short_name": "おばけ大作戦",
+  "description": "廃校に住みつくおばけを操作して、心霊スポット目当てで来た人間たちを驚かせ、校門の外へ追い出す3人称オープンワールド・サバイバルホラー（ちょっぴりコメディ）。",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0a0918",
+  "theme_color": "#1a1436",
+  "categories": ["games"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

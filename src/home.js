@@ -197,75 +197,67 @@ export class Home {
     });
   }
 
-  // --- メールありログイン（大人向け） -------------------------
+  // --- どの端末でも（なまえ＋あいことば） ---------------------
   renderMail() {
     const body = $("#mailBody");
     const c = this.game.cloud;
 
-    if (!c || !c.ready) {
+    if (c.signedIn) {
       body.innerHTML =
-        "<div class='savecard'><div class='t'>✉️ メールでログイン（準備中）</div>" +
-        "メールでログインすると、<b>ちがう端末でも同じ記録のつづき</b>から遊べます。" +
-        "スマホで遊んだつづきを、家のパソコンで、といったことができます。<br><br>" +
-        "記録をあずかるサーバーにまだつないでいません。つなぐと使えるようになります。</div>" +
-        "<div class='note' style='text-align:left'>" +
-        "・こちらは<b>大人の方向け</b>です。お子さんは「📵 メールなし」をお使いください<br>" +
-        "・パスワードは使いません。メールに届くリンクを開くだけでログインします<br>" +
-        "・いまは「📵 メールなし」で、この端末に記録を残して遊べます" +
-        "</div>";
-      return;
-    }
+        "<div class='who'>ログイン中： <b>" + esc(c.name) + "</b></div>" +
+        "<button class='bigbtn' id='btnPush'>☁ いまの記録をあずける</button>" +
+        "<button class='bigbtn sub' id='btnPull'>⬇ あずけた記録をとりだす</button>" +
+        "<button class='bigbtn sub' id='btnOut'>ログアウト</button>" +
+        "<div class='msg' id='mailMsg'></div>" +
+        "<div class='note'>ほかの端末でも、同じ<b>なまえ</b>と<b>あいことば</b>でログインすれば、" +
+        "「とりだす」でつづきから遊べます。<br>" +
+        "「とりだす」を押すと、この端末の記録はあずけたものに置きかわります。</div>";
 
-    if (!c.signedIn) {
-      body.innerHTML =
-        "<div class='who'>メールアドレスを入れると、ログイン用のリンクが届きます</div>" +
-        "<div class='namenew'><input id='mailAddr' type='email' placeholder='メールアドレス' autocomplete='email'>" +
-        "<button id='btnMail'>リンクを送る</button></div>" +
-        "<div class='msg' id='mailMsg'>" + (c.lastError ? c.lastError : "") + "</div>" +
-        "<div class='note'>パスワードは使いません。届いたメールのリンクを開くとログインできます。<br>" +
-        "<b>大人の方向け</b>の機能です。お子さんは「📵 メールなし」をお使いください。</div>";
-      const send = async () => {
-        const btn = $("#btnMail"), msg = $("#mailMsg");
-        btn.disabled = true; msg.style.color = "var(--muted)"; msg.textContent = "送っています…";
-        const r = await c.sendLink($("#mailAddr").value);
-        btn.disabled = false;
-        msg.style.color = r.ok ? "var(--mint)" : "var(--fear)";
-        msg.textContent = r.ok ? "メールを送りました。届いたリンクを開いてください" : r.why;
+      const msg = (t, ok) => { const m = $("#mailMsg"); m.style.color = ok ? "var(--mint)" : "var(--fear)"; m.textContent = t; };
+      $("#btnPush").addEventListener("click", async () => {
+        msg("あずけています…", true);
+        const r = await this.game.pushToCloud();
+        msg(r.ok ? "あずけました" : r.why, r.ok);
         this.game.audio[r.ok ? "pickup" : "deny"]();
-      };
-      $("#btnMail").addEventListener("click", send);
-      $("#mailAddr").addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+      });
+      $("#btnPull").addEventListener("click", async () => {
+        msg("とりだしています…", true);
+        const r = await this.game.pullFromCloud();
+        msg(r.ok ? "とりだしました" : r.why, r.ok);
+        this.game.audio[r.ok ? "pickup" : "deny"]();
+        if (r.ok) this.show("play");
+      });
+      $("#btnOut").addEventListener("click", () => { c.signOut(); this.game.audio.click(); this.renderMail(); });
       return;
     }
 
     body.innerHTML =
-      "<div class='who'>ログイン中： <b>" + esc(c.email || "（確認中）") + "</b></div>" +
-      "<button class='bigbtn' id='btnPush'>☁ いまの記録をクラウドに保存</button>" +
-      "<button class='bigbtn sub' id='btnPull'>⬇ クラウドの記録を読みこむ</button>" +
-      "<button class='bigbtn sub' id='btnOut'>ログアウト</button>" +
+      "<div class='who'>なまえと あいことばで、どの端末からでも つづきから遊べます</div>" +
+      "<div class='namenew' style='margin-bottom:7px'>" +
+      "<input id='cId' type='text' maxlength='24' placeholder='なまえ' autocomplete='username'></div>" +
+      "<div class='namenew'>" +
+      "<input id='cPw' type='password' maxlength='64' placeholder='あいことば（4文字いじょう）' autocomplete='current-password'></div>" +
+      "<div style='display:flex;gap:8px;margin-top:9px'>" +
+      "<button class='bigbtn' id='btnIn' style='margin:0'>ログイン</button>" +
+      "<button class='bigbtn sub' id='btnUp' style='margin:0'>はじめて（とうろく）</button></div>" +
       "<div class='msg' id='mailMsg'></div>" +
-      "<div class='note'>「読みこむ」を押すと、この端末の記録はクラウドのものに置きかわります。</div>";
+      "<div class='note'>メールアドレスは いりません。<br>" +
+      "⚠️ <b>あいことばを忘れると、あずけた記録は取り出せません。</b>忘れないものにしてください。</div>";
 
     const msg = (t, ok) => { const m = $("#mailMsg"); m.style.color = ok ? "var(--mint)" : "var(--fear)"; m.textContent = t; };
-
-    $("#btnPush").addEventListener("click", async () => {
-      msg("保存しています…", true);
-      const r = await this.game.pushToCloud();
-      msg(r.ok ? "クラウドに保存しました" : r.why, r.ok);
-      this.game.audio[r.ok ? "pickup" : "deny"]();
-    });
-    $("#btnPull").addEventListener("click", async () => {
-      msg("読みこんでいます…", true);
-      const r = await this.game.pullFromCloud();
-      msg(r.ok ? "クラウドの記録を読みこみました" : r.why, r.ok);
-      this.game.audio[r.ok ? "pickup" : "deny"]();
-      if (r.ok) { this.renderMail(); this.show("play"); }
-    });
-    $("#btnOut").addEventListener("click", () => {
-      c.signOut();
-      this.game.audio.click();
+    const go = async (how) => {
+      const id = $("#cId").value, pw = $("#cPw").value;
+      $("#btnIn").disabled = $("#btnUp").disabled = true;
+      msg(how === "signup" ? "とうろくしています…" : "ログインしています…", true);
+      const r = how === "signup" ? await c.signup(id, pw) : await c.login(id, pw);
+      $("#btnIn").disabled = $("#btnUp").disabled = false;
+      if (!r.ok) { msg(r.why, false); this.game.audio.deny(); return; }
+      this.game.audio.pickup();
       this.renderMail();
-    });
+    };
+    $("#btnIn").addEventListener("click", () => go("login"));
+    $("#btnUp").addEventListener("click", () => go("signup"));
+    $("#cPw").addEventListener("keydown", (e) => { if (e.key === "Enter") go("login"); });
   }
 
   favBlock(s) {

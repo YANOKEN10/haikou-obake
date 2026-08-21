@@ -3,3 +3,5 @@ deploy/
 shots/
 *.zip
 .claude/
+.env*
+.vercel

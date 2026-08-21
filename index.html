@@ -4,6 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>廃校おばけ大作戦</title>
+<meta name="description" content="廃校に住みつくおばけを操作して、心霊スポット目当てで来た人間たちを驚かせ、校門の外へ追い出す3人称オープンワールド・サバイバルホラー（ちょっぴりコメディ）。">
+<meta name="theme-color" content="#1a1436">
+
+<!-- タブのアイコン（PC・スマホ共通） -->
+<link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="./icons/icon-16.png">
+<link rel="shortcut icon" href="./icons/icon-48.png">
+
+<!-- ホーム画面に追加したときのアイコン -->
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="おばけ大作戦">
+<meta name="mobile-web-app-capable" content="yes">
+
+<!-- SNS などで共有したときの見た目 -->
+<meta property="og:title" content="廃校おばけ大作戦">
+<meta property="og:description" content="おばけになって、廃校に来た人間たちを驚かせて追い出そう。">
+<meta property="og:type" content="website">
+<meta property="og:image" content="./icons/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Silkscreen:wght@400;700&display=swap">
@@ -387,8 +408,8 @@ body.touch #craftClose{display:block}
     <!-- ログイン -->
     <div class="hpanel" id="hpLogin">
       <div class="subtabs">
-        <button class="stab on" data-sub="local">📵 メールなし</button>
-        <button class="stab" data-sub="mail">✉️ メールあり（大人の方）</button>
+        <button class="stab on" data-sub="local">📱 この端末だけ</button>
+        <button class="stab" data-sub="mail">☁ どの端末でも</button>
       </div>
 
       <div class="spanel on" id="lgLocal">
@@ -400,8 +421,9 @@ body.touch #craftClose{display:block}
         </div>
         <div class="msg" id="loginMsg"></div>
         <div class="note">
-          メールアドレスもパスワードも要りません。<br>
-          記録は<b>この端末の中だけ</b>に残ります（他の端末には引きつげません）。
+          なまえを決めるだけ。あいことばもメールアドレスも要りません。<br>
+          記録は<b>この端末の中だけ</b>に残ります。<br>
+          ほかの端末でも遊びたいときは「☁ どの端末でも」を使ってください。
         </div>
       </div>
 
@@ -424,5 +446,11 @@ body.touch #craftClose{display:block}
 { "imports": { "three": "./lib/three.module.js" } }
 </script>
 <script type="module" src="./src/main.js"></script>
+<script>
+  // オフラインでも遊べるようにする（対応ブラウザのみ）
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+  }
+</script>
 </body>
 </html>
