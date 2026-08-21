@@ -1,6 +1,7 @@
 import * as THREE from "../lib/three.module.js";
 import { buildWorld } from "./world.js";
 import { buildSky } from "./sky.js";
+import { TouchControls, isTouchDevice, goFullscreen } from "./touch.js";
 import { Player } from "./player.js";
 import { Human } from "./human.js";
 import { Pickup, Trap, Summon, FloatText } from "./entities.js";
@@ -16,6 +17,8 @@ class Input {
   constructor(el) {
     this.keys = new Set();
     this.mouseDX = 0; this.mouseDY = 0;
+    this.axisX = 0; this.axisZ = 0;   // タッチのスティック（-1〜1）
+    this.dash = false;                // タッチのダッシュ
     this.locked = false;
     this.pressed = new Set();
     this.wheel = 0;
@@ -56,11 +59,21 @@ class Input {
 // ============================================================
 //  ゲーム本体
 // ============================================================
+// 端末に応じた画質設定（スマホは軽さ優先）
+function pickQuality() {
+  const touch = isTouchDevice();
+  const small = Math.min(innerWidth, innerHeight) < 520;
+  if (touch && small) return { name: "mobile", torches: 2, lamps: 2, dust: 200, pickups: 40, maxPickups: 70, pixelRatio: 1.0, aa: false, far: 190, fov: 68 };
+  if (touch) return { name: "tablet", torches: 3, lamps: 3, dust: 380, pickups: 50, maxPickups: 90, pixelRatio: 1.25, aa: true, far: 220, fov: 65 };
+  return { name: "desktop", torches: 5, lamps: 4, dust: 700, pickups: 60, maxPickups: 110, pixelRatio: 1.75, aa: true, far: 260, fov: 62 };
+}
+
 class Game {
   constructor() {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
-    this.renderer.setSize(innerWidth, innerHeight);
+    this.q = pickQuality();
+    this.renderer = new THREE.WebGLRenderer({ antialias: this.q.aa, powerPreference: "high-performance" });
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.q.pixelRatio));
+    this.renderer.setSize(Math.max(1, innerWidth || 1), Math.max(1, innerHeight || 1));
     this.renderer.setClearColor(0x0a0d1e);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
@@ -68,7 +81,7 @@ class Game {
 
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.FogExp2(0x131a2e, 0.0145);
-    this.camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.08, 260);
+    this.camera = new THREE.PerspectiveCamera(this.q.fov, Math.max(1, innerWidth || 1) / Math.max(1, innerHeight || 1), 0.08, this.q.far);
 
     this.input = new Input(this.renderer.domElement);
     this.audio = new Audio();
@@ -92,17 +105,23 @@ class Game {
     this.summons = [];
     this.texts = [];
 
-    addEventListener("resize", () => {
-      this.renderer.setSize(innerWidth, innerHeight);
-      this.camera.aspect = innerWidth / innerHeight;
+    this.resize = () => {
+      // 画面回転の途中などで 0 が返ることがあるので必ず 1 以上にする
+      const w = Math.max(1, innerWidth || 1), h = Math.max(1, innerHeight || 1);
+      if (w === this._w && h === this._h) return;
+      this._w = w; this._h = h;
+      this.renderer.setSize(w, h);
+      this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
-    });
+    };
+    addEventListener("resize", this.resize);
+    addEventListener("orientationchange", () => setTimeout(this.resize, 300));
   }
 
   // --- 初期化 ------------------------------------------------
   build() {
     const t0 = performance.now();
-    this.world = buildWorld(this.scene);
+    this.world = buildWorld(this.scene, { dust: this.q.dust });
 
     this.sky = buildSky(this.scene);
 
@@ -124,17 +143,27 @@ class Game {
       this.scene.add(m);
     }
     this.lampPool = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < this.q.lamps; i++) {
       const l = new THREE.PointLight(0x7fffc0, 0, 11, 1.9);
       this.scene.add(l);
       this.lampPool.push(l);
+    }
+
+    // 懐中電灯のライトプール（人数ぶん作らず、近い人だけを灯す）
+    this.torchPool = [];
+    for (let i = 0; i < this.q.torches; i++) {
+      const l = new THREE.SpotLight(0xffe9c0, 0, 22, 0.44, 0.45, 1.2);
+      const tgt = new THREE.Object3D();
+      this.scene.add(l, tgt);
+      l.target = tgt;
+      this.torchPool.push(l);
     }
 
     this.player = new Player(this.scene, this.world);
     this.player.x = 0; this.player.z = 16;
 
     // 材料をばらまく
-    for (let i = 0; i < 60; i++) this.spawnPickup();
+    for (let i = 0; i < this.q.pickups; i++) this.spawnPickup();
 
     this.ui.setRank(0);
     this.ui.setBag(this.inv);
@@ -146,7 +175,7 @@ class Game {
 
   spawnPickup() {
     const spots = this.world.spawnSpots;
-    if (!spots.length || this.pickups.length > 110) return;
+    if (!spots.length || this.pickups.length > this.q.maxPickups) return;
     const s = choice(spots);
     const table = ["hokori", "hokori", "hokori", "chalk", "chalk", "uwabaki", "pan", "denchi", "nurunuru"];
     const kind = choice(table);
@@ -422,6 +451,25 @@ class Game {
       if (this.waveTimer <= 0) { this.spawnWave(); this.waveTimer = 26; }
     } else this.waveTimer = 26;
 
+    // --- 懐中電灯ライトプール（プレイヤーに近い人だけ灯す） --
+    const lit = this.humans
+      .filter((h) => !h.out)
+      .map((h) => ({ h, d: dist(h.x, h.z, p.x, p.z) }))
+      .sort((a, b) => a.d - b.d);
+    for (let i = 0; i < this.torchPool.length; i++) {
+      const l = this.torchPool[i], e = lit[i];
+      if (!e || e.d > 46) { l.intensity = 0; continue; }
+      const h = e.h;
+      const c = Math.cos(h.yaw), sn = Math.sin(h.yaw);
+      // 手もとの位置（体のローカル座標 0.3, 1.1, 0.25 をワールドへ）
+      l.position.set(h.x + 0.3 * c + 0.25 * sn, 1.1, h.z - 0.3 * sn + 0.25 * c);
+      // 照らす先（ふらつきぶんを横にずらす）
+      const ax = 0.3 + (h.sway || 0) * 2.4;
+      l.target.position.set(h.x + ax * c + 8 * sn, h.torchAimY !== undefined ? h.torchAimY : 0.55, h.z - ax * sn + 8 * c);
+      l.target.updateMatrixWorld();
+      l.intensity = h.torchHot ? 26 : 20;
+    }
+
     // --- 非常灯ライトプール ---------------------------------
     const spots = w.lightSpots
       .map((s) => ({ s, d: dist(s.x, s.z, p.x, p.z) }))
@@ -432,6 +480,12 @@ class Game {
         l.position.set(e.s.x, e.s.y, e.s.z);
         l.intensity = 5.5 * clamp(1 - e.d / 26, 0, 1) * (0.85 + Math.sin(t * 9 + i) * 0.15);
       } else l.intensity = 0;
+    }
+
+    // 端末の向きの変化を取りこぼさないための保険
+    if (this.touch) {
+      this._orientT = (this._orientT || 0) + dt;
+      if (this._orientT > 0.5) { this._orientT = 0; this.touch.checkOrientation(); this.resize(); }
     }
 
     this.updateHud(dt, t);
@@ -488,7 +542,7 @@ class Game {
     this.started = true;
     this.audio.start();
     this.ui.hideScreen();
-    this.input.lock();
+    if (this.touch) goFullscreen(); else this.input.lock();
     this._last = performance.now();
     this.ui.toast("材料を集めて、人間たちを追い出そう！", "good");
     setTimeout(() => this.spawnWave(), 3500);
@@ -505,12 +559,29 @@ const btn = document.getElementById("startBtn");
 document.getElementById("loading").textContent =
   "廃校の準備完了（" + game.world.triangles.toLocaleString() + " 面 / " + game.buildMs + "ms）";
 btn.addEventListener("click", () => game.start());
-document.getElementById("app").addEventListener("click", () => {
-  if (game.started && !game.ui.craftOpen && !game.paused && !game.input.locked) game.input.lock();
-});
 
-// スマホ・タブレットで開かれたときの案内（キーボードとマウスが要るため）
-if (matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1) {
-  const w = document.getElementById("touchWarn");
-  if (w) w.style.display = "block";
+// --- スマホ・タブレットならタッチ操作に切り替える ------------
+if (isTouchDevice()) {
+  game.touch = new TouchControls(game.input, game);
+  const keys = document.querySelector(".keys");
+  if (keys) {
+    keys.innerHTML = [
+      ["左下のまる", "うごく（はじまで倒すとダッシュ）"],
+      ["画面をなぞる", "見まわす"],
+      ["😱 おどかす", "人間をおどろかす"],
+      ["👻 すりぬけ", "おしているあいだ壁を通る"],
+      ["⬆ うく", "ふわっと浮かぶ"],
+      ["📍 おく", "えらんだ仕掛けを置く"],
+      ["🛠 おばけ工房", "仕掛けとおばけを作る"],
+      ["下のならび", "仕掛けをえらぶ（タップ）"],
+    ].map((r) => "<div><b>" + r[0] + "</b>" + r[1] + "</div>").join("");
+  }
+  const sub = document.querySelector(".sbox .sub");
+  if (sub) sub.textContent = "〜 心霊スポット荒らしを、ぜんぶ追い出せ 〜";
+} else {
+  document.getElementById("app").addEventListener("click", () => {
+    if (game.started && !game.ui.craftOpen && !game.paused && !game.input.locked) game.input.lock();
+  });
 }
+
+console.log("[廃校] 画質:", game.q.name, "/ 懐中電灯", game.q.torches, "本 / 塵", game.q.dust);

@@ -97,20 +97,24 @@ export class Player {
     this.camPitch = clamp(this.camPitch + input.mouseDY * 0.0022, -0.6, 1.15);
     input.mouseDX = 0; input.mouseDY = 0;
 
-    // --- 移動入力 ------------------------------------------
+    // --- 移動入力（キーボード or タッチのスティック） --------
     let mx = 0, mz = 0;
     if (input.k("KeyW")) mz -= 1;
     if (input.k("KeyS")) mz += 1;
     if (input.k("KeyA")) mx -= 1;
     if (input.k("KeyD")) mx += 1;
-    const mag = Math.hypot(mx, mz);
+    let mag = Math.hypot(mx, mz);
     if (mag > 0) { mx /= mag; mz /= mag; }
+    else if (input.axisX || input.axisZ) {
+      mx = input.axisX; mz = input.axisZ;
+      mag = Math.min(1, Math.hypot(mx, mz));
+    }
 
     const cos = Math.cos(this.camYaw), sin = Math.sin(this.camYaw);
     const dirX = mx * cos - mz * sin;
     const dirZ = mx * sin + mz * cos;
 
-    this.dashing = input.k("ShiftLeft") && mag > 0 && this.stamina > 1;
+    this.dashing = (input.k("ShiftLeft") || input.dash) && mag > 0 && this.stamina > 1;
     if (this.dashing) this.stamina = Math.max(0, this.stamina - dt * 26);
     else this.stamina = Math.min(100, this.stamina + dt * 17);
 

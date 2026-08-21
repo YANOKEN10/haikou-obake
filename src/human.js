@@ -111,13 +111,10 @@ export class Human {
     this.legL.geometry.translate(0, -0.3, 0); this.legR.geometry.translate(0, -0.3, 0);
     this.group.add(this.legL, this.legR);
 
-    // 懐中電灯
-    this.torch = new THREE.SpotLight(0xffe9c0, 22, 22, 0.44, 0.45, 1.2);
-    this.torch.position.set(0.3, 1.1, 0.25);
-    this.torchTarget = new THREE.Object3D();
-    this.torchTarget.position.set(0.3, 0.6, 8);
-    this.group.add(this.torch, this.torchTarget);
-    this.torch.target = this.torchTarget;
+    // 懐中電灯（光そのものは Game 側のライトプールが受けもつ。
+    //   端末ごとに灯す本数を変えられるようにするため）
+    this.sway = 0;
+    this.torchHot = false;
 
     const beam = new THREE.Mesh(
       new THREE.ConeGeometry(1.5, 7, 12, 1, true),
@@ -323,9 +320,10 @@ export class Human {
 
     // 懐中電灯は少しふらつく／パニックで乱れる
     const sway = panic ? Math.sin(t * 13) * 0.9 : Math.sin(t * 1.1 + this.walkPhase * 0.2) * 0.28;
-    this.torchTarget.position.set(0.3 + sway * 2.4, panic ? rand(-0.5, 1.6) : 0.55, 8);
+    this.sway = sway;
+    this.torchHot = panic;
+    this.torchAimY = panic ? 0.2 + Math.abs(Math.sin(t * 9)) * 1.2 : 0.55;
     this.beam.rotation.z = -sway * 0.16;
-    this.torch.intensity = panic ? 26 : 20;
 
     // ふきだし
     const show = this.talkT > 0;

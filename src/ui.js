@@ -12,6 +12,17 @@ export class UI {
     this._bagSig = "";
     this._humanSig = "";
 
+    // ホットバーはタップ／クリックでも選べる
+    const bar = $("#hotbar");
+    if (bar) bar.addEventListener("pointerdown", (e) => {
+      const s = e.target.closest(".slot");
+      if (!s) return;
+      e.preventDefault();
+      this.game.selTrap = Number(s.dataset.i);
+      this.game.audio.click();
+      this.setHotbar(this.game.built, this.game.selTrap);
+    });
+
     document.querySelectorAll(".ctab").forEach((el) => {
       el.addEventListener("click", () => {
         this.craftTab = el.dataset.tab;

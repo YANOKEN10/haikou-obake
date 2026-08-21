@@ -52,6 +52,7 @@ canvas{display:block}
 #bag span{color:var(--gold);font-family:var(--px);margin-left:4px}
 
 /* --- 中央下：ホットバー --- */
+#hotbar .slot{pointer-events:auto;cursor:pointer}
 #hotbar{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:7px}
 .slot{width:56px;height:56px;background:var(--panel);border:2px solid var(--edge);border-radius:10px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;position:relative}
@@ -130,6 +131,77 @@ canvas{display:block}
 #vignette{position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;
   background:radial-gradient(75% 60% at 50% 50%,transparent 40%,rgba(120,20,60,.55) 100%);transition:opacity .25s}
 #flash{position:fixed;inset:0;pointer-events:none;z-index:6;background:#fff;opacity:0}
+
+/* ============ タッチ操作（スマホ・タブレット） ============ */
+#touch{position:fixed;inset:0;z-index:8;display:none;pointer-events:none}
+body.touch #touch{display:block}
+body.touch{touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;
+  -webkit-tap-highlight-color:transparent}
+body.touch canvas{touch-action:none}
+
+#stick{position:absolute;left:16px;bottom:16px;width:126px;height:126px;border-radius:50%;
+  border:2px solid rgba(169,123,255,.45);background:rgba(12,10,26,.4);pointer-events:auto}
+#stickKnob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;
+  background:rgba(169,123,255,.7);box-shadow:0 0 18px rgba(169,123,255,.55);transition:background .12s}
+#stick.dash #stickKnob{background:rgba(255,212,94,.85);box-shadow:0 0 22px rgba(255,212,94,.7)}
+
+.tbtn{position:absolute;border-radius:50%;border:2px solid var(--edge2);background:rgba(18,15,38,.68);
+  color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:10.5px;line-height:1.2;pointer-events:auto;backdrop-filter:blur(3px);text-align:center}
+.tbtn i{font-style:normal;font-size:21px;line-height:1}
+.tbtn.on{background:rgba(169,123,255,.6);transform:scale(.92)}
+#bScare{right:20px;bottom:20px;width:92px;height:92px;border-color:var(--gold);color:var(--gold);font-size:12px}
+#bScare i{font-size:27px}
+#bPhase{right:124px;bottom:32px;width:66px;height:66px}
+#bUp{right:32px;bottom:124px;width:66px;height:66px}
+#bPlace{right:122px;bottom:122px;width:60px;height:60px}
+#bCraft{left:24px;bottom:158px;width:62px;height:62px;border-color:var(--gold);color:var(--gold)}
+
+/* 縦持ちのときの案内 */
+#rotate{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+  background:#07060f;text-align:center;padding:28px;flex-direction:column;gap:14px}
+#rotate .ic{font-size:60px;animation:tilt 1.6s ease-in-out infinite}
+@keyframes tilt{0%,100%{transform:rotate(0)}50%{transform:rotate(90deg)}}
+body.touch.portrait #rotate{display:flex}
+
+/* 小さい画面向けにHUDを詰める */
+@media (max-height:560px){
+  #rankBox{padding:6px 10px;min-width:0;max-width:190px;border-radius:9px}
+  #rankName{font-size:13px} #rankNote{display:none} #kicked{font-size:11px;margin-top:2px}
+  #kicked b{font-size:15px} #progWrap{height:5px}
+  #place{top:84px;font-size:11px;padding:2px 9px}
+  #humanList{width:152px;gap:3px;top:8px;right:8px;max-height:150px;overflow:hidden}
+  .hrow{padding:3px 6px;font-size:10px;border-radius:7px}
+  .hrow .st{font-size:9px}
+  #bag{left:158px;top:8px;right:auto;bottom:auto;padding:4px 9px;
+    grid-template-columns:repeat(4,auto);gap:0 9px;font-size:10px;border-width:1px;border-radius:8px}
+  #hotbar{bottom:8px;gap:5px}
+  .slot{width:44px;height:44px;font-size:17px;border-radius:8px}
+  .slot .num{font-size:8px} .slot .cnt{font-size:9px}
+  #gauges{right:auto;left:8px;bottom:auto;top:110px;width:118px;gap:4px}
+  .g{padding:2px 7px;font-size:9.5px}
+  #bCraft{left:150px;bottom:16px;width:64px;height:64px}
+  #hint{bottom:auto;top:130px;font-size:11px;padding:3px 10px}
+  #toasts{top:96px}
+  .toast{font-size:12px;padding:4px 12px}
+  .cwrap{padding:12px 14px}
+  .chead h3{font-size:17px}
+  .cgrid{grid-template-columns:repeat(auto-fill,minmax(214px,1fr));gap:8px}
+  .card{padding:8px 10px} .card h4{font-size:13.5px} .card .d{font-size:10.5px;min-height:0}
+  .card .cost{font-size:10.5px} .card .stat{font-size:9.5px}
+  .ctab{padding:5px 12px;font-size:13px}
+  .sbox{padding:14px}
+  .sbox h1{font-size:30px} .sbox .sub{font-size:12px;margin-bottom:10px}
+  .keys{padding:8px 12px;font-size:11px;gap:3px 10px;margin:9px 0 12px}
+  #startBtn{font-size:17px;padding:9px 36px}
+  .credit{display:none}
+}
+/* 工房を閉じるボタン */
+body.touch #craft{touch-action:pan-y}
+.cwrap{-webkit-overflow-scrolling:touch}
+#craftClose{pointer-events:auto;cursor:pointer;border:2px solid var(--edge);background:rgba(255,255,255,.05);
+  color:var(--ink);border-radius:10px;width:38px;height:38px;font-size:19px;line-height:1;display:none}
+body.touch #craftClose{display:block}
 </style>
 </head>
 <body>
@@ -157,11 +229,28 @@ canvas{display:block}
   <div id="toasts"></div>
 </div>
 
+
+<div id="touch">
+  <div id="stick"><div id="stickKnob"></div></div>
+  <div class="tbtn" id="bCraft"><i>🛠</i>おばけ工房</div>
+  <div class="tbtn" id="bPlace"><i>📍</i>おく</div>
+  <div class="tbtn" id="bUp"><i>⬆</i>うく</div>
+  <div class="tbtn" id="bPhase"><i>👻</i>すりぬけ</div>
+  <div class="tbtn" id="bScare"><i>😱</i>おどかす</div>
+</div>
+
+<div id="rotate">
+  <div class="ic">📱</div>
+  <div style="font-size:19px;color:#c9a6ff">スマホを横向きにしてください</div>
+  <div style="font-size:13px;color:#9b93c4">画面を横にすると、廃校が広く見えます</div>
+</div>
+
 <div id="craft">
   <div class="cwrap">
     <div class="chead">
       <h3>おばけ工房</h3>
       <div class="close">Tab / Esc でとじる</div>
+      <button id="craftClose" aria-label="とじる">✕</button>
     </div>
     <div class="ctabs">
       <div class="ctab on" data-tab="trap">🪤 仕掛けをつくる</div>
@@ -193,7 +282,7 @@ canvas{display:block}
       <div><b>1〜6</b>仕掛けをえらぶ</div>
       <div><b>Esc</b>ポーズ</div>
     </div>
-    <div id="touchWarn" style="display:none;border:2px solid var(--fear);border-radius:12px;padding:12px 16px;margin:0 0 16px;font-size:14px;color:var(--fear);line-height:1.8">⚠️ このゲームは<b>キーボードとマウス</b>で遊びます。<br>スマホ・タブレットでは操作できません。パソコンで開いてください。</div>
+    
     <button id="startBtn">はじめる</button>
     <div id="loading">廃校を建てています…</div>
     <div class="credit">3人称視点 / オープンワールド・サバイバルホラー（笑）</div>

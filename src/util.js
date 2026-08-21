@@ -87,16 +87,22 @@ export class Colliders {
     return { x, z, hit };
   }
 
+  // 歩いて通り抜けられるか（腰高の窓で止まる高さで見る。机やイスは迂回できるので無視）
+  navSight(ax, az, bx, bz) {
+    return this.lineOfSight(ax, az, bx, bz, 0.6, 0.12, ["furn"]);
+  }
+
   // 視線が通るか（XZ平面のレイ vs AABB、指定の高さ帯のみ）
-  lineOfSight(ax, az, bx, bz, y = 1.4, step = 0.75) {
+  lineOfSight(ax, az, bx, bz, y = 1.4, step = 0.15, ignore = null) {
     const dx = bx - ax, dz = bz - az;
     const len = Math.hypot(dx, dz);
     if (len < 1e-4) return true;
-    const n = Math.ceil(len / step);
+    const n = Math.ceil(len / Math.min(step, 0.15));
     for (let i = 1; i < n; i++) {
       const t = i / n, px = ax + dx * t, pz = az + dz * t;
       for (const b of this.near(px, pz, 0.2)) {
         if (b.tag === "soft") continue;
+        if (ignore && ignore.indexOf(b.tag) >= 0) continue;
         if (y < b.y1 || y > b.y2) continue;
         if (px > b.x1 && px < b.x2 && pz > b.z1 && pz < b.z2) return false;
       }
@@ -130,25 +136,30 @@ export class NavGraph {
         const a = this.nodes[i], b = this.nodes[j];
         if (a.floor !== b.floor) continue;
         if (dist(a.x, a.z, b.x, b.z) > maxDist) continue;
-        if (!colliders.lineOfSight(a.x, a.z, b.x, b.z, 1.2, 0.5)) continue;
+        if (!colliders.navSight(a.x, a.z, b.x, b.z)) continue;
         this.link(i, j);
       }
     return this;
   }
 
-  // colliders を渡すと「壁ごしに近いだけの点」を除外する
-  nearest(x, z, floor = 0, colliders = null) {
-    let best = -1, bd = Infinity;      // 視線が通るもののうち最寄り
-    let any = -1, ad = Infinity;       // 見つからなければ純粋な最寄り
+  // colliders を渡すと「壁ごしに近いだけの点」を除外する。
+  // 近い順に見て、最初に歩いてたどり着けたノードを返す。
+  nearest(x, z, floor = 0, colliders = null, maxR = 26) {
+    const cand = [];
+    let any = -1, ad = Infinity;
+    const maxD2 = maxR * maxR;
     for (const n of this.nodes) {
       if (n.floor !== floor) continue;
       const d = dist2(x, z, n.x, n.z);
       if (d < ad) { ad = d; any = n.i; }
-      if (d >= bd) continue;
-      if (colliders && d < 900 && !colliders.lineOfSight(x, z, n.x, n.z, 1.2, 0.6)) continue;
-      bd = d; best = n.i;
+      if (d <= maxD2) cand.push({ i: n.i, d, n });
     }
-    return best >= 0 ? best : any;
+    if (!colliders) return any;
+    cand.sort((a, b) => a.d - b.d);
+    for (const c of cand) {
+      if (colliders.navSight(x, z, c.n.x, c.n.z)) return c.i;
+    }
+    return any;   // どこへも歩けない位置なら、単純な最寄りで妥協する
   }
 
   // A*（ノード数が少ないのでダイクストラで十分）

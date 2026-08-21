@@ -35,7 +35,7 @@ const YARD = { x1: -42, x2: 42, z1: 0, z2: 34 };
 export const EXIT_POINT = { x: 0, z: 41 };
 export const HUMAN_ENTRY = { x: 0, z: 37 };
 
-export function buildWorld(scene) {
+export function buildWorld(scene, opts = {}) {
   const col = new Colliders();
   const nav = new NavGraph();
   const mb = new MeshBuilder();
@@ -44,7 +44,7 @@ export function buildWorld(scene) {
   const props = [];
   const lightSpots = [];
 
-  buildYard(mb, col, spawnSpots, props);
+  buildYard(mb, col, spawnSpots, props, opts.dust || 700);
 
   // --- 床と天井 ---------------------------------------------
   tiled(mb, BX1, RZ1, BX2, HZ2, 0, 0.3, C.floorHall, 6);
@@ -126,7 +126,10 @@ export function buildWorld(scene) {
   for (let x = BX1 + 3; x <= BX2 - 3; x += 5) nav.addNode(x, -2, 0, "廊下");
   for (const r of rooms) {
     if (r.kind === "hall" || r.kind === "yard") continue;
-    if (r.doorX !== undefined) nav.addNode(r.doorX, RZ2 - 1.4, 0, r.name);
+    if (r.doorX !== undefined) {
+      nav.addNode(r.doorX, RZ2 - 1.4, 0, r.name);     // ドアの内側
+      nav.addNode(r.doorX, (HZ1 + HZ2) / 2, 0, "廊下"); // ドアの正面（廊下側）
+    }
     if (r.kind !== "stair") nav.addNode(r.cx, r.cz, 0, r.name);
   }
   nav.addNode(0, 1.6, 0, "昇降口"); nav.addNode(0, 5, 0, "昇降口"); nav.addNode(0, 8.4, 0, "昇降口");
@@ -294,7 +297,7 @@ function shelfRow(mb, col, x1, z1, x2, z2, h) {
 // ============================================================
 //  中庭・地面
 // ============================================================
-function buildYard(mb, col, spawnSpots, props) {
+function buildYard(mb, col, spawnSpots, props, dustCount) {
   // 地面はタイル状に分割（点光源のムラを防ぐ）
   for (let x = -84; x < 84; x += 8)
     for (let z = -44; z < 64; z += 8)
@@ -371,7 +374,7 @@ function buildYard(mb, col, spawnSpots, props) {
 
   for (let i = 0; i < 26; i++) spawnSpots.push({ x: rand(-38, 38), z: rand(4, 32), room: "中庭" });
   scatterYardDetail(mb);
-  props.push(makeDust());
+  props.push(makeDust(dustCount));
 }
 
 function fence(mb, col, x1, z1, x2, z2) {
@@ -453,8 +456,8 @@ function makeBarrier(x, y, z, w, h) {
   };
 }
 
-function makeDust() {
-  const N = 700;
+function makeDust(N) {
+  N = N || 700;
   const pos = new Float32Array(N * 3);
   for (let i = 0; i < N; i++) {
     pos[i * 3] = rand(-45, 45);
