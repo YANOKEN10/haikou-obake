@@ -2,6 +2,8 @@ import * as THREE from "../lib/three.module.js";
 import { buildWorld } from "./world.js";
 import { buildSky } from "./sky.js";
 import { TouchControls, isTouchDevice, goFullscreen } from "./touch.js";
+import { Home } from "./home.js";
+import * as S from "./save.js";
 import { Player } from "./player.js";
 import { Human } from "./human.js";
 import { Pickup, Trap, Summon, FloatText } from "./entities.js";
@@ -227,6 +229,7 @@ class Game {
     this.pay(d.cost);
     if (kind === "trap") {
       this.built[id] = (this.built[id] || 0) + 1;
+      this.bump("trapsBuilt"); this.bumpIn("byTrap", id);
       this.selTrap = Object.keys(TRAPS).indexOf(id);
       this.ui.setHotbar(this.built, this.selTrap);
       this.ui.toast(d.icon + " " + d.name + " ができた！ F で置ける", "good");
@@ -235,6 +238,7 @@ class Game {
       const p = this.player;
       const r = this.world.colliders.resolve(p.x + rand(-2, 2), p.z + rand(-2, 2), 0.4, 1.2);
       this.summons.push(new Summon(this.scene, this.world, id, r.x, r.z));
+      this.bump("ghostsSummoned"); this.bumpIn("byGhost", id);
       this.ui.toast(d.icon + " " + d.name + " を生み出した！", "gold");
       this.audio.summon();
       this.texts.push(new FloatText(this.scene, "召喚！", p.x, p.y + 2.2, p.z, "#c9a6ff", 2.2));
@@ -285,6 +289,9 @@ class Game {
     this.texts.push(new FloatText(this.scene, "わっ！", p.x, p.y + 2.1, p.z, "#ffe27a", 2.3));
 
     if (eff > 0) {
+      this.bump("scares"); this.best("biggest", eff);
+      if (behind) this.bump("behind");
+      if (best.lastCombo) this.bump("combos");
       this.audio.scare();
       this.audio.scream(best.type.courage < 90 ? 1.35 : 1);
       this.ui.flash(behind ? 0.5 : 0.28);
@@ -295,6 +302,7 @@ class Game {
       const drop = best.takeDrop();
       if (drop) { this.dropAt(drop, best.x, best.z); this.texts.push(new FloatText(this.scene, MATERIALS[drop].icon + "落とした", best.x, 2.0, best.z, "#7fe8b8", 1.5)); }
     } else {
+      this.bump("laughed");
       this.audio.laugh();
       this.texts.push(new FloatText(this.scene, "笑われた…", best.x, 2.7, best.z, "#8fa8c8", 1.6));
     }
@@ -303,6 +311,8 @@ class Game {
   // --- 人間が逃げ切った --------------------------------------
   onEscape(h) {
     this.kicked++;
+    this.bumpIn("byHuman", h.name);
+    this.best("bestWave", this.wave);
     const before = this.rankName;
     const r = this.ui.setRank(this.kicked);
     this.ui.toast("🎉 " + h.name + " を追い出した！（計 " + this.kicked + " 人）", "gold");
@@ -320,6 +330,13 @@ class Game {
   // --- 毎フレーム --------------------------------------------
   update(dt, t) {
     const inp = this.input, p = this.player, w = this.world;
+
+    // 遊んだ時間と自動セーブ
+    if (this.profile) {
+      this.profile.playSeconds = (this.profile.playSeconds || 0) + dt;
+      this._autosaveT = (this._autosaveT || 0) + dt;
+      if (this._autosaveT > 45) this.saveNow(false);
+    }
 
     // メニュー・ポーズ
     if (inp.once("Tab")) {
@@ -348,6 +365,7 @@ class Game {
       it.update(dt, t);
       if (dist(it.x, it.z, p.x, p.z) < 1.35 && Math.abs(it.y - p.y) < 2.2) {
         this.inv[it.kind] = (this.inv[it.kind] || 0) + 1;
+        this.bump("materials");
         this.audio.pickup();
         this.texts.push(new FloatText(this.scene, MATERIALS[it.kind].icon + "+1", it.x, it.y + 0.9, it.z, "#9fe8ff", 1.15));
         it.dispose();
@@ -402,6 +420,7 @@ class Game {
         if (!w.colliders.lineOfSight(tr.x, tr.z, h.x, h.z, 1.2, 0.7)) continue;
         const eff = h.addFear(tr.def.fear, tr.x, tr.z, "trap:" + tr.id, tr.def.name);
         tr.fire();
+        this.bump("trapsFired");
         if (dist(tr.x, tr.z, p.x, p.z) < 34) this.audio.trapSound(tr.id);
         this.texts.push(new FloatText(this.scene, tr.def.line, tr.x, 2.4, tr.z, eff > 0 ? "#ffb3e0" : "#8fa8c8", 1.9));
         if (eff > 0) {
@@ -538,14 +557,140 @@ class Game {
     }
   };
 
-  start() {
+  // ==========================================================
+  //  ホーム画面とのやりとり・セーブ
+  // ==========================================================
+  ensureProfile() {
+    let n = S.currentName();
+    if (!n) {
+      if (!S.getProfile("ゲスト")) S.createProfile("ゲスト");
+      else S.setCurrent("ゲスト");
+      n = "ゲスト";
+    }
+    return S.getProfile(n) || S.blank("ゲスト");
+  }
+
+  // いまの状態をセーブデータに写す
+  collectSave() {
+    const p = this.profile;
+    if (!p) return null;
+    p.hasSave = true;
+    p.kicked = this.kicked;
+    p.wave = this.wave;
+    p.rank = this.rankName;
+    p.inv = { ...this.inv };
+    p.built = { ...this.built };
+    p.selTrap = this.selTrap;
+    p.traps = this.traps.map((t) => ({ id: t.id, x: +t.x.toFixed(2), z: +t.z.toFixed(2), uses: t.uses }));
+    p.pos = { x: +this.player.x.toFixed(2), z: +this.player.z.toFixed(2) };
+    p.playSeconds = Math.round(p.playSeconds || 0);
+    p.stats = p.stats || S.blank(p.name).stats;
+    p.stats.bestWave = Math.max(p.stats.bestWave || 0, this.wave);
+    return p;
+  }
+
+  saveNow(showToast) {
+    if (!this.profile) return false;
+    const ok = S.saveProfile(this.collectSave());
+    if (showToast) {
+      if (ok) { this.ui.toast("💾 「" + this.profile.name + "」の記録をセーブしました", "good"); this.audio.pickup(); }
+      else { this.ui.toast("セーブできませんでした", "bad"); this.audio.deny(); }
+    }
+    this._autosaveT = 0;
+    return ok;
+  }
+
+  // セーブデータを読みこんで反映する
+  applySave(p) {
+    this.kicked = p.kicked || 0;
+    this.wave = p.wave || 0;
+    this.inv = { ...(p.inv || {}) };
+    this.built = { ...(p.built || {}) };
+    this.selTrap = p.selTrap || 0;
+    for (const t of p.traps || []) {
+      if (!TRAPS[t.id]) continue;
+      const tr = new Trap(this.scene, t.id, t.x, t.z, 0);
+      tr.uses = t.uses || 0;
+      this.traps.push(tr);
+    }
+    if (p.pos) { this.player.x = p.pos.x; this.player.z = p.pos.z; }
+    this.rankName = this.ui.setRank(this.kicked).name;
+    this.ui.setBag(this.inv);
+    this.ui.setHotbar(this.built, this.selTrap);
+  }
+
+  // 前回のゲームの後片づけ
+  resetSession() {
+    for (const h of this.humans) this.scene.remove(h.group);
+    for (const t of this.traps) t.dispose();
+    for (const s of this.summons) s.dispose();
+    for (const it of this.pickups) it.dispose();
+    for (const x of this.texts) this.scene.remove(x.sprite);
+    this.humans = []; this.traps = []; this.summons = []; this.pickups = []; this.texts = [];
+    this.inv = {}; this.built = {};
+    this.kicked = 0; this.wave = 0; this.selTrap = 0;
+    this.waveTimer = 0; this.spawnTimer = 6; this.scareFx = 0;
+    this.rankName = RANKS[0].name;
+    this.paused = false;
+    this.ui.closeCraft();
+    this.player.x = 0; this.player.z = 16; this.player.y = 1.5;
+    this.player.vx = 0; this.player.vz = 0; this.player.camYaw = Math.PI;
+    for (let i = 0; i < this.q.pickups; i++) this.spawnPickup();
+    this.ui.setRank(0);
+    this.ui.setBag(this.inv);
+    this.ui.setHotbar(this.built, this.selTrap);
+    this.ui.setHumans(this.humans);
+    this.ui.vignette(0);
+  }
+
+  startGame(cont) {
+    this.profile = this.ensureProfile();
+    this.resetSession();
+    if (cont && this.profile.hasSave) this.applySave(this.profile);
+
     this.started = true;
     this.audio.start();
     this.ui.hideScreen();
     if (this.touch) goFullscreen(); else this.input.lock();
     this._last = performance.now();
-    this.ui.toast("材料を集めて、人間たちを追い出そう！", "good");
-    setTimeout(() => this.spawnWave(), 3500);
+    this._autosaveT = 0;
+
+    if (cont && this.profile.hasSave) {
+      this.ui.toast("おかえり、" + this.profile.name + "。つづきから始めます", "good");
+      setTimeout(() => this.spawnWave(), 3000);
+    } else {
+      this.ui.toast("材料を集めて、人間たちを追い出そう！", "good");
+      setTimeout(() => this.spawnWave(), 3500);
+    }
+  }
+
+  goHome() {
+    if (!this.started) return;
+    const ok = this.saveNow(false);
+    this.started = false;
+    this.paused = false;
+    this.ui.closeCraft();
+    this.input.unlock();
+    if (this.touch) this.touch.release();
+    this.ui.showScreen();
+    this.home.show(this.home.tab);
+    this.home.render();
+    if (ok) this.ui.toast("記録をセーブしました", "good");
+  }
+
+  // 統計をためる（プロフィール画面に出る）
+  bump(key, n) {
+    if (!this.profile || !this.profile.stats) return;
+    this.profile.stats[key] = (this.profile.stats[key] || 0) + (n === undefined ? 1 : n);
+  }
+  bumpIn(bucket, key) {
+    if (!this.profile || !this.profile.stats) return;
+    const b = this.profile.stats[bucket] || (this.profile.stats[bucket] = {});
+    b[key] = (b[key] || 0) + 1;
+  }
+  best(key, v) {
+    if (!this.profile || !this.profile.stats) return;
+    if (v > (this.profile.stats[key] || 0)) this.profile.stats[key] = v;
   }
 }
 
@@ -555,10 +700,17 @@ window.game = game;
 game.build();
 game.loop(performance.now());
 
-const btn = document.getElementById("startBtn");
+game.home = new Home(game);
 document.getElementById("loading").textContent =
   "廃校の準備完了（" + game.world.triangles.toLocaleString() + " 面 / " + game.buildMs + "ms）";
-btn.addEventListener("click", () => game.start());
+game.home.show("play");
+
+// 閉じる・タブを切りかえる直前にも自動でセーブする
+addEventListener("beforeunload", () => { if (game.started) game.saveNow(false); });
+addEventListener("pagehide", () => { if (game.started) game.saveNow(false); });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && game.started) game.saveNow(false);
+});
 
 // --- スマホ・タブレットならタッチ操作に切り替える ------------
 if (isTouchDevice()) {
@@ -579,6 +731,15 @@ if (isTouchDevice()) {
   const sub = document.querySelector(".sbox .sub");
   if (sub) sub.textContent = "〜 心霊スポット荒らしを、ぜんぶ追い出せ 〜";
 } else {
+  const keys = document.querySelector(".keys");
+  if (keys) {
+    keys.innerHTML = [
+      ["WASD", "うごく"], ["マウス", "見まわす"], ["Shift", "ダッシュ"],
+      ["Space/C", "浮く・沈む"], ["E", "おどかす"], ["Q", "すりぬけ（壁を通る）"],
+      ["Tab", "おばけ工房"], ["F", "選んだ仕掛けを置く"], ["1〜6", "仕掛けをえらぶ"],
+      ["Esc", "ポーズ"],
+    ].map((r) => "<div><b>" + r[0] + "</b>" + r[1] + "</div>").join("");
+  }
   document.getElementById("app").addEventListener("click", () => {
     if (game.started && !game.ui.craftOpen && !game.paused && !game.input.locked) game.input.lock();
   });

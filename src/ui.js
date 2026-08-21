@@ -54,7 +54,7 @@ export class UI {
     if (sig === this._bagSig) return;
     this._bagSig = sig;
     $("#bag").innerHTML = keys
-      .map((k) => '<div title="' + MATERIALS[k].desc + '">' + MATERIALS[k].icon + " " + MATERIALS[k].name + "<span>" + (inv[k] || 0) + "</span></div>")
+      .map((k) => '<div title="' + MATERIALS[k].desc + '">' + MATERIALS[k].icon + '<i class="nm"> ' + MATERIALS[k].name + '</i><span>' + (inv[k] || 0) + "</span></div>")
       .join("");
   }
 

@@ -33,11 +33,11 @@ canvas{display:block}
 #progBar{height:100%;width:0;background:linear-gradient(90deg,var(--spook),var(--fear));transition:width .4s}
 
 /* --- 左上その下：現在地 --- */
-#place{position:absolute;left:14px;top:104px;background:var(--panel);border:1px solid var(--edge);
+#place{position:absolute;left:14px;top:126px;background:var(--panel);border:1px solid var(--edge);
   border-radius:9px;padding:4px 12px;font-size:13px;color:var(--mint)}
 
 /* --- 右上：人間リスト --- */
-#humanList{position:absolute;right:14px;top:12px;width:216px;display:flex;flex-direction:column;gap:5px}
+#humanList{position:absolute;right:14px;top:12px;width:216px;display:flex;flex-direction:column;gap:5px;max-height:calc(100vh - 230px);overflow:hidden}
 .hrow{background:var(--panel);border:1px solid var(--edge);border-radius:9px;padding:5px 9px;font-size:12px}
 .hrow .n{display:flex;justify-content:space-between;align-items:center}
 .hrow .st{font-size:10px;color:var(--muted)}
@@ -50,6 +50,7 @@ canvas{display:block}
   border-radius:12px;padding:8px 12px;display:grid;grid-template-columns:repeat(2,auto);gap:2px 16px;font-size:13px}
 #bag div{white-space:nowrap}
 #bag span{color:var(--gold);font-family:var(--px);margin-left:4px}
+#bag .nm{font-style:normal}
 
 /* --- 中央下：ホットバー --- */
 #hotbar .slot{pointer-events:auto;cursor:pointer}
@@ -114,7 +115,7 @@ canvas{display:block}
 #screen{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;
   background:radial-gradient(120% 90% at 50% 20%,#241a52 0%,#0c0a1c 55%,#04030a 100%)}
 #screen.off{display:none}
-.sbox{width:min(660px,92vw);text-align:center;padding:26px}
+.sbox{width:min(660px,92vw);text-align:center;padding:26px;max-height:96vh;overflow:auto}
 .sbox h1{font-size:clamp(28px,6.6vw,52px);margin:0 0 4px;color:var(--ink);text-shadow:0 0 26px rgba(169,123,255,.65)}
 .sbox .sub{color:var(--spook);font-size:15px;margin-bottom:18px}
 .keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 14px;
@@ -173,8 +174,9 @@ body.touch.portrait #rotate{display:flex}
   #humanList{width:152px;gap:3px;top:8px;right:8px;max-height:150px;overflow:hidden}
   .hrow{padding:3px 6px;font-size:10px;border-radius:7px}
   .hrow .st{font-size:9px}
-  #bag{left:158px;top:8px;right:auto;bottom:auto;padding:4px 9px;
-    grid-template-columns:repeat(4,auto);gap:0 9px;font-size:10px;border-width:1px;border-radius:8px}
+  #bag{left:324px;top:8px;right:auto;bottom:auto;padding:4px 9px;
+    grid-template-columns:repeat(4,auto);gap:0 9px;font-size:11px;border-width:1px;border-radius:8px}
+  #bag .nm{display:none}
   #hotbar{bottom:8px;gap:5px}
   .slot{width:44px;height:44px;font-size:17px;border-radius:8px}
   .slot .num{font-size:8px} .slot .cnt{font-size:9px}
@@ -202,6 +204,103 @@ body.touch #craft{touch-action:pan-y}
 #craftClose{pointer-events:auto;cursor:pointer;border:2px solid var(--edge);background:rgba(255,255,255,.05);
   color:var(--ink);border-radius:10px;width:38px;height:38px;font-size:19px;line-height:1;display:none}
 body.touch #craftClose{display:block}
+
+/* ============ ホーム画面 ============ */
+.hometabs{display:flex;gap:8px;justify-content:center;margin:16px 0 14px;flex-wrap:wrap}
+.htab{pointer-events:auto;cursor:pointer;padding:9px 20px;border:2px solid var(--edge);border-radius:11px;
+  font-size:15px;background:rgba(255,255,255,.04);color:var(--muted);transition:.15s;font-family:var(--jp)}
+.htab:hover{border-color:var(--edge2);color:var(--ink)}
+.htab.on{border-color:var(--gold);color:var(--gold);background:rgba(255,212,94,.1)}
+.hpanel{display:none;text-align:left}
+.subtabs{display:flex;gap:6px;justify-content:center;margin-bottom:10px}
+.stab{pointer-events:auto;cursor:pointer;padding:6px 16px;border:2px solid var(--edge);border-radius:9px;
+  font-size:13px;background:rgba(255,255,255,.03);color:var(--muted);font-family:var(--jp)}
+.stab.on{border-color:var(--mint);color:var(--mint);background:rgba(95,232,196,.1)}
+.spanel{display:none}
+.spanel.on{display:block}
+.hpanel.on{display:block}
+.who{font-size:13px;color:var(--muted);margin-bottom:12px;text-align:center}
+.who b{color:var(--mint);font-size:16px}
+.bigbtn{pointer-events:auto;cursor:pointer;font-family:var(--jp);font-size:19px;padding:12px 0;width:100%;
+  border-radius:12px;border:2px solid var(--gold);background:rgba(255,212,94,.12);color:var(--gold);
+  display:block;margin:0 0 9px}
+.bigbtn:hover{background:rgba(255,212,94,.24)}
+.bigbtn.sub{border-color:var(--edge2);color:var(--ink);background:rgba(255,255,255,.05);font-size:16px;padding:10px 0}
+.bigbtn.sub:hover{background:rgba(255,255,255,.11)}
+.bigbtn:disabled{opacity:.35;cursor:default}
+.savecard{border:2px solid var(--edge);border-radius:12px;padding:10px 14px;margin-bottom:10px;
+  background:rgba(255,255,255,.04);font-size:13px;line-height:1.75}
+.savecard .t{color:var(--spook);font-size:15px;margin-bottom:3px}
+.savecard span{color:var(--gold)}
+.namelist{display:flex;flex-direction:column;gap:7px;margin-bottom:12px;max-height:190px;overflow:auto}
+.namerow{pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:10px;
+  border:2px solid var(--edge);border-radius:11px;padding:8px 12px;background:rgba(255,255,255,.035);transition:.15s}
+.namerow:hover{border-color:var(--edge2)}
+.namerow.on{border-color:var(--mint);background:rgba(95,232,196,.1)}
+.namerow .nm{font-size:16px;flex:1;color:var(--ink)}
+.namerow .meta{font-size:11px;color:var(--muted);text-align:right;line-height:1.5}
+.namerow .del{pointer-events:auto;cursor:pointer;border:1px solid var(--edge);background:transparent;
+  color:var(--muted);border-radius:8px;width:30px;height:30px;font-size:15px;flex:none}
+.namerow .del:hover{border-color:var(--fear);color:var(--fear)}
+.namenew{display:flex;gap:8px}
+.namenew input{pointer-events:auto;flex:1;font-family:var(--jp);font-size:16px;padding:9px 12px;border-radius:10px;
+  border:2px solid var(--edge);background:rgba(0,0,0,.3);color:var(--ink)}
+.namenew input:focus{outline:none;border-color:var(--gold)}
+.namenew button{pointer-events:auto;cursor:pointer;font-family:var(--jp);font-size:15px;padding:9px 18px;
+  border-radius:10px;border:2px solid var(--mint);background:rgba(95,232,196,.12);color:var(--mint);flex:none}
+.note{font-size:11.5px;color:#6f6899;line-height:1.7;margin-top:10px;text-align:center}
+.msg{font-size:13px;color:var(--fear);min-height:20px;text-align:center;margin-top:6px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:8px}
+.stat{border:1px solid var(--edge);border-radius:10px;padding:7px 11px;background:rgba(255,255,255,.035)}
+.stat .k{font-size:11px;color:var(--muted)}
+.stat .v{font-size:18px;color:var(--gold);font-family:var(--px)}
+.stat .v small{font-family:var(--jp);font-size:12px;color:var(--ink)}
+.rankbig{text-align:center;font-size:21px;color:var(--spook);margin-bottom:4px}
+
+/* ゲーム中の「戻る」「セーブ」 */
+#sysbar{position:absolute;left:50%;top:12px;transform:translateX(-50%);display:flex;gap:8px}
+.sysbtn{pointer-events:auto;cursor:pointer;font-family:var(--jp);font-size:13px;padding:7px 16px;border-radius:10px;
+  border:2px solid var(--edge2);background:rgba(16,13,34,.82);color:var(--ink);backdrop-filter:blur(4px)}
+.sysbtn:hover{background:rgba(122,95,214,.4)}
+.sysbtn:active{transform:scale(.95)}
+#btnSave{border-color:var(--mint);color:var(--mint)}
+#btnHome{border-color:var(--gold);color:var(--gold)}
+
+/* ============ せまい画面でのホーム画面と戻る／セーブ ============ */
+/* （通常指定より後ろに置くこと。前に置くと上書きされてしまう） */
+@media (max-height:560px){
+  .sbox{padding:10px 14px}
+  .sbox h1{font-size:25px;margin-bottom:2px}
+  .sbox .sub{font-size:11.5px;margin-bottom:6px}
+  .hometabs{margin:7px 0 7px;gap:6px}
+  .htab{padding:5px 12px;font-size:12.5px;border-radius:9px}
+  .hpanel{max-height:196px;overflow:auto}
+  .bigbtn{font-size:15px;padding:8px 0;margin-bottom:6px}
+  .bigbtn.sub{font-size:13.5px;padding:7px 0}
+  .savecard{padding:6px 10px;font-size:11px;line-height:1.55}
+  .savecard .t{font-size:12.5px}
+  .namelist{max-height:112px;gap:5px}
+  .namerow{padding:5px 9px}
+  .namerow .nm{font-size:13.5px}
+  .namerow .meta{font-size:10px}
+  .namerow .del{width:26px;height:26px;font-size:13px}
+  .namenew input{font-size:14px;padding:6px 9px}
+  .namenew button{font-size:13px;padding:6px 13px}
+  .who{font-size:11.5px;margin-bottom:7px}
+  .stats{grid-template-columns:repeat(auto-fit,minmax(106px,1fr));gap:5px}
+  .stat{padding:4px 8px} .stat .k{font-size:9.5px} .stat .v{font-size:14px}
+  .stat .v small{font-size:10.5px}
+  .rankbig{font-size:16px}
+  .subtabs{margin-bottom:7px;gap:5px}
+  .stab{padding:4px 12px;font-size:12px}
+  .note{font-size:10px;margin-top:6px}
+  .msg{font-size:11.5px;min-height:16px}
+  .keys{padding:6px 10px;font-size:10.5px;gap:2px 8px;margin:7px 0 8px}
+  .credit{display:none}
+  /* 戻る／セーブはランクの右どなり */
+  #sysbar{left:168px;top:8px;transform:none;gap:5px}
+  .sysbtn{font-size:11px;padding:5px 11px;border-radius:8px}
+}
 </style>
 </head>
 <body>
@@ -224,6 +323,10 @@ body.touch #craftClose{display:block}
   <div id="gauges">
     <div class="g" id="phaseG">すりぬけ <span></span><div class="bar" id="phaseBar"><i></i></div></div>
     <div class="g" id="staG">ダッシュ<div class="bar" id="staBar"><i></i></div></div>
+  </div>
+  <div id="sysbar">
+    <button class="sysbtn" id="btnHome">↩ 戻る</button>
+    <button class="sysbtn" id="btnSave">💾 セーブ</button>
   </div>
   <div id="hint"></div>
   <div id="toasts"></div>
@@ -264,30 +367,58 @@ body.touch #craftClose{display:block}
   <div class="sbox">
     <h1>廃校おばけ大作戦</h1>
     <div class="sub">〜 心霊スポット荒らしを、ぜんぶ追い出せ 〜</div>
-    <div style="font-size:14px;color:#cfc7ee;line-height:1.9">
-      きみは、廃校になった<b>市立あかつき小学校</b>に住みついたおばけ。<br>
-      今夜もまた、うるさい人間たちがやってきた。<br>
-      材料を集めて仕掛けを作り、新しいおばけを生み出して、<br>
-      ぜんぶ<b>校門の外へ追い出そう</b>。
+
+    <div class="hometabs">
+      <button class="htab on" data-tab="play">▶ ゲームを始める</button>
+      <button class="htab" data-tab="login">👤 ログイン</button>
+      <button class="htab" data-tab="profile">📋 プロフィール</button>
     </div>
-    <div class="keys">
-      <div><b>WASD</b>うごく</div>
-      <div><b>マウス</b>見まわす</div>
-      <div><b>Shift</b>ダッシュ</div>
-      <div><b>Space/C</b>浮く・沈む</div>
-      <div><b>E</b>おどかす / ひろう</div>
-      <div><b>Q</b>すりぬけ（壁を通る）</div>
-      <div><b>Tab</b>おばけ工房</div>
-      <div><b>F</b>選んだ仕掛けを置く</div>
-      <div><b>1〜6</b>仕掛けをえらぶ</div>
-      <div><b>Esc</b>ポーズ</div>
+
+    <!-- ゲームを始める -->
+    <div class="hpanel on" id="hpPlay">
+      <div class="who" id="whoPlay"></div>
+      <div id="saveCard"></div>
+      <button class="bigbtn" id="btnContinue">つづきから</button>
+      <button class="bigbtn sub" id="btnNew">さいしょから</button>
+      <div class="keys" id="keysBox"></div>
+      <div id="loading"></div>
     </div>
-    
-    <button id="startBtn">はじめる</button>
-    <div id="loading">廃校を建てています…</div>
+
+    <!-- ログイン -->
+    <div class="hpanel" id="hpLogin">
+      <div class="subtabs">
+        <button class="stab on" data-sub="local">📵 メールなし</button>
+        <button class="stab" data-sub="mail">✉️ メールあり</button>
+      </div>
+
+      <div class="spanel on" id="lgLocal">
+        <div class="who">なまえをえらぶと、その人の記録で遊べます</div>
+        <div class="namelist" id="nameList"></div>
+        <div class="namenew">
+          <input id="newName" type="text" maxlength="12" placeholder="あたらしいなまえ" autocomplete="off">
+          <button id="btnCreate">つくる</button>
+        </div>
+        <div class="msg" id="loginMsg"></div>
+        <div class="note">
+          メールアドレスもパスワードも要りません。<br>
+          記録は<b>この端末の中だけ</b>に残ります（他の端末には引きつげません）。
+        </div>
+      </div>
+
+      <div class="spanel" id="lgMail">
+        <div id="mailBody"></div>
+      </div>
+    </div>
+
+    <!-- プロフィール -->
+    <div class="hpanel" id="hpProfile">
+      <div id="profBody"></div>
+    </div>
+
     <div class="credit">3人称視点 / オープンワールド・サバイバルホラー（笑）</div>
   </div>
 </div>
+
 
 <script type="importmap">
 { "imports": { "three": "./lib/three.module.js" } }
