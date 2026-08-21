@@ -195,13 +195,13 @@ body.touch.portrait #rotate{display:flex}
   #humanList{width:152px;gap:3px;top:8px;right:8px;max-height:150px;overflow:hidden}
   .hrow{padding:3px 6px;font-size:10px;border-radius:7px}
   .hrow .st{font-size:9px}
-  #bag{left:324px;top:8px;right:auto;bottom:auto;padding:4px 9px;
+  body.touch #bag{left:324px;top:8px;right:auto;bottom:auto;padding:4px 9px;
     grid-template-columns:repeat(4,auto);gap:0 9px;font-size:11px;border-width:1px;border-radius:8px}
-  #bag .nm{display:none}
+  body.touch #bag .nm{display:none}
   #hotbar{bottom:8px;gap:5px}
   .slot{width:44px;height:44px;font-size:17px;border-radius:8px}
   .slot .num{font-size:8px} .slot .cnt{font-size:9px}
-  #gauges{right:auto;left:8px;bottom:auto;top:110px;width:118px;gap:4px}
+  body.touch #gauges{right:auto;left:8px;bottom:auto;top:110px;width:118px;gap:4px}
   .g{padding:2px 7px;font-size:9.5px}
   #bCraft{left:150px;bottom:16px;width:64px;height:64px}
   #hint{bottom:auto;top:130px;font-size:11px;padding:3px 10px}
@@ -295,7 +295,7 @@ body.touch #craftClose{display:block}
   .sbox .sub{font-size:11.5px;margin-bottom:6px}
   .hometabs{margin:7px 0 7px;gap:6px}
   .htab{padding:5px 12px;font-size:12.5px;border-radius:9px}
-  .hpanel{max-height:196px;overflow:auto}
+  /* 高さは下の flex に任せる */
   .bigbtn{font-size:15px;padding:8px 0;margin-bottom:6px}
   .bigbtn.sub{font-size:13.5px;padding:7px 0}
   .savecard{padding:6px 10px;font-size:11px;line-height:1.55}
@@ -319,7 +319,7 @@ body.touch #craftClose{display:block}
   .keys{padding:6px 10px;font-size:10.5px;gap:2px 8px;margin:7px 0 8px}
   .credit{display:none}
   /* 戻る／セーブはランクの右どなり */
-  #sysbar{left:168px;top:8px;transform:none;gap:5px}
+  body.touch #sysbar{left:168px;top:8px;transform:none;gap:5px}
   .sysbtn{font-size:11px;padding:5px 11px;border-radius:8px}
 }
 
@@ -347,6 +347,51 @@ body.touch #craftClose{display:block}
   .pbox h3{font-size:17px} .pbox .psub{font-size:10.5px;margin-bottom:9px}
   .pbtn{font-size:14px;padding:8px 0;margin-bottom:6px;border-radius:9px}
   .pnote{font-size:9.5px;margin-top:4px}
+}
+
+/* ============ 窓の高さに合わせて縮める ============ */
+/* ホーム画面の箱そのものはスクロールさせず、中のパネルだけを可変にする */
+.sbox{
+  display:flex; flex-direction:column;
+  max-height:94vh; overflow:hidden;
+}
+.hpanel{min-height:0}
+.hpanel.on{display:flex; flex-direction:column; flex:1 1 auto; min-height:0; overflow:auto}
+.sbox h1, .sbox .sub, .hometabs, .credit{flex:none}
+
+/* スクロールバーが出るときは、細く目立たない見た目にする */
+*{scrollbar-width:thin;scrollbar-color:rgba(169,123,255,.45) transparent}
+*::-webkit-scrollbar{width:8px;height:8px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:rgba(169,123,255,.42);border-radius:4px}
+*::-webkit-scrollbar-thumb:hover{background:rgba(169,123,255,.72)}
+
+/* 縦に余裕のない窓（ノートPCなど）では、文字と余白を詰める */
+@media (max-height:820px){
+  .sbox{padding:14px 20px}
+  .keys{grid-template-columns:repeat(auto-fit,minmax(132px,1fr))}
+  .sbox h1{font-size:clamp(22px,4.4vw,38px);margin-bottom:2px}
+  .sbox .sub{font-size:13px;margin-bottom:8px}
+  .hometabs{margin:9px 0 9px}
+  .htab{padding:6px 15px;font-size:14px}
+  .keys{padding:9px 13px;font-size:12px;gap:3px 12px;margin:9px 0 12px}
+  .bigbtn{font-size:17px;padding:10px 0;margin-bottom:7px}
+  .bigbtn.sub{font-size:15px;padding:9px 0}
+  .savecard{padding:8px 12px;font-size:12.5px;line-height:1.65}
+  .who{margin-bottom:9px}
+  .stats{grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:6px}
+  .stat{padding:5px 9px}
+  .stat .v{font-size:16px}
+  #loading{margin-top:8px}
+  .credit{margin-top:10px}
+}
+@media (max-height:640px){
+  .sbox h1{font-size:clamp(19px,3.6vw,28px)}
+  /* 操作説明を横に詰めて行数を減らす */
+  .keys{grid-template-columns:repeat(auto-fit,minmax(116px,1fr))}
+  .sbox .sub{font-size:11.5px;margin-bottom:6px}
+  .keys{font-size:11px;gap:2px 10px;margin:7px 0 9px;padding:7px 11px}
+  .credit{display:none}
 }
 </style>
 </head>
