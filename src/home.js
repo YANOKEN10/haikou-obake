@@ -31,6 +31,9 @@ export class Home {
     $("#newName").addEventListener("keydown", (e) => { if (e.key === "Enter") this.create(); });
 
     $("#btnHome").addEventListener("click", () => this.game.goHome());
+    $("#pResume").addEventListener("click", () => this.game.setPaused(false));
+    $("#pSave").addEventListener("click", () => this.game.saveNow(true));
+    $("#pHome").addEventListener("click", () => this.game.goHome());
     $("#btnSave").addEventListener("click", () => this.game.saveNow(true));
 
     if (!S.storageAvailable()) {

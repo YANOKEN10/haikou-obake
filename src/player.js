@@ -79,6 +79,23 @@ export class Player {
     this.group.add(mouth);
     this.mouth = mouth;
 
+    // 壁にさえぎられたときに、輪郭だけ手前に描くためのコピー
+    const xrayMat = new THREE.MeshBasicMaterial({
+      color: 0x9fd8ff, transparent: true, opacity: 0.42,
+      depthTest: false, depthWrite: false,
+    });
+    this.xrayMat = xrayMat;
+    this.xray = new THREE.Group();
+    this.xray.renderOrder = 900;
+    this.xray.visible = false;
+    const xHead = new THREE.Mesh(head.geometry, xrayMat);
+    xHead.position.copy(head.position); xHead.scale.copy(head.scale);
+    const xSkirt = new THREE.Mesh(skirtGeo, xrayMat);
+    xSkirt.position.copy(skirt.position);
+    this.xray.add(xHead, xSkirt);
+    this.xHead = xHead;
+    this.group.add(this.xray);
+
     const handGeo = new THREE.SphereGeometry(0.15, 10, 8);
     this.handL = new THREE.Mesh(handGeo, bodyMat);
     this.handR = new THREE.Mesh(handGeo, bodyMat);
@@ -206,22 +223,58 @@ export class Player {
     const tx = this.x, ty = this.y + 0.75, tz = this.z;
     const cp = Math.cos(this.camPitch), sp = Math.sin(this.camPitch);
     const dx = Math.sin(this.camYaw) * cp, dz = Math.cos(this.camYaw) * cp;
-
-    let d = this.camDist;
     const col = this.world.colliders;
-    for (let s = 0.55; s <= this.camDist; s += 0.18) {
-      const px = tx - dx * s, pz = tz - dz * s, py = ty + sp * s;
-      let blocked = false;
-      for (const b of col.near(px, pz, 0.4)) {
-        if (b.tag === "soft" || b.tag === "barrier") continue;
-        if (py < b.y1 - 0.15 || py > b.y2 + 0.15) continue;
-        if (px > b.x1 - 0.32 && px < b.x2 + 0.32 && pz > b.z1 - 0.32 && pz < b.z2 + 0.32) { blocked = true; break; }
-      }
-      if (blocked) { d = Math.max(1.6, s - 0.5); break; }
-    }
-    this.curDist = lerp(this.curDist, d, clamp(dt * (d < this.curDist ? 22 : 6), 0, 1));
 
-    camera.position.set(tx - dx * this.curDist, ty + sp * this.curDist + 0.35, tz - dz * this.curDist);
-    camera.lookAt(tx, ty + 0.15, tz);
+    // 壁にぶつかる手前までカメラを寄せる
+    let d = this.camDist;
+    for (let s = 0.5; s <= this.camDist; s += 0.15) {
+      const px = tx - dx * s, pz = tz - dz * s, py = ty + sp * s;
+      if (this.blockedAt(px, py, pz, 0.3)) { d = Math.max(1.15, s - 0.42); break; }
+    }
+    this.curDist = lerp(this.curDist, d, clamp(dt * (d < this.curDist ? 24 : 6), 0, 1));
+
+    // 近づくほど少し高い位置から見下ろして、おばけが隠れにくいようにする
+    const tight = clamp(1 - (this.curDist - 1.15) / (this.camDist - 1.15), 0, 1);
+    const lift = tight * 0.55;
+
+    camera.position.set(
+      tx - dx * this.curDist,
+      ty + sp * this.curDist + 0.35 + lift,
+      tz - dz * this.curDist
+    );
+    camera.lookAt(tx, ty + 0.15 - lift * 0.25, tz);
+
+    // それでも壁ごしになるときは、輪郭を手前に描く
+    const hidden = this.occluded(camera.position, tx, ty, tz);
+    if (this.xray) {
+      this.xray.visible = hidden;
+      if (hidden) {
+        this.xHead.scale.copy(this.head.scale);
+        this.xrayMat.opacity = 0.30 + (this.scarePose > 0 ? 0.25 : 0);
+      }
+    }
+  }
+
+  // (px,py,pz) が壁などの中に入っているか
+  blockedAt(px, py, pz, pad) {
+    for (const b of this.world.colliders.near(px, pz, pad + 0.2)) {
+      if (b.tag === "soft" || b.tag === "barrier" || b.tag === "furn") continue;
+      if (py < b.y1 - 0.12 || py > b.y2 + 0.12) continue;
+      if (px > b.x1 - pad && px < b.x2 + pad && pz > b.z1 - pad && pz < b.z2 + pad) return true;
+    }
+    return false;
+  }
+
+  // カメラとおばけのあいだに壁があるか（高さも見る）
+  occluded(camPos, tx, ty, tz) {
+    const dx = tx - camPos.x, dy = ty - camPos.y, dz = tz - camPos.z;
+    const len = Math.hypot(dx, dz);
+    if (len < 0.4) return false;
+    const n = Math.min(40, Math.max(4, Math.ceil(len / 0.18)));
+    for (let i = 1; i < n; i++) {
+      const t = i / n;
+      if (this.blockedAt(camPos.x + dx * t, camPos.y + dy * t, camPos.z + dz * t, 0.02)) return true;
+    }
+    return false;
   }
 }

@@ -342,11 +342,16 @@ class Game {
     // メニュー・ポーズ
     if (inp.once("Tab")) {
       this.ui.toggleCraft();
-      if (this.ui.craftOpen) inp.unlock(); else inp.lock();
+      if (this.ui.craftOpen) inp.unlock(); else if (!this.touch) inp.lock();
     }
     if (inp.once("Escape")) {
-      if (this.ui.craftOpen) { this.ui.closeCraft(); inp.lock(); }
-      else { this.paused = !this.paused; if (this.paused) inp.unlock(); else inp.lock(); }
+      if (this.ui.craftOpen) { this.ui.closeCraft(); if (!this.touch) inp.lock(); }
+      else this.setPaused(!this.paused);
+    }
+    // ポーズ中は S でセーブ、H でホームへ
+    if (this.paused) {
+      if (inp.once("KeyS")) { this.saveNow(true); }
+      if (inp.once("KeyH")) { this.goHome(); return; }
     }
     if (this.ui.craftOpen || this.paused) { w.update(0, t); this.sky.update(0, t); this.renderer.render(this.scene, this.camera); inp.endFrame(); return; }
 
@@ -651,6 +656,7 @@ class Game {
     if (cont && this.profile.hasSave) this.applySave(this.profile);
 
     this.started = true;
+    this.setPaused(false);
     this.audio.start();
     this.ui.hideScreen();
     if (this.touch) goFullscreen(); else this.input.lock();
@@ -666,11 +672,22 @@ class Game {
     }
   }
 
+  setPaused(on) {
+    this.paused = on;
+    document.getElementById("pause").classList.toggle("on", on);
+    if (on) this.input.unlock();
+    else if (!this.touch && this.started) this.input.lock();
+    if (on && this.touch) this.touch.release();
+  }
+
   goHome() {
-    if (!this.started) return;
+    // ゲーム中でなくても、ポーズ画面は必ず閉じる
+    this.setPaused(false);
+    this.ui.closeCraft();
+    if (!this.started) { this.ui.showScreen(); this.home.render(); return; }
     const ok = this.saveNow(false);
     this.started = false;
-    this.paused = false;
+    this.setPaused(false);
     this.ui.closeCraft();
     this.input.unlock();
     if (this.touch) this.touch.release();
@@ -738,6 +755,15 @@ addEventListener("pagehide", () => { if (game.started) game.saveNow(false); });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden && game.started) game.saveNow(false);
 });
+
+// PCではポインタが画面に吸着してボタンを押せないので、
+// 上の帯は「ESCでメニュー」の案内に置きかえる（タッチ端末ではボタンのまま）
+if (!isTouchDevice()) {
+  const bar = document.getElementById("sysbar");
+  if (bar) bar.innerHTML = '<div class="sysbtn" style="cursor:default;opacity:.75">' +
+    '<kbd style="font-family:var(--px);font-size:10px;border:1px solid var(--edge);border-radius:5px;' +
+    'padding:2px 6px;margin-right:7px">ESC</kbd>ポーズ・セーブ・ホーム</div>';
+}
 
 // --- スマホ・タブレットならタッチ操作に切り替える ------------
 if (isTouchDevice()) {

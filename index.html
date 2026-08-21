@@ -322,6 +322,32 @@ body.touch #craftClose{display:block}
   #sysbar{left:168px;top:8px;transform:none;gap:5px}
   .sysbtn{font-size:11px;padding:5px 11px;border-radius:8px}
 }
+
+/* ============ ポーズ画面 ============ */
+#pause{position:fixed;inset:0;z-index:22;display:none;align-items:center;justify-content:center;
+  background:rgba(4,3,10,.72);backdrop-filter:blur(5px)}
+#pause.on{display:flex}
+.pbox{width:min(360px,88vw);background:linear-gradient(180deg,#16122e,#0c0a1c);
+  border:2px solid var(--edge2);border-radius:16px;padding:20px;text-align:center;
+  box-shadow:0 20px 70px rgba(0,0,0,.7)}
+.pbox h3{margin:0 0 4px;font-size:22px;color:var(--spook)}
+.pbox .psub{font-size:12px;color:var(--muted);margin-bottom:16px}
+.pbtn{pointer-events:auto;cursor:pointer;font-family:var(--jp);font-size:17px;padding:12px 0;width:100%;
+  border-radius:12px;border:2px solid var(--edge);background:rgba(255,255,255,.05);color:var(--ink);
+  display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:9px}
+.pbtn:hover{background:rgba(255,255,255,.12);border-color:var(--edge2)}
+.pbtn kbd{font-family:var(--px);font-size:10px;border:1px solid var(--edge);border-radius:5px;
+  padding:2px 6px;color:var(--muted);background:rgba(0,0,0,.35)}
+#pResume{border-color:var(--gold);color:var(--gold)}
+#pSave{border-color:var(--mint);color:var(--mint)}
+#pHome{border-color:var(--fear);color:var(--fear)}
+.pnote{font-size:11px;color:#6f6899;line-height:1.7;margin-top:6px}
+@media (max-height:560px){
+  .pbox{width:min(320px,84vw);padding:12px 14px}
+  .pbox h3{font-size:17px} .pbox .psub{font-size:10.5px;margin-bottom:9px}
+  .pbtn{font-size:14px;padding:8px 0;margin-bottom:6px;border-radius:9px}
+  .pnote{font-size:9.5px;margin-top:4px}
+}
 </style>
 </head>
 <body>
@@ -367,6 +393,17 @@ body.touch #craftClose{display:block}
   <div class="ic">📱</div>
   <div style="font-size:19px;color:#c9a6ff">スマホを横向きにしてください</div>
   <div style="font-size:13px;color:#9b93c4">画面を横にすると、廃校が広く見えます</div>
+</div>
+
+<div id="pause">
+  <div class="pbox">
+    <h3>ポーズ</h3>
+    <div class="psub">おばけの時間が止まっています</div>
+    <button class="pbtn" id="pResume">▶ つづける <kbd>ESC</kbd></button>
+    <button class="pbtn" id="pSave">💾 セーブする <kbd>S</kbd></button>
+    <button class="pbtn" id="pHome">↩ ホームにもどる <kbd>H</kbd></button>
+    <div class="pnote">「ホームにもどる」を押すと、<br>ここまでの記録は自動でセーブされます。</div>
+  </div>
 </div>
 
 <div id="craft">
