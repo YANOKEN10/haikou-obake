@@ -4,6 +4,7 @@ import { buildSky } from "./sky.js";
 import { TouchControls, isTouchDevice, goFullscreen } from "./touch.js";
 import { Home } from "./home.js";
 import * as S from "./save.js";
+import { Cloud } from "./cloud.js";
 import { Player } from "./player.js";
 import { Human } from "./human.js";
 import { Pickup, Trap, Summon, FloatText } from "./entities.js";
@@ -597,6 +598,7 @@ class Game {
       else { this.ui.toast("セーブできませんでした", "bad"); this.audio.deny(); }
     }
     this._autosaveT = 0;
+    if (this.cloud && this.cloud.signedIn) this.cloud.push({ v: 1, profile: this.profile }).catch(() => {});
     return ok;
   }
 
@@ -678,6 +680,26 @@ class Game {
     if (ok) this.ui.toast("記録をセーブしました", "good");
   }
 
+  // --- クラウド（メールでログインしている人だけ） -------------
+  async pushToCloud() {
+    if (!this.cloud || !this.cloud.signedIn) return { ok: false, why: "ログインしていません" };
+    const p = this.started ? this.collectSave() : (this.profile || this.ensureProfile());
+    if (this.started) S.saveProfile(p);
+    return await this.cloud.push({ v: 1, profile: p });
+  }
+
+  async pullFromCloud() {
+    if (!this.cloud || !this.cloud.signedIn) return { ok: false, why: "ログインしていません" };
+    const row = await this.cloud.pull();
+    if (!row || !row.payload || !row.payload.profile) return { ok: false, why: "クラウドにまだ記録がありません" };
+    const p = row.payload.profile;
+    p.name = p.name || "クラウド";
+    S.saveProfile(p);
+    S.setCurrent(p.name);
+    this.profile = S.getProfile(p.name);
+    return { ok: true };
+  }
+
   // 統計をためる（プロフィール画面に出る）
   bump(key, n) {
     if (!this.profile || !this.profile.stats) return;
@@ -700,7 +722,16 @@ window.game = game;
 game.build();
 game.loop(performance.now());
 
+game.cloud = new Cloud();
+const cameBack = game.cloud.captureFromUrl();
 game.home = new Home(game);
+if (game.cloud.signedIn) {
+  game.cloud.loadUser().then(() => { if (game.home.tab === "login") game.home.renderLogin(); });
+}
+if (cameBack) {
+  game.home.show("login");
+  game.home.showSub("mail");
+}
 document.getElementById("loading").textContent =
   "廃校の準備完了（" + game.world.triangles.toLocaleString() + " 面 / " + game.buildMs + "ms）";
 game.home.show("play");
