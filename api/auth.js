@@ -8,6 +8,7 @@ const PW_MIN = 4, PW_MAX = 64;
 module.exports = async function handler(req, res) {
   L.cors(req, res);
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
+  if (!L.configured()) { L.notReady(res); return; }
   if (req.method !== "POST") { res.status(405).json({ error: "method" }); return; }
 
   const b = L.body(req);

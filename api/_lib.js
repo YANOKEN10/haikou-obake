@@ -16,6 +16,15 @@ const ORIGINS = [
 ];
 const YEAR = 1000 * 60 * 60 * 24 * 365;
 
+function configured() { return Boolean(process.env.BLOB_READ_WRITE_TOKEN); }
+
+function notReady(res) {
+  res.status(503).json({
+    error: "setup",
+    message: "クラウド機能はまだ準備中です。「📱 この端末だけ」でお楽しみください。",
+  });
+}
+
 function cors(req, res) {
   const o = req.headers.origin;
   if (o && (ORIGINS.indexOf(o) >= 0 || /^https:\/\/haikou-obake-daisakusen-[a-z0-9-]+\.vercel\.app$/.test(o))) {
@@ -103,6 +112,6 @@ function publicUser(u) {
 }
 
 module.exports = {
-  cors, body, normId, readUser, writeUser,
+  configured, notReady, cors, body, normId, readUser, writeUser,
   hashPw, checkPw, slowDown, makeToken, readToken, bearer, publicUser,
 };

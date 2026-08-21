@@ -6,6 +6,7 @@ const MAX_BYTES = 200 * 1024;   // 記録1つの上限
 module.exports = async function handler(req, res) {
   L.cors(req, res);
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
+  if (!L.configured()) { L.notReady(res); return; }
 
   const claim = L.readToken(L.bearer(req));
   if (!claim) { res.status(401).json({ error: "auth", message: "ログインしなおしてください。" }); return; }

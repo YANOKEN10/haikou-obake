@@ -58,7 +58,10 @@ export class Cloud {
   async restore() {
     if (!this.token) return false;
     const r = await this.call("/api/save");
-    if (!r.ok) { if (!r.missing && (r.status === 401 || r.status === 404)) { this.setToken(""); this.user = null; } return false; }
+    if (!r.ok) {
+      if (!r.missing && r.status !== 503 && (r.status === 401 || r.status === 404)) { this.setToken(""); this.user = null; }
+      return false;
+    }
     this.user = r.data.user;
     return true;
   }
