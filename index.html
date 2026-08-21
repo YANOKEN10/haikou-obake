@@ -249,6 +249,12 @@ body.touch #craftClose{display:block}
 .bigbtn.sub{border-color:var(--edge2);color:var(--ink);background:rgba(255,255,255,.05);font-size:16px;padding:10px 0}
 .bigbtn.sub:hover{background:rgba(255,255,255,.11)}
 .bigbtn:disabled{opacity:.35;cursor:default}
+.bigbtn.pulse{animation:btnPulse 1.1s ease-out 2}
+@keyframes btnPulse{
+  0%{box-shadow:0 0 0 0 rgba(255,212,94,.55)}
+  70%{box-shadow:0 0 0 14px rgba(255,212,94,0)}
+  100%{box-shadow:0 0 0 0 rgba(255,212,94,0)}
+}
 .savecard{border:2px solid var(--edge);border-radius:12px;padding:10px 14px;margin-bottom:10px;
   background:rgba(255,255,255,.04);font-size:13px;line-height:1.75}
 .savecard .t{color:var(--spook);font-size:15px;margin-bottom:3px}
@@ -472,7 +478,7 @@ body.touch #craftClose{display:block}
     <div class="sub">〜 心霊スポット荒らしを、ぜんぶ追い出せ 〜</div>
 
     <div class="hometabs">
-      <button class="htab on" data-tab="play">▶ ゲームを始める</button>
+      <button class="htab on" data-tab="play">🎮 あそぶ</button>
       <button class="htab" data-tab="login">👤 ログイン</button>
       <button class="htab" data-tab="profile">📋 プロフィール</button>
     </div>
@@ -481,8 +487,8 @@ body.touch #craftClose{display:block}
     <div class="hpanel on" id="hpPlay">
       <div class="who" id="whoPlay"></div>
       <div id="saveCard"></div>
-      <button class="bigbtn" id="btnContinue">つづきから</button>
-      <button class="bigbtn sub" id="btnNew">さいしょから</button>
+      <button class="bigbtn" id="btnContinue">▶ つづきから始める</button>
+      <button class="bigbtn sub" id="btnNew">さいしょから始める</button>
       <div class="keys" id="keysBox"></div>
       <div id="loading"></div>
     </div>

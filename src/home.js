@@ -47,11 +47,19 @@ export class Home {
   }
 
   show(tab) {
+    const again = this.tab === tab;
     this.tab = tab;
     document.querySelectorAll(".htab").forEach((e) => e.classList.toggle("on", e.dataset.tab === tab));
     document.querySelectorAll(".hpanel").forEach((e) => e.classList.remove("on"));
     $("#hp" + tab[0].toUpperCase() + tab.slice(1)).classList.add("on");
     this.render();
+    // 同じタブを押し直したときは、次に押す場所を光らせる
+    if (again && tab === "play") {
+      const b = $("#btnContinue").disabled ? $("#btnNew") : $("#btnContinue");
+      b.classList.remove("pulse");
+      void b.offsetWidth;
+      b.classList.add("pulse");
+    }
   }
 
   render() {
@@ -68,6 +76,7 @@ export class Home {
       : "なまえを決めると記録が残ります。<b>ゲスト</b>のままでも遊べます。";
 
     const card = $("#saveCard");
+    const cont = $("#btnContinue"), fresh = $("#btnNew");
     if (p && p.hasSave) {
       card.innerHTML =
         "<div class='savecard'><div class='t'>つづきの記録</div>" +
@@ -77,12 +86,19 @@ export class Home {
         "作った仕掛け <span>" + this.trapCount(p) + "</span>個　" +
         "遊んだ時間 <span>" + S.fmtTime(p.playSeconds) + "</span><br>" +
         "<span style='color:var(--muted);font-size:11px'>さいごに遊んだ日：" + S.fmtDate(p.lastPlayed) + "</span></div>";
-      $("#btnContinue").disabled = false;
-      $("#btnContinue").textContent = "つづきから";
+      cont.disabled = false;
+      cont.textContent = "▶ つづきから始める";
+      cont.className = "bigbtn";
+      fresh.textContent = "さいしょから始める";
+      fresh.className = "bigbtn sub";
     } else {
+      // まだ記録がない人には、押すべきボタンをはっきり見せる
       card.innerHTML = "";
-      $("#btnContinue").disabled = true;
-      $("#btnContinue").textContent = "つづきから（まだ記録がありません）";
+      cont.disabled = true;
+      cont.textContent = "つづきの記録はまだありません";
+      cont.className = "bigbtn sub";
+      fresh.textContent = "▶ ゲームを始める";
+      fresh.className = "bigbtn";
     }
   }
 
