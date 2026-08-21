@@ -7,7 +7,7 @@
 const crypto = require("crypto");
 const { put, get } = require("@vercel/blob");
 
-const SECRET = process.env.AUTH_SECRET || process.env.BLOB_READ_WRITE_TOKEN || "haikou-obake-dev-secret";
+const SECRET = process.env.AUTH_SECRET || "";   // 代用はしない（他ゲームと同じ鍵になる事故を防ぐ）
 const ORIGINS = [
   "https://haikou-obake-daisakusen.vercel.app",
   "https://yanoken10.github.io",
@@ -16,7 +16,7 @@ const ORIGINS = [
 ];
 const YEAR = 1000 * 60 * 60 * 24 * 365;
 
-function configured() { return Boolean(process.env.BLOB_READ_WRITE_TOKEN); }
+function configured() { return Boolean(process.env.BLOB_READ_WRITE_TOKEN) && SECRET.length >= 16; }
 
 function notReady(res) {
   res.status(503).json({
@@ -47,7 +47,7 @@ function normId(id) {
   return String(id == null ? "" : id).normalize("NFKC").trim().toLowerCase();
 }
 function idKey(id) {
-  return "u/" + crypto.createHash("sha256").update("hobake1:" + id).digest("hex") + ".json";
+  return "hobake/" + crypto.createHash("sha256").update("hobake1:" + id).digest("hex") + ".json";
 }
 async function readUser(id) {
   let r;

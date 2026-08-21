@@ -5,6 +5,7 @@ module.exports = function handler(req, res) {
     node: process.version,
     hasBlobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
     hasAuthSecret: Boolean(process.env.AUTH_SECRET),
+    authSecretLongEnough: String(process.env.AUTH_SECRET || "").length >= 16,
     blobModule: "?",
     hasResponse: typeof Response !== "undefined",
   };
