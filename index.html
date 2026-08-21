@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>廃校おばけ大作戦</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Silkscreen:wght@400;700&display=swap">
+<style>
+:root{
+  --void:#05060b; --panel:rgba(14,12,28,.82); --panel2:rgba(24,20,48,.9);
+  --edge:#4a3b86; --edge2:#7a5fd6; --ink:#eee9ff; --muted:#9b93c4;
+  --spook:#a97bff; --fear:#ff5f8d; --gold:#ffd45e; --mint:#5fe8c4;
+  --jp:"DotGothic16","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  --px:"Silkscreen",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--void);color:var(--ink);font-family:var(--jp)}
+canvas{display:block}
+#app{position:fixed;inset:0}
+.hud{position:fixed;inset:0;pointer-events:none;z-index:5}
+.hud > *{pointer-events:none}
+
+/* --- 左上：ランク --- */
+#rankBox{position:absolute;left:14px;top:12px;background:var(--panel);border:2px solid var(--edge);
+  border-radius:12px;padding:9px 14px;min-width:210px;backdrop-filter:blur(6px)}
+#rankName{font-size:17px;color:var(--spook);font-weight:bold;letter-spacing:.03em}
+#rankNote{font-size:11px;color:var(--muted);margin-top:1px}
+#kicked{font-size:13px;margin-top:5px;color:var(--ink)}
+#kicked b{color:var(--gold);font-size:19px;font-family:var(--px)}
+#progWrap{height:7px;background:rgba(255,255,255,.12);border-radius:4px;margin-top:5px;overflow:hidden}
+#progBar{height:100%;width:0;background:linear-gradient(90deg,var(--spook),var(--fear));transition:width .4s}
+
+/* --- 左上その下：現在地 --- */
+#place{position:absolute;left:14px;top:104px;background:var(--panel);border:1px solid var(--edge);
+  border-radius:9px;padding:4px 12px;font-size:13px;color:var(--mint)}
+
+/* --- 右上：人間リスト --- */
+#humanList{position:absolute;right:14px;top:12px;width:216px;display:flex;flex-direction:column;gap:5px}
+.hrow{background:var(--panel);border:1px solid var(--edge);border-radius:9px;padding:5px 9px;font-size:12px}
+.hrow .n{display:flex;justify-content:space-between;align-items:center}
+.hrow .st{font-size:10px;color:var(--muted)}
+.hbar{height:5px;background:rgba(255,255,255,.13);border-radius:3px;margin-top:3px;overflow:hidden}
+.hbar i{display:block;height:100%;width:0;background:var(--mint);transition:width .18s,background .3s}
+.hrow.gone{opacity:.35}
+
+/* --- 左下：所持材料 --- */
+#bag{position:absolute;left:14px;bottom:14px;background:var(--panel);border:2px solid var(--edge);
+  border-radius:12px;padding:8px 12px;display:grid;grid-template-columns:repeat(2,auto);gap:2px 16px;font-size:13px}
+#bag div{white-space:nowrap}
+#bag span{color:var(--gold);font-family:var(--px);margin-left:4px}
+
+/* --- 中央下：ホットバー --- */
+#hotbar{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:7px}
+.slot{width:56px;height:56px;background:var(--panel);border:2px solid var(--edge);border-radius:10px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;position:relative}
+.slot .num{position:absolute;top:1px;left:4px;font-size:9px;font-family:var(--px);color:var(--muted)}
+.slot .cnt{position:absolute;bottom:1px;right:4px;font-size:11px;font-family:var(--px);color:var(--gold)}
+.slot.sel{border-color:var(--gold);box-shadow:0 0 12px rgba(255,212,94,.45)}
+.slot.empty{opacity:.35}
+
+/* --- 右下：ゲージ --- */
+#gauges{position:absolute;right:14px;bottom:14px;width:180px;display:flex;flex-direction:column;gap:6px}
+.g{background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:4px 9px;font-size:11px}
+.g .bar{height:6px;background:rgba(255,255,255,.13);border-radius:3px;margin-top:3px;overflow:hidden}
+.g .bar i{display:block;height:100%;width:100%}
+#phaseBar i{background:linear-gradient(90deg,#5fc9ff,#a97bff)}
+#staBar i{background:linear-gradient(90deg,#ffd45e,#ff8a5f)}
+
+/* --- 操作ヒント --- */
+#hint{position:absolute;left:50%;bottom:82px;transform:translateX(-50%);font-size:13px;
+  background:rgba(8,7,16,.7);border-radius:8px;padding:4px 14px;color:var(--gold);opacity:0;transition:opacity .18s}
+#hint.on{opacity:1}
+
+/* --- トースト --- */
+#toasts{position:absolute;left:50%;top:78px;transform:translateX(-50%);display:flex;flex-direction:column;
+  gap:6px;align-items:center}
+.toast{background:var(--panel2);border:2px solid var(--edge2);border-radius:10px;padding:6px 16px;font-size:14px;
+  animation:pop .28s ease-out;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+.toast.good{border-color:var(--mint);color:var(--mint)}
+.toast.bad{border-color:var(--fear);color:var(--fear)}
+.toast.gold{border-color:var(--gold);color:var(--gold);font-size:16px}
+@keyframes pop{from{transform:translateY(-12px) scale(.9);opacity:0}to{transform:none;opacity:1}}
+
+/* --- 作成メニュー --- */
+#craft{position:fixed;inset:0;background:rgba(4,3,10,.78);backdrop-filter:blur(4px);z-index:20;
+  display:none;align-items:center;justify-content:center}
+#craft.on{display:flex}
+.cwrap{width:min(920px,94vw);max-height:86vh;background:linear-gradient(180deg,#16122e,#0c0a1c);
+  border:2px solid var(--edge2);border-radius:16px;padding:18px 20px;overflow:auto;box-shadow:0 20px 70px rgba(0,0,0,.7)}
+.ctabs{display:flex;gap:8px;margin-bottom:14px}
+.ctab{padding:6px 18px;border:2px solid var(--edge);border-radius:9px;cursor:pointer;font-size:15px;background:rgba(255,255,255,.03)}
+.ctab.on{border-color:var(--gold);color:var(--gold);background:rgba(255,212,94,.08)}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:11px}
+.card{border:2px solid var(--edge);border-radius:12px;padding:11px 13px;background:rgba(255,255,255,.035);cursor:pointer;
+  transition:border-color .15s,transform .1s}
+.card:hover{border-color:var(--edge2);transform:translateY(-2px)}
+.card.can{border-color:var(--mint)}
+.card.no{opacity:.55}
+.card h4{margin:0 0 4px;font-size:16px}
+.card .d{font-size:11.5px;color:var(--muted);line-height:1.55;min-height:34px}
+.card .cost{margin-top:7px;font-size:12px;display:flex;flex-wrap:wrap;gap:8px}
+.card .cost b{font-weight:normal;color:var(--gold)}
+.card .cost b.lack{color:var(--fear);text-decoration:line-through}
+.card .stat{font-size:11px;color:var(--spook);margin-top:4px}
+.locked{filter:grayscale(1);opacity:.4}
+.chead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.chead h3{margin:0;font-size:21px;color:var(--spook)}
+.chead .close{font-size:12px;color:var(--muted)}
+
+/* --- タイトル / ポーズ --- */
+#screen{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(120% 90% at 50% 20%,#241a52 0%,#0c0a1c 55%,#04030a 100%)}
+#screen.off{display:none}
+.sbox{width:min(660px,92vw);text-align:center;padding:26px}
+.sbox h1{font-size:clamp(28px,6.6vw,52px);margin:0 0 4px;color:var(--ink);text-shadow:0 0 26px rgba(169,123,255,.65)}
+.sbox .sub{color:var(--spook);font-size:15px;margin-bottom:18px}
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 14px;
+  text-align:left;font-size:13px;color:var(--muted);margin:14px 0 20px;
+  background:rgba(255,255,255,.04);border:1px solid var(--edge);border-radius:12px;padding:14px 18px}
+.keys b{color:var(--gold);font-family:var(--px);font-size:11px;margin-right:6px}
+#startBtn{pointer-events:auto;font-family:var(--jp);font-size:19px;padding:11px 44px;border-radius:12px;
+  border:2px solid var(--gold);background:rgba(255,212,94,.12);color:var(--gold);cursor:pointer}
+#startBtn:hover{background:rgba(255,212,94,.24)}
+#loading{color:var(--muted);font-size:13px;margin-top:12px}
+.credit{margin-top:16px;font-size:11px;color:#5c5580}
+
+/* --- 驚かせ演出のビネット --- */
+#vignette{position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;
+  background:radial-gradient(75% 60% at 50% 50%,transparent 40%,rgba(120,20,60,.55) 100%);transition:opacity .25s}
+#flash{position:fixed;inset:0;pointer-events:none;z-index:6;background:#fff;opacity:0}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="vignette"></div>
+<div id="flash"></div>
+
+<div class="hud">
+  <div id="rankBox">
+    <div id="rankName">見習い地縛霊</div>
+    <div id="rankNote">まだ誰も怖がってくれない</div>
+    <div id="kicked">追い出した人間 <b>0</b> 人</div>
+    <div id="progWrap"><div id="progBar"></div></div>
+  </div>
+  <div id="place">中庭</div>
+  <div id="humanList"></div>
+  <div id="bag"></div>
+  <div id="hotbar"></div>
+  <div id="gauges">
+    <div class="g" id="phaseG">すりぬけ <span></span><div class="bar" id="phaseBar"><i></i></div></div>
+    <div class="g" id="staG">ダッシュ<div class="bar" id="staBar"><i></i></div></div>
+  </div>
+  <div id="hint"></div>
+  <div id="toasts"></div>
+</div>
+
+<div id="craft">
+  <div class="cwrap">
+    <div class="chead">
+      <h3>おばけ工房</h3>
+      <div class="close">Tab / Esc でとじる</div>
+    </div>
+    <div class="ctabs">
+      <div class="ctab on" data-tab="trap">🪤 仕掛けをつくる</div>
+      <div class="ctab" data-tab="ghost">👻 おばけを生み出す</div>
+    </div>
+    <div class="cgrid" id="cgrid"></div>
+  </div>
+</div>
+
+<div id="screen">
+  <div class="sbox">
+    <h1>廃校おばけ大作戦</h1>
+    <div class="sub">〜 心霊スポット荒らしを、ぜんぶ追い出せ 〜</div>
+    <div style="font-size:14px;color:#cfc7ee;line-height:1.9">
+      きみは、廃校になった<b>市立あかつき小学校</b>に住みついたおばけ。<br>
+      今夜もまた、うるさい人間たちがやってきた。<br>
+      材料を集めて仕掛けを作り、新しいおばけを生み出して、<br>
+      ぜんぶ<b>校門の外へ追い出そう</b>。
+    </div>
+    <div class="keys">
+      <div><b>WASD</b>うごく</div>
+      <div><b>マウス</b>見まわす</div>
+      <div><b>Shift</b>ダッシュ</div>
+      <div><b>Space/C</b>浮く・沈む</div>
+      <div><b>E</b>おどかす / ひろう</div>
+      <div><b>Q</b>すりぬけ（壁を通る）</div>
+      <div><b>Tab</b>おばけ工房</div>
+      <div><b>F</b>選んだ仕掛けを置く</div>
+      <div><b>1〜6</b>仕掛けをえらぶ</div>
+      <div><b>Esc</b>ポーズ</div>
+    </div>
+    <div id="touchWarn" style="display:none;border:2px solid var(--fear);border-radius:12px;padding:12px 16px;margin:0 0 16px;font-size:14px;color:var(--fear);line-height:1.8">⚠️ このゲームは<b>キーボードとマウス</b>で遊びます。<br>スマホ・タブレットでは操作できません。パソコンで開いてください。</div>
+    <button id="startBtn">はじめる</button>
+    <div id="loading">廃校を建てています…</div>
+    <div class="credit">3人称視点 / オープンワールド・サバイバルホラー（笑）</div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.js" } }
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

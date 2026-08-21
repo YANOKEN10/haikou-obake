@@ -1,0 +1,7 @@
+{
+  "name": "haikou-obake",
+  "version": "0.1.0",
+  "private": true,
+  "description": "廃校おばけサバイバル - 3人称オープンワールド",
+  "scripts": { "start": "node serve.js" }
+}
