@@ -60,7 +60,7 @@ export class Human {
     this.world = world;
     this.type = type;
     this.name = type.name;
-    this.x = x; this.z = z; this.y = 0;
+    this.x = x; this.z = z; this.y = 0; this.floor = 0;
     this.yaw = Math.PI;
     this.vx = 0; this.vz = 0;
     this.radius = 0.38 * HUMAN_SCALE;
@@ -291,23 +291,25 @@ export class Human {
   }
 
   // --- 移動先を決める ---------------------------------------
-  goTo(x, z) {
+  goTo(x, z, floor) {
     const nav = this.world.nav;
-    const a = nav.nearest(this.x, this.z, 0, this.world.colliders);
-    const b = nav.nearest(x, z, 0, this.world.colliders);
+    const to = floor === undefined ? this.floor : floor;
+    const a = nav.nearest(this.x, this.z, this.floor, this.world.colliders, 26, this.y);
+    const b = nav.nearest(x, z, to, this.world.colliders);
     const p = nav.path(a, b);
     this.path = p ? p.map((i) => nav.nodes[i]) : null;
     this.pathI = 0;
-    this.target = { x, z };
+    this.target = { x, z, floor: to };
   }
 
   wanderSomewhere() {
-    const rooms = this.world.rooms.filter((r) => r.kind !== "yard" || Math.random() < 0.35);
-    const r = choice(rooms);
-    const x = r.kind === "yard" ? rand(-34, 34) : r.cx + rand(-2, 2);
-    if (r.kind === "stair") return this.goTo(r.cx, -5.5);
-    const z = r.kind === "yard" ? rand(6, 30) : r.cz + rand(-1.5, 1.5);
-    this.goTo(x, z);
+    const all = this.world.rooms.filter((r) => r.kind !== "yard" || Math.random() < 0.3);
+    const r = choice(all);
+    const f = r.floor || 0;
+    if (r.kind === "stair") return this.goTo(r.cx, -5.5, f);
+    if (r.kind === "yard") return this.goTo(rand(-34, 34), rand(6, 30), 0);
+    if (r.kind === "watari") return this.goTo(r.cx, rand(r.z1 + 1, r.z2 - 1), 0);
+    this.goTo(r.cx + rand(-2, 2), r.cz + rand(-1.5, 1.5), f);
   }
 
   // --- 恐怖を与える -----------------------------------------
@@ -370,12 +372,13 @@ export class Human {
 
   // プレイヤーが視界にいるか
   canSee(px, py, pz, range = 17) {
+    if (Math.abs((py || 0) - this.y) > 2.4) return false;   // 別の階にいる相手は見えない
     const d = dist(this.x, this.z, px, pz);
     if (d > range) return false;
     const ang = Math.atan2(px - this.x, pz - this.z);
     let diff = Math.abs(((ang - this.yaw + Math.PI) % (Math.PI * 2)) - Math.PI);
     if (diff > 1.05 && d > 2.4) return false;
-    return this.world.colliders.lineOfSight(this.x, this.z, px, pz, EYE_Y, 0.7);
+    return this.world.colliders.lineOfSight(this.x, this.z, px, pz, this.y + EYE_Y, 0.7);
   }
 
   // ==========================================================
@@ -426,7 +429,7 @@ export class Human {
       }
       case "flee": {
         speed *= 1.9;
-        if (!this.path) this.goTo(w.exit.x, w.exit.z);
+        if (!this.path) this.goTo(w.exit.x, w.exit.z, 0);
         if (dist(this.x, this.z, w.exit.x, w.exit.z) < 2.5) {
           this.out = true;
           this.group.visible = false;
@@ -446,6 +449,10 @@ export class Human {
         if (this.pathI >= this.path.length) { this.path = null; if (this.state === "investigate") this.stateT = Math.min(this.stateT, 2.6); }
       } else {
         wantX = (n.x - this.x) / d; wantZ = (n.z - this.z) / d;
+        // 目ざす点の高さへ、なめらかに上り下りする
+        const ty = n.y === undefined ? 0 : n.y;
+        this.y = lerp(this.y, ty, clamp(dt * (Math.abs(ty - this.y) > 1.5 ? 2.2 : 5), 0, 1));
+        this.floor = n.floor;
       }
     }
 
@@ -457,11 +464,11 @@ export class Human {
       this.vz = lerp(this.vz, 0, clamp(dt * 9, 0, 1));
     }
 
-    const r = w.colliders.resolve(this.x + this.vx * dt, this.z + this.vz * dt, this.radius, 1.0 * HUMAN_SCALE);
+    const r = w.colliders.resolve(this.x + this.vx * dt, this.z + this.vz * dt, this.radius, this.y + 1.0 * HUMAN_SCALE, ["stair"]);
     if (r.hit) {
       // 引っかかったら経路を引き直す
       this.stuck = (this.stuck || 0) + dt;
-      if (this.stuck > 1.2 && this.target) { this.goTo(this.target.x, this.target.z); this.stuck = 0; }
+      if (this.stuck > 1.2 && this.target) { this.goTo(this.target.x, this.target.z, this.target.floor); this.stuck = 0; }
     } else this.stuck = 0;
     this.x = r.x; this.z = r.z;
 

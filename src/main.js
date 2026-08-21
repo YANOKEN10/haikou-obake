@@ -12,6 +12,7 @@ import { UI } from "./ui.js";
 import { Audio } from "./audio.js";
 import { MATERIALS, TRAPS, GHOSTS, HUMAN_TYPES, RANKS } from "./data.js";
 import { clamp, rand, randi, choice, dist } from "./util.js";
+const FLOOR_HEIGHT_HALF = 2.6;
 
 // ============================================================
 //  入力
@@ -132,8 +133,9 @@ class Game {
   // --- 初期化 ------------------------------------------------
   build() {
     const t0 = performance.now();
-    // 隠し要素：どのトイレに置くかは毎回ランダム
-    const toilets = ["toilet"];
+    // 隠し要素：全階のトイレから、毎回ランダムにひとつ選ぶ
+    const toilets = [];
+    for (let f = 1; f <= 4; f++) { toilets.push("wc_m" + f, "wc_f" + f); }
     this.world = buildWorld(this.scene, { dust: this.q.dust, poopRoom: choice(toilets) });
 
     this.sky = buildSky(this.scene);
@@ -194,13 +196,15 @@ class Game {
     const s = choice(spots);
     const table = ["hokori", "hokori", "hokori", "chalk", "chalk", "uwabaki", "pan", "denchi", "nurunuru"];
     const kind = choice(table);
-    const r = this.world.colliders.resolve(s.x + rand(-0.8, 0.8), s.z + rand(-0.8, 0.8), 0.3, 0.6);
-    this.pickups.push(new Pickup(this.scene, kind, r.x, r.z, rand(0.45, 0.75)));
+    const y = s.y || 0;
+    const r = this.world.colliders.resolve(s.x + rand(-0.8, 0.8), s.z + rand(-0.8, 0.8), 0.3, y + 0.6);
+    this.pickups.push(new Pickup(this.scene, kind, r.x, r.z, y + rand(0.45, 0.75)));
   }
 
-  dropAt(kind, x, z) {
-    const r = this.world.colliders.resolve(x + rand(-0.6, 0.6), z + rand(-0.6, 0.6), 0.3, 0.6);
-    this.pickups.push(new Pickup(this.scene, kind, r.x, r.z, 0.55));
+  dropAt(kind, x, z, y) {
+    const yy = y || 0;
+    const r = this.world.colliders.resolve(x + rand(-0.6, 0.6), z + rand(-0.6, 0.6), 0.3, yy + 0.6);
+    this.pickups.push(new Pickup(this.scene, kind, r.x, r.z, yy + 0.55));
   }
 
   // --- 人間の襲来 --------------------------------------------
@@ -313,7 +317,7 @@ class Game {
       this.texts.push(new FloatText(this.scene, tag + Math.round(eff),
         best.x, 2.9, best.z, best.lastCombo ? "#9dffe0" : behind ? "#ff8ac4" : "#ffd45e", (behind || best.lastCombo) ? 2.2 : 1.7));
       const drop = best.takeDrop();
-      if (drop) { this.dropAt(drop, best.x, best.z); this.texts.push(new FloatText(this.scene, MATERIALS[drop].icon + "落とした", best.x, 2.0, best.z, "#7fe8b8", 1.5)); }
+      if (drop) { this.dropAt(drop, best.x, best.z, best.y); this.texts.push(new FloatText(this.scene, MATERIALS[drop].icon + "落とした", best.x, 2.0, best.z, "#7fe8b8", 1.5)); }
     } else {
       this.bump("laughed");
       this.audio.laugh();
@@ -331,7 +335,7 @@ class Game {
     this.ui.toast("🎉 " + h.name + " を追い出した！（計 " + this.kicked + " 人）", "gold");
     this.audio.escape();
     for (let i = 0; i < 3; i++) this.dropAt("onnen", this.world.exit.x + rand(-4, 4), 30 + rand(-3, 3));
-    this.dropAt("onnen", h.x, h.z);
+    this.dropAt("onnen", h.x, h.z, h.y);
     if (r.name !== before) {
       this.rankName = r.name;
       this.audio.rankUp();
@@ -381,7 +385,7 @@ class Game {
     for (let i = this.pickups.length - 1; i >= 0; i--) {
       const it = this.pickups[i];
       it.update(dt, t);
-      if (dist(it.x, it.z, p.x, p.z) < 1.35 && Math.abs(it.y - p.y) < 2.2) {
+      if (dist(it.x, it.z, p.x, p.z) < 1.35 && Math.abs(it.y - p.y) < 1.8) {
         this.inv[it.kind] = (this.inv[it.kind] || 0) + 1;
         this.bump("materials");
         this.audio.pickup();
@@ -444,7 +448,7 @@ class Game {
         if (eff > 0) {
           this.audio.scream(h.type.courage < 90 ? 1.3 : 1);
           const drop = h.takeDrop();
-          if (drop) this.dropAt(drop, h.x, h.z);
+          if (drop) this.dropAt(drop, h.x, h.z, h.y);
           // 理科室・音楽室の備品も呼応する
           for (const pr of w.props) {
             if ((tr.id === "piano" && pr.kind === "piano") || (tr.id === "jintai" && pr.kind === "jintai")) {
@@ -466,7 +470,7 @@ class Game {
         if (eff > 0) {
           this.audio.scream(res.human.type.courage < 90 ? 1.3 : 1);
           const drop = res.human.takeDrop();
-          if (drop) this.dropAt(drop, res.human.x, res.human.z);
+          if (drop) this.dropAt(drop, res.human.x, res.human.z, res.human.y);
         }
       }
       if (s.dead) {
@@ -497,12 +501,13 @@ class Game {
     for (const pr of w.props) {
       if (pr.kind !== "poop" || pr.found) continue;
       if (dist(pr.x, pr.z, p.x, p.z) > 1.6) continue;
+      if (Math.abs(pr.mesh.position.y - p.y) > 1.8) continue;
       pr.found = true;
       this.bump("poop");
       this.audio.laugh();
       this.ui.toast("💩 見つけてしまった…（誰のだ）", "gold");
       this.texts.push(new FloatText(this.scene, "うわっ", pr.x, 1.6, pr.z, "#c9a06a", 1.8));
-      for (let i = 0; i < 4; i++) this.dropAt("onnen", pr.x, pr.z);
+      for (let i = 0; i < 4; i++) this.dropAt("onnen", pr.x, pr.z, pr.mesh.position.y - 0.6);
     }
 
     // --- 懐中電灯ライトプール（プレイヤーに近い人だけ灯す） --
@@ -527,6 +532,7 @@ class Game {
 
     // --- 非常灯ライトプール ---------------------------------
     const spots = w.lightSpots
+      .filter((s) => Math.abs((s.y - 1.8) - p.y) < FLOOR_HEIGHT_HALF)
       .map((s) => ({ s, d: dist(s.x, s.z, p.x, p.z) }))
       .sort((a, b) => a.d - b.d);
     for (let i = 0; i < this.lampPool.length; i++) {
@@ -551,7 +557,7 @@ class Game {
   // --- HUD ---------------------------------------------------
   updateHud(dt, t) {
     const p = this.player, w = this.world;
-    this.ui.setPlace(w.roomAt(p.x, p.z));
+    this.ui.setPlace(w.roomAt(p.x, p.z, p.y));
     this.ui.setBag(this.inv);
     this.ui.setHotbar(this.built, this.selTrap);
     this.ui.setHumans(this.humans);

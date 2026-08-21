@@ -1,5 +1,6 @@
 import * as THREE from "../lib/three.module.js";
 import { clamp, lerp, angleLerp } from "./util.js";
+import { FLOOR_H, FLOORS } from "./world.js";
 
 // ============================================================
 //  プレイヤー（おばけ）と3人称カメラ
@@ -151,17 +152,27 @@ export class Player {
 
     // --- 上下 ----------------------------------------------
     const up = input.k("Space") ? 1 : input.k("KeyC") ? -1 : 0;
-    const hover = 1.02 + Math.sin(t * 1.9) * 0.05;
-    if (up !== 0) this.vy = lerp(this.vy, up * 2.6, clamp(9 * dt, 0, 1));
+    const indoors = w.isIndoors(this.x, this.z);
+    const inShaft = indoors && w.inStairShaft(this.x, this.z);
+    // いま何階にいるか（階段の途中では、近いほうの階に落ち着く）
+    this.floor = clamp(Math.round((this.y - 1.02) / FLOOR_H), 0, FLOORS - 1);
+    const base = indoors ? this.floor * FLOOR_H : 0;
+    const hover = base + 1.02 + Math.sin(t * 1.9) * 0.05;
+    if (up !== 0) this.vy = lerp(this.vy, up * 3.0, clamp(9 * dt, 0, 1));
     else this.vy = lerp(this.vy, (hover - this.y) * 3.2, clamp(6 * dt, 0, 1));
-    const ceilY = w.isIndoors(this.x, this.z) ? 2.55 : 5.0;
-    this.y = clamp(this.y + this.vy * dt, 0.38, ceilY);
+    let lo = 0.38, hi = 5.0;
+    if (indoors) {
+      lo = inShaft ? 0.38 : base + 0.38;
+      hi = inShaft ? FLOORS * FLOOR_H - 0.7 : base + 2.55;
+    }
+    this.y = clamp(this.y + this.vy * dt, lo, hi);
+    this.inShaft = inShaft;
 
     // --- 移動と衝突 ----------------------------------------
     let nx = this.x + this.vx * dt;
     let nz = this.z + this.vz * dt;
     if (!this.phasing) {
-      const r = w.colliders.resolve(nx, nz, this.radius, this.y);
+      const r = w.colliders.resolve(nx, nz, this.radius, this.y, this.inShaft ? ["stair"] : null);
       if (r.hit) { this.vx *= 0.55; this.vz *= 0.55; }
       nx = r.x; nz = r.z;
     } else {

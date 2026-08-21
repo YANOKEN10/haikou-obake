@@ -60,11 +60,12 @@ export class Colliders {
   }
 
   // 円(x,z,r) を y の高さで箱から押し出す。戻り値 {x,z,hit}
-  resolve(x, z, r, y = 1.0) {
+  resolve(x, z, r, y = 1.0, ignore = null) {
     let hit = false;
     for (let pass = 0; pass < 2; pass++) {
       for (const b of this.near(x, z, r + 0.5)) {
         if (y + 0.6 < b.y1 || y - 0.6 > b.y2) continue;
+        if (ignore && ignore.indexOf(b.tag) >= 0) continue;
         const cx = clamp(x, b.x1, b.x2);
         const cz = clamp(z, b.z1, b.z2);
         const dx = x - cx, dz = z - cz;
@@ -88,8 +89,8 @@ export class Colliders {
   }
 
   // 歩いて通り抜けられるか（腰高の窓で止まる高さで見る。机やイスは迂回できるので無視）
-  navSight(ax, az, bx, bz) {
-    return this.lineOfSight(ax, az, bx, bz, 0.6, 0.12, ["furn"]);
+  navSight(ax, az, bx, bz, floorY = 0) {
+    return this.lineOfSight(ax, az, bx, bz, floorY + 0.6, 0.12, ["furn"]);
   }
 
   // 視線が通るか（XZ平面のレイ vs AABB、指定の高さ帯のみ）
@@ -117,8 +118,8 @@ export class Colliders {
 export class NavGraph {
   constructor() { this.nodes = []; this.links = []; }
 
-  addNode(x, z, floor = 0, room = "") {
-    this.nodes.push({ x, z, floor, room, i: this.nodes.length });
+  addNode(x, z, floor = 0, room = "", y = null) {
+    this.nodes.push({ x, z, floor, room, y: y === null ? floor * 3.6 : y, i: this.nodes.length });
     this.links.push([]);
     return this.nodes.length - 1;
   }
@@ -136,7 +137,7 @@ export class NavGraph {
         const a = this.nodes[i], b = this.nodes[j];
         if (a.floor !== b.floor) continue;
         if (dist(a.x, a.z, b.x, b.z) > maxDist) continue;
-        if (!colliders.navSight(a.x, a.z, b.x, b.z)) continue;
+        if (!colliders.navSight(a.x, a.z, b.x, b.z, a.y || 0)) continue;
         this.link(i, j);
       }
     return this;
@@ -144,7 +145,8 @@ export class NavGraph {
 
   // colliders を渡すと「壁ごしに近いだけの点」を除外する。
   // 近い順に見て、最初に歩いてたどり着けたノードを返す。
-  nearest(x, z, floor = 0, colliders = null, maxR = 26) {
+  nearest(x, z, floor = 0, colliders = null, maxR = 26, y = null) {
+    const fy = y === null ? floor * 3.6 : y;
     const cand = [];
     let any = -1, ad = Infinity;
     const maxD2 = maxR * maxR;
@@ -157,7 +159,7 @@ export class NavGraph {
     if (!colliders) return any;
     cand.sort((a, b) => a.d - b.d);
     for (const c of cand) {
-      if (colliders.navSight(x, z, c.n.x, c.n.z)) return c.i;
+      if (colliders.navSight(x, z, c.n.x, c.n.z, fy)) return c.i;
     }
     return any;   // どこへも歩けない位置なら、単純な最寄りで妥協する
   }
