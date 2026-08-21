@@ -5,7 +5,7 @@
 //   ・メールアドレスは一切あつかわない
 // ============================================================
 const crypto = require("crypto");
-const { put, get } = require("@vercel/blob");
+const { put, get, del } = require("@vercel/blob");
 
 const SECRET = process.env.AUTH_SECRET || "";   // 代用はしない（他ゲームと同じ鍵になる事故を防ぐ）
 const ORIGINS = [
@@ -31,7 +31,7 @@ function cors(req, res) {
     res.setHeader("Access-Control-Allow-Origin", o);
   }
   res.setHeader("Vary", "Origin");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
   res.setHeader("Cache-Control", "no-store");
 }
@@ -69,6 +69,10 @@ async function writeUser(u) {
     allowOverwrite: true,
     contentType: "application/json",
   });
+}
+
+async function deleteUser(id) {
+  try { await del(idKey(id)); } catch (e) { /* もともと無い場合は成功扱い */ }
 }
 
 // --- あいことば ---------------------------------------------
@@ -112,6 +116,6 @@ function publicUser(u) {
 }
 
 module.exports = {
-  configured, notReady, cors, body, normId, readUser, writeUser,
+  configured, notReady, cors, body, normId, readUser, writeUser, deleteUser,
   hashPw, checkPw, slowDown, makeToken, readToken, bearer, publicUser,
 };

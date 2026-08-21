@@ -92,6 +92,12 @@ export class Cloud {
     return r;
   }
 
+  async removeAccount(pw) {
+    const r = await this.call("/api/save", { method: "DELETE", body: { pw } });
+    if (r.ok) this.signOut();
+    return r;
+  }
+
   async changePw(oldPw, newPw) {
     return await this.call("/api/save", { method: "POST", body: { oldPw, newPw } });
   }

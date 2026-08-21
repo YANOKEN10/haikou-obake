@@ -694,7 +694,7 @@ class Game {
     if (!r.ok) return r;
     if (!r.payload || !r.payload.profile) return { ok: false, why: "あずけた記録がまだありません" };
     const p = r.payload.profile;
-    p.name = p.name || (this.cloud.name || "クラウド");
+    if (!p.name || p.name === "ゲスト") p.name = this.cloud.name || "クラウド";
     S.saveProfile(p);
     S.setCurrent(p.name);
     this.profile = S.getProfile(p.name);

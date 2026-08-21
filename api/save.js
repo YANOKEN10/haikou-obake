@@ -19,6 +19,18 @@ module.exports = async function handler(req, res) {
       res.status(200).json({ user: L.publicUser(user), payload: user.payload || null });
       return;
     }
+    // アカウントごと消す（あいことばの確認が必要）
+    if (req.method === "DELETE") {
+      const bb = L.body(req);
+      if (!L.checkPw(String(bb.pw == null ? "" : bb.pw), user)) {
+        await L.slowDown();
+        res.status(401).json({ error: "auth", message: "あいことばが ちがいます。" });
+        return;
+      }
+      await L.deleteUser(claim.id);
+      res.status(200).json({ deleted: true });
+      return;
+    }
     if (req.method !== "POST") { res.status(405).json({ error: "method" }); return; }
 
     const b = L.body(req);

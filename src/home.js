@@ -208,6 +208,7 @@ export class Home {
         "<button class='bigbtn' id='btnPush'>☁ いまの記録をあずける</button>" +
         "<button class='bigbtn sub' id='btnPull'>⬇ あずけた記録をとりだす</button>" +
         "<button class='bigbtn sub' id='btnOut'>ログアウト</button>" +
+        "<button class='bigbtn sub' id='btnDel' style='border-color:var(--fear);color:var(--fear)'>このアカウントを消す</button>" +
         "<div class='msg' id='mailMsg'></div>" +
         "<div class='note'>ほかの端末でも、同じ<b>なまえ</b>と<b>あいことば</b>でログインすれば、" +
         "「とりだす」でつづきから遊べます。<br>" +
@@ -228,6 +229,14 @@ export class Home {
         if (r.ok) this.show("play");
       });
       $("#btnOut").addEventListener("click", () => { c.signOut(); this.game.audio.click(); this.renderMail(); });
+      $("#btnDel").addEventListener("click", async () => {
+        const pw = prompt("あずけた記録をぜんぶ消します。もとに戻せません。\nよろしければ、あいことばを入れてください。");
+        if (pw === null) return;
+        msg("消しています…", true);
+        const r = await c.removeAccount(pw);
+        if (r.ok) { this.game.audio.click(); this.renderMail(); $("#mailMsg").textContent = "消しました"; }
+        else { msg(r.why, false); this.game.audio.deny(); }
+      });
       return;
     }
 
