@@ -188,7 +188,7 @@ export class Home {
     const body = $("#frBody");
     const row = (c, kind) => {
       const sm = c.has
-        ? "👑 " + esc(c.rank || "?") + "　追い出した " + c.kicked + " 人　遊んだ時間 " + S.fmtTime(c.playSeconds)
+        ? "追い出した " + c.kicked + " 人　いちばんの波 " + c.wave + " 陣　遊んだ時間 " + S.fmtTime(c.playSeconds)
         : "まだ 記録がありません";
       let btns = "";
       if (kind === "friend") {
