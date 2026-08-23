@@ -155,28 +155,31 @@ export class Player {
 
     // --- 上下 ----------------------------------------------
     const up = input.k("Space") ? 1 : input.k("KeyC") ? -1 : 0;
-    const indoors = w.isIndoors(this.x, this.z);
+    const indoors = w.isIndoors(this.x, this.z, this.y);
     const inShaft = indoors && w.inStairShaft(this.x, this.z);
     // いま何階にいるか（階段の途中では、近いほうの階に落ち着く）
-    this.floor = clamp(Math.round((this.y - 1.02) / FLOOR_H), 0, FLOORS - 1);
-    const base = indoors ? this.floor * FLOOR_H : 0;
+    this.floor = clamp(Math.round((this.y - 1.02) / FLOOR_H), 0, FLOORS);
+    const base = indoors ? Math.min(this.floor, FLOORS) * FLOOR_H : 0;
     let hover = base + 1.02 + Math.sin(t * 1.9) * 0.05;
     if (inShaft) {
       // 階段では、段の高さに沿って自然に上り下りする（奥へ進むと上へ）
       const rel = stairSurface(this.x, this.z, w.stairCenterX(this.x));
       let best = null;
-      for (let f = 0; f < FLOORS; f++) {
+      for (let f = 0; f <= FLOORS; f++) {
         const cand = f * FLOOR_H + rel + 1.02;
         if (best === null || Math.abs(cand - this.y) < Math.abs(best - this.y)) best = cand;
       }
-      hover = clamp(best, 1.02, (FLOORS - 1) * FLOOR_H + 1.02);
+      hover = clamp(best, 1.02, FLOORS * FLOOR_H + 1.02);
     }
     if (up !== 0) this.vy = lerp(this.vy, up * 3.0, clamp(9 * dt, 0, 1));
     else this.vy = lerp(this.vy, (hover - this.y) * 3.2, clamp(6 * dt, 0, 1));
     let lo = 0.38, hi = 5.0;
-    if (indoors) {
+    const onRoof = indoors && this.y > w.roofY - 1.0;
+    if (onRoof) {
+      lo = w.roofY + 0.38; hi = w.roofY + 3.2;
+    } else if (indoors) {
       lo = inShaft ? 0.38 : base + 0.38;
-      hi = inShaft ? FLOORS * FLOOR_H - 0.7 : base + 2.55;
+      hi = inShaft ? FLOORS * FLOOR_H + 2.4 : base + 2.55;
     } else if (w.inGym && w.inGym(this.x, this.z)) {
       hi = w.gymCeil;                       // 体育館は天井が高い
     }

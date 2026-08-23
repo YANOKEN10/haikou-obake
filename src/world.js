@@ -54,6 +54,7 @@ export function buildWorld(scene, opts = {}) {
   buildGym(ctx);
   buildEntranceHall(ctx);
   buildRoof(ctx);
+  buildSecret(ctx);
 
   linkNav(ctx);
   col.build();
@@ -69,9 +70,12 @@ export function buildWorld(scene, opts = {}) {
   return {
     colliders: col, nav, rooms, spawnSpots, props, lightSpots,
     exit: EXIT_POINT, entry: HUMAN_ENTRY, staticMesh, triangles: mb.triangles,
-    bounds: { x1: -52, x2: 52, z1: -18, z2: 82 },
+    bounds: { x1: -52, x2: 52, z1: -36, z2: 82 },
     northOutsideZ: RZ1 - 1.6,
     floors: FLOORS,
+    roofY: floorY(FLOORS),
+    secret: SECRET,
+    inSecret(x, z, y) { return x > SECRET.x1 && x < SECRET.x2 && z > SECRET.z1 && z < SECRET.z2 && Math.abs(y - SECRET.y) < 4; },
     floorOf(y) { return Math.max(0, Math.min(FLOORS - 1, Math.round(y / FLOOR_H))); },
     // その位置が階段の吹き抜けの中か（おばけはここで上下に移動できる）
     stairCenterX(x) { return (x < 0 ? (ST_W.x1 + ST_W.x2) : (ST_E.x1 + ST_E.x2)) / 2; },
@@ -80,6 +84,7 @@ export function buildWorld(scene, opts = {}) {
       return (x > ST_W.x1 && x < ST_W.x2) || (x > ST_E.x1 && x < ST_E.x2);
     },
     roomAt(x, z, y) {
+      if (z < RZ1 - 1 && x > SECRET.x1 - 3 && x < SECRET.x2 && (y || 0) > SECRET.y - 2) return "？？？";
       if (z > 1.6) {
         if (x > GYM.x1 && x < GYM.x2 && z > GYM.z1 && z < GYM.z2) return "体育館";
         if (z > 34.5) return "運動場";
@@ -88,15 +93,25 @@ export function buildWorld(scene, opts = {}) {
         return "中庭";
       }
       if (z >= -0.2 && x > EH.x1 && x < EH.x2) return "昇降口";
+      if ((y || 0) > floorY(FLOORS) - 1.2) return "屋上";
       const f = Math.max(0, Math.min(FLOORS - 1, Math.round((y || 0) / FLOOR_H)));
       const label = FLOOR_LABEL[f];
       if (z > HZ1) return label + " 廊下";
       for (const r of FLOOR_ROOMS[f]) if (x >= r.x1 && x <= r.x2) return label + " " + r.name;
       return label + " 廊下";
     },
-    isIndoors(x, z) { return z < 0.2 && z > RZ1 - 0.2 && x > BX1 && x < BX2; },
+    isIndoors(x, z, y = 0) {
+      if (z < 0.2 && z > RZ1 - 0.2 && x > BX1 && x < BX2) return true;
+      // 秘密の通路と忘れられた教室。4階の高さにいるときだけ「屋内」あつかい
+      if (y > SECRET.y - 1.5) {
+        if (x > 21.4 && x < 24.6 && z < RZ1 + 0.2 && z > RZ1 - 4.4) return true;
+        if (x > SECRET.x1 && x < SECRET.x2 && z > SECRET.z1 && z < SECRET.z2) return true;
+      }
+      return false;
+    },
     inGym(x, z) { return x > GYM.x1 && x < GYM.x2 && z > GYM.z1 && z < GYM.z2; },
     gymCeil: GYM.h - 1.0,
+    gym: { x1: GYM.x1, x2: GYM.x2, z1: GYM.z1, z2: GYM.z2 },
     update(dt, t) { for (const p of props) if (p.update) p.update(dt, t); },
   };
 }
@@ -194,7 +209,7 @@ function buildStairs(ctx, r, f, y0) {
   mb.slab(r.x1 + 0.6, zN - 1.4, r.x2 - 0.6, zN + 0.2, y0 + half, 0.24, C.concrete, { jitter: 0.06 });
   col.add(r.x1 + 0.6, zN - 1.4, r.x2 - 0.6, zN + 0.2, y0, y0 + half, "stair");
 
-  if (f < FLOORS - 1) {
+  {
     // 上り①：手前 → 奥（西半分）
     for (let i = 0; i < N; i++) {
       const t = (i + 1) / N;
@@ -264,13 +279,67 @@ function buildEntranceHall(ctx) {
 }
 
 function buildRoof(ctx) {
-  const { mb } = ctx;
+  const { mb, col, rooms, spawnSpots, props, lightSpots } = ctx;
   const top = floorY(FLOORS);
-  tiled(mb, BX1, RZ1, BX2, HZ2, top, 0.34, 0x55524b, 8);
-  for (const e of [RZ1, HZ2]) mb.box(0, top + 0.55, e, BX2 - BX1 + 0.5, 1.1, 0.34, 0x7a7469, { jitter: 0.05 });
-  for (const x of [BX1, BX2]) mb.box(x, top + 0.55, (RZ1 + HZ2) / 2, 0.34, 1.1, HZ2 - RZ1, 0x7a7469, { jitter: 0.05 });
-  mb.box(28, top + 4.2, -9, 3.0, 2.4, 3.0, 0x6e7a80, { jitter: 0.05 });
-  for (const dx of [-1.2, 1.2]) for (const dz of [-1.2, 1.2]) mb.box(28 + dx, top + 1.6, -9 + dz, 0.18, 3.2, 0.18, 0x4d5459);
+
+  // 床（歩けるように、当たり判定つきの手すりで囲む）
+  tiled(mb, BX1, RZ1, BX2, HZ2, top, 0.34, 0x63605a, 7);
+  grime(mb, BX1 + 2, RZ1 + 1, BX2 - 2, HZ2 - 1, top - 0.02, 0.55);
+
+  // 低い立ち上がり＋その上の金網フェンス
+  const fenceH = 1.9;
+  const edges = [[BX1, RZ1, BX2, RZ1], [BX1, HZ2, BX2, HZ2]];
+  for (const e of edges) {
+    mb.box((e[0] + e[2]) / 2, top + 0.35, e[1], e[2] - e[0] + 0.6, 0.7, 0.34, 0x7a7469, { jitter: 0.06 });
+    col.add(Math.min(e[0], e[2]) - 0.3, e[1] - 0.3, Math.max(e[0], e[2]) + 0.3, e[1] + 0.3, top, top + fenceH, "wall");
+    for (let x = e[0]; x <= e[2]; x += 2.2) mb.box(x, top + 1.3, e[1], 0.09, 1.3, 0.09, C.fence, { jitter: 0.12 });
+    mb.wall(e[0], e[1], e[2], e[1], top + 0.7, top + fenceH, 0.05, 0x4a5057, { jitter: 0.07 });
+    mb.box((e[0] + e[2]) / 2, top + fenceH, e[1], e[2] - e[0], 0.1, 0.14, C.metal, { jitter: 0.05 });
+  }
+  for (const x of [BX1, BX2]) {
+    mb.box(x, top + 0.35, (RZ1 + HZ2) / 2, 0.34, 0.7, HZ2 - RZ1, 0x7a7469, { jitter: 0.06 });
+    col.add(x - 0.3, RZ1, x + 0.3, HZ2, top, top + fenceH, "wall");
+    for (let z = RZ1; z <= HZ2; z += 2.2) mb.box(x, top + 1.3, z, 0.09, 1.3, 0.09, C.fence, { jitter: 0.12 });
+    mb.wall(x, RZ1, x, HZ2, top + 0.7, top + fenceH, 0.05, 0x4a5057, { jitter: 0.07 });
+  }
+
+  // 階段室から屋上へ出る小屋（東西とも）
+  for (const s of [ST_W, ST_E]) {
+    const cx = (s.x1 + s.x2) / 2;
+    const hx1 = cx - 2.2, hx2 = cx + 2.2, hz1 = RZ2 - 3.4, hz2 = RZ2 - 0.6;
+    wallWithHoles(mb, col, { axis: "x", fixed: hz1, from: hx1, to: hx2, y1: top, y2: top + 2.6, thick: 0.22, color: C.wall,
+      holes: [{ a: cx - 0.9, b: cx + 0.9, y1: top, y2: top + 2.1 }] });
+    wallWithHoles(mb, col, { axis: "x", fixed: hz2, from: hx1, to: hx2, y1: top, y2: top + 2.6, thick: 0.22, color: C.wall });
+    wallWithHoles(mb, col, { axis: "z", fixed: hx1, from: hz1, to: hz2, y1: top, y2: top + 2.6, thick: 0.22, color: C.wall });
+    wallWithHoles(mb, col, { axis: "z", fixed: hx2, from: hz1, to: hz2, y1: top, y2: top + 2.6, thick: 0.22, color: C.wall });
+    mb.slab(hx1 - 0.3, hz1 - 0.3, hx2 + 0.3, hz2 + 0.3, top + 2.9, 0.3, 0x55524b, { jitter: 0.05 });
+    lightSpots.push({ x: cx, y: top + 2.3, z: hz1 - 0.6, floor: FLOORS });
+  }
+
+  // 給水塔
+  mb.box(28, top + 4.4, -9, 3.2, 2.6, 3.2, 0x6e7a80, { jitter: 0.05 });
+  col.add(26.4, -10.6, 29.6, -7.4, top, top + 6, "wall");
+  for (const dx of [-1.3, 1.3]) for (const dz of [-1.3, 1.3]) mb.box(28 + dx, top + 1.7, -9 + dz, 0.2, 3.4, 0.2, 0x4d5459);
+  // はしご
+  for (let i = 0; i < 8; i++) mb.box(26.2, top + 0.5 + i * 0.4, -9, 0.7, 0.06, 0.06, C.metal, { jitter: 0.1 });
+
+  // ベンチと、置きっぱなしの物
+  for (const b2 of [[-20, -9], [8, -6], [-6, -11]]) {
+    mb.box(b2[0], top + 0.42, b2[1], 2.0, 0.1, 0.5, C.wood, { jitter: 0.1 });
+    for (const s2 of [-0.8, 0.8]) mb.box(b2[0] + s2, top + 0.2, b2[1], 0.1, 0.44, 0.4, C.metal);
+    col.add(b2[0] - 1, b2[1] - 0.3, b2[0] + 1, b2[1] + 0.3, top, top + 0.5, "furn");
+    spawnSpots.push({ x: b2[0] + 1.6, z: b2[1] + 1, y: top, floor: FLOORS });
+  }
+  // 水たまりと落ち葉
+  for (let i = 0; i < 60; i++) {
+    mb.box(rand(BX1 + 2, BX2 - 2), top + 0.02, rand(RZ1 + 1, HZ2 - 1), rand(0.3, 1.2), 0.02, rand(0.3, 1.2),
+      choice([0x4a4438, 0x3a4a44, 0x5c4433]), { jitter: 0.4, rotY: rand(0, 3.14) });
+  }
+  for (let i = 0; i < 10; i++) spawnSpots.push({ x: rand(BX1 + 3, BX2 - 3), z: rand(RZ1 + 2, HZ2 - 2), y: top, floor: FLOORS });
+  props.push(makeCobweb(BX1 + 1.5, top + 1.5, RZ1 + 1.5, 1.1));
+
+  rooms.push({ id: "roof", name: "屋上", floor: FLOORS, cx: 0, cz: -7, y: top,
+    x1: BX1, x2: BX2, z1: RZ1, z2: HZ2, kind: "roof", label: "屋上" });
 }
 
 // ============================================================
@@ -652,6 +721,12 @@ function linkNav(ctx) {
   nav.addNode(GYM.x2 - 1.6, GYM_DOOR.z, 0, "体育館", 0.24);
   for (let x = GYM.x1 + 6; x < GYM.x2 - 2; x += 6)
     for (let z = GYM.z1 + 6; z < GYM.z2 - 7; z += 6) nav.addNode(x, z, 0, "体育館", 0.24);
+  // 屋上
+  for (let x = BX1 + 6; x <= BX2 - 6; x += 7) {
+    for (const z of [-11, -6]) nav.addNode(x, z, FLOORS, "屋上", floorY(FLOORS));
+  }
+  for (const s of [ST_W, ST_E]) nav.addNode((s.x1 + s.x2) / 2, RZ2 - 2.6, FLOORS, "屋上", floorY(FLOORS));
+
   // 正門とその外
   for (const z of [FIELD.z2 - 3, FIELD.z2 + 1.5, EXIT_POINT.z]) nav.addNode(EXIT_POINT.x, z, 0, "正門", 0);
 }
@@ -668,7 +743,7 @@ function linkStairs(ctx) {
     });
     return best;
   };
-  for (let f = 0; f < FLOORS - 1; f++) {
+  for (let f = 0; f < FLOORS; f++) {
     for (const s of [ST_W, ST_E]) {
       const cx = (s.x1 + s.x2) / 2;
       const lower = find(cx, RZ2 - 2.6, f);
@@ -1148,4 +1223,96 @@ function makeBall(x, y, z) {
     new THREE.MeshLambertMaterial({ color: choice([0xd8721f, 0xc9c4b4, 0x7a4a3a]) }));
   m.position.set(x, y, z);
   return { mesh: m, kind: "ball", x, z, update(dt, t) { m.rotation.y = t * 0.2; } };
+}
+
+// ============================================================
+//  秘密のマップ
+//   4階「音楽準備室」の奥の壁は、すりぬけでしか通れない。
+//   その先に、忘れられた教室がひろがっている。
+// ============================================================
+const SECRET = { x1: 6, x2: 34, z1: -34, z2: -18, y: floorY(3), h: 5.2 };
+
+function buildSecret(ctx) {
+  const { mb, col, rooms, spawnSpots, props, lightSpots } = ctx;
+  const S = SECRET, y0 = S.y, H = S.h;
+  const cx = (S.x1 + S.x2) / 2, cz = (S.z1 + S.z2) / 2;
+
+  // 床と天井
+  tiled(mb, S.x1, S.z1, S.x2, S.z2, y0 + 0.02, 0.3, 0x6a5a72, 6);
+  tiled(mb, S.x1, S.z1, S.x2, S.z2, y0 + H, 0.28, 0x3a3244, 6);
+  // 四方の壁（外からは入れない）
+  for (const e of [[S.z1, "x"], [S.z2, "x"]]) {
+    wallWithHoles(mb, col, { axis: "x", fixed: e[0], from: S.x1, to: S.x2, y1: y0, y2: y0 + H, thick: 0.3, color: 0x5a4f6a });
+  }
+  wallWithHoles(mb, col, { axis: "z", fixed: S.x1, from: S.z1, to: S.z2, y1: y0, y2: y0 + H, thick: 0.3, color: 0x5a4f6a });
+  wallWithHoles(mb, col, { axis: "z", fixed: S.x2, from: S.z1, to: S.z2, y1: y0, y2: y0 + H, thick: 0.3, color: 0x5a4f6a });
+
+  // 入口となる「すりぬけ専用の壁」
+  //   4階の音楽準備室（x 20〜26）の北の外壁ぎわに、細い通路をつなぐ
+  const gate = { x: 23, z1: RZ1, z2: S.z2 };
+  tiled(mb, gate.x - 1.4, gate.z1 - 4.2, gate.x + 1.4, gate.z1 + 0.2, y0 + 0.02, 0.3, 0x6a5a72, 3);
+  tiled(mb, gate.x - 1.4, gate.z1 - 4.2, gate.x + 1.4, gate.z1 + 0.2, y0 + 3.2, 0.28, 0x3a3244, 3);
+  for (const sx of [gate.x - 1.4, gate.x + 1.4]) {
+    wallWithHoles(mb, col, { axis: "z", fixed: sx, from: gate.z1 - 4.2, to: gate.z1 + 0.2, y1: y0, y2: y0 + 3.2, thick: 0.24, color: 0x5a4f6a });
+  }
+  // 目印：床にうっすら光る印
+  for (let i = 0; i < 4; i++) {
+    mb.box(gate.x, y0 + 0.06, RZ1 + 2.2 - i * 0.5, 0.62 - i * 0.11, 0.03, 0.16, 0x8f6bff, { jitter: 0.15 });
+  }
+  props.push(makeSecretGlow(gate.x, y0 + 1.5, RZ1 + 0.28));
+
+  // 中身：忘れられた教室
+  for (let i = 0; i < 4; i++)
+    for (let j = 0; j < 3; j++) {
+      const dx = S.x1 + 4 + i * 5.5, dz = S.z1 + 4 + j * 4;
+      if (Math.random() < 0.3) { tippedDesk(mb, col, dx, dz, y0, rand(0, 6.28)); continue; }
+      desk(mb, col, dx, dz, y0, rand(0, 6.28));
+      chair(mb, col, dx + 0.9, dz, y0, rand(0, 6.28));
+    }
+  // 中央に、ぽつんと置かれた古いオルガン
+  mb.box(cx, y0 + 0.55, cz, 1.6, 1.1, 0.8, 0x2a2230, { jitter: 0.06 });
+  mb.box(cx, y0 + 1.14, cz + 0.3, 1.3, 0.08, 0.34, 0xe8e6dc, { jitter: 0.05 });
+  col.add(cx - 0.9, cz - 0.5, cx + 0.9, cz + 0.5, y0, y0 + 1.2, "furn");
+  // 黒板に書かれた、消えかけの文字
+  mb.box(S.x1 + 0.4, y0 + 2.0, cz, 0.14, 1.4, 7.0, C.board, { jitter: 0.04 });
+  for (let i = 0; i < 12; i++) {
+    mb.box(S.x1 + 0.5, y0 + 1.7 + rand(0, 0.7), cz - 3 + i * 0.55, 0.03, rand(0.1, 0.3), rand(0.1, 0.3),
+      0xd8d4c8, { jitter: 0.3 });
+  }
+  // 宙に浮くカケラ（雰囲気）
+  props.push(makeSecretMotes(cx, y0 + 2.2, cz));
+  props.push(makeCobweb(S.x1 + 1, y0 + H - 0.8, S.z1 + 1, 1.6));
+  props.push(makeCobweb(S.x2 - 1, y0 + H - 0.8, S.z1 + 1, 1.6));
+  for (const z of [S.z1 + 4, cz, S.z2 - 4]) lightSpots.push({ x: cx, y: y0 + H - 0.6, z, floor: 3 });
+
+  // 材料がたっぷり
+  for (let i = 0; i < 34; i++) {
+    spawnSpots.push({ x: rand(S.x1 + 1.5, S.x2 - 1.5), z: rand(S.z1 + 1.5, S.z2 - 1.5), y: y0, floor: 3, rich: true });
+  }
+  rooms.push({ id: "secret", name: "忘れられた教室", floor: 3, cx, cz, y: y0,
+    x1: S.x1, x2: S.x2, z1: S.z1, z2: S.z2, kind: "secret", label: "？？？", secret: true });
+}
+
+function makeSecretGlow(x, y, z) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.9),
+    new THREE.MeshBasicMaterial({ color: 0xa98bff, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false }));
+  m.position.set(x, y, z);
+  return { mesh: m, kind: "secretGate", x, z,
+    update(dt, t) { m.material.opacity = 0.2 + Math.sin(t * 1.6) * 0.09 + Math.sin(t * 5.1) * 0.03; } };
+}
+
+function makeSecretMotes(x, y, z) {
+  const N = 90, pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    pos[i * 3] = x + rand(-13, 13); pos[i * 3 + 1] = y + rand(-1.6, 2.4); pos[i * 3 + 2] = z + rand(-7, 7);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xc9a6ff, size: 0.09, transparent: true, opacity: 0.6, depthWrite: false }));
+  return { mesh: pts, kind: "motes", x, z,
+    update(dt, t) {
+      const a = g.attributes.position.array;
+      for (let i = 1; i < a.length; i += 3) { a[i] += dt * 0.09; if (a[i] > y + 2.6) a[i] = y - 1.6; }
+      g.attributes.position.needsUpdate = true;
+    } };
 }

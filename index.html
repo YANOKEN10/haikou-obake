@@ -178,6 +178,9 @@ body.touch .hpanel, body.touch .namelist, body.touch .cwrap{-webkit-overflow-scr
   font-size:10.5px;line-height:1.2;pointer-events:auto;backdrop-filter:blur(3px);text-align:center}
 .tbtn i{font-style:normal;font-size:21px;line-height:1}
 .tbtn.on{background:rgba(169,123,255,.6);transform:scale(.92)}
+.tbtn.ready{border-color:#b6ffd0;color:#b6ffd0;box-shadow:0 0 14px rgba(182,255,208,.5)}
+#bTake{right:198px;bottom:152px;width:58px;height:58px;opacity:.55}
+#bTake.ready{opacity:1}
 #bScare{right:20px;bottom:20px;width:92px;height:92px;border-color:var(--gold);color:var(--gold);font-size:12px}
 #bScare i{font-size:27px}
 #bPhase{right:124px;bottom:32px;width:66px;height:66px}
@@ -210,6 +213,7 @@ body.touch.portrait #rotate{display:flex}
   body.touch #gauges{right:auto;left:8px;bottom:auto;top:110px;width:118px;gap:4px}
   .g{padding:2px 7px;font-size:9.5px}
   #bCraft{left:150px;bottom:16px;width:64px;height:64px}
+  #bTake{right:196px;bottom:150px;width:52px;height:52px}
   #hint{bottom:auto;top:130px;font-size:11px;padding:3px 10px}
   #toasts{top:96px}
   .toast{font-size:12px;padding:4px 12px}
@@ -490,6 +494,7 @@ body.touch #craftClose{display:block}
   <div class="tbtn" id="bPlace"><i>📍</i>おく</div>
   <div class="tbtn" id="bUp"><i>⬆</i>うく</div>
   <div class="tbtn" id="bPhase"><i>👻</i>すりぬけ</div>
+  <div class="tbtn" id="bTake"><i>🫳</i>もどす</div>
   <div class="tbtn" id="bScare"><i>😱</i>おどかす</div>
 </div>
 

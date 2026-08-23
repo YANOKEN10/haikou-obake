@@ -24,6 +24,7 @@ export class TouchControls {
     this.bindLook();
     this.bindButton("bScare", () => game.doScare());
     this.bindButton("bPlace", () => game.placeTrap());
+    this.bindButton("bTake", () => game.retrieve());
     this.bindHold("bPhase", "KeyQ");
     this.bindHold("bUp", "Space");
     this.bindButton("bCraft", () => {

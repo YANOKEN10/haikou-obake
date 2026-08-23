@@ -165,6 +165,81 @@ export class Human {
       if (s2 < 0) this.shoeL = sh; else this.shoeR = sh;
     }
 
+    // --- 持ち物・かぶり物（人ごとの見わけ） -------------------
+    const acc = T.acc || "none";
+    const hairM2 = new THREE.MeshLambertMaterial({ color: T.hair || 0x30262a });
+    if (acc === "glasses") {
+      const gm = new THREE.MeshLambertMaterial({ color: 0x2a2a30 });
+      for (const sx of [-0.085, 0.085]) {
+        const l = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.09, 0.02), gm);
+        l.position.set(sx, 1.63, 0.185); this.body.add(l);
+      }
+      const br = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.02, 0.02), gm);
+      br.position.set(0, 1.63, 0.185); this.body.add(br);
+    } else if (acc === "cap") {
+      const cm = new THREE.MeshLambertMaterial({ color: T.trim || 0x8899aa });
+      const c = new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), cm);
+      c.position.y = 1.68; this.body.add(c);
+      const brim = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.03, 0.18), cm);
+      brim.position.set(0, 1.68, 0.2); this.body.add(brim);
+    } else if (acc === "beanie") {
+      const bm = new THREE.MeshLambertMaterial({ color: T.trim || 0x99aa88 });
+      const c = new THREE.Mesh(new THREE.SphereGeometry(0.215, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), bm);
+      c.position.y = 1.66; this.body.add(c);
+      const p2 = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), bm);
+      p2.position.set(0, 1.86, 0); this.body.add(p2);
+    } else if (acc === "headphone") {
+      const hm = new THREE.MeshLambertMaterial({ color: 0x2a2f3a });
+      for (const sx of [-0.2, 0.2]) {
+        const e = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.14), hm);
+        e.position.set(sx, 1.62, 0); this.body.add(e);
+      }
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.022, 6, 12, Math.PI), hm);
+      band.position.y = 1.62; band.rotation.y = Math.PI / 2; this.body.add(band);
+    } else if (acc === "scarf") {
+      const sm = new THREE.MeshLambertMaterial({ color: T.trim || 0xcc6677 });
+      const s1 = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.13, 0.3), sm);
+      s1.position.y = 1.44; this.body.add(s1);
+      const s2 = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.4, 0.06), sm);
+      s2.position.set(0.13, 1.24, 0.17); this.body.add(s2);
+    } else if (acc === "backpack") {
+      const pm = new THREE.MeshLambertMaterial({ color: 0x554466 });
+      const p3 = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.46, 0.2), pm);
+      p3.position.set(0, 1.16, -0.24); this.body.add(p3);
+    } else if (acc === "camera") {
+      const cm2 = new THREE.MeshLambertMaterial({ color: 0x22242a });
+      const c = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.12), cm2);
+      c.position.set(0, 1.18, 0.2); this.body.add(c);
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.1, 10), cm2);
+      lens.rotation.x = Math.PI / 2; lens.position.set(0, 1.18, 0.3); this.body.add(lens);
+      const strap = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.014, 6, 14), cm2);
+      strap.position.y = 1.35; strap.rotation.x = Math.PI / 2; this.body.add(strap);
+    } else if (acc === "hood") {
+      const hm2 = new THREE.MeshLambertMaterial({ color: T.blazer || 0x445566 });
+      const hd = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 9, 0, Math.PI * 2, 0, Math.PI * 0.6), hm2);
+      hd.position.set(0, 1.6, -0.03); this.body.add(hd);
+    } else if (acc === "mask") {
+      const mm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.06),
+        new THREE.MeshLambertMaterial({ color: 0xf0f2f6 }));
+      mm.position.set(0, 1.56, 0.14); this.body.add(mm);
+    } else if (acc === "ribbon") {
+      const rm = new THREE.MeshLambertMaterial({ color: T.trim || 0xff88aa });
+      for (const sx of [-0.1, 0.1]) {
+        const w2 = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.1, 0.06), rm);
+        w2.position.set(sx, 1.78, -0.06); this.body.add(w2);
+      }
+    } else if (acc === "ponytail") {
+      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.04, 0.5, 8), hairM2);
+      tail.position.set(0, 1.42, -0.22); tail.rotation.x = -0.35; this.body.add(tail);
+    } else if (acc === "ahoge") {
+      const ah = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.02, 0.24, 6), hairM2);
+      ah.position.set(0.03, 1.88, -0.02); ah.rotation.z = 0.5; this.body.add(ah);
+    } else if (acc === "towel") {
+      const tm = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.1, 0.26),
+        new THREE.MeshLambertMaterial({ color: 0xe8e2d0 }));
+      tm.position.set(0, 1.44, -0.02); this.body.add(tm);
+    }
+
     // 懐中電灯（光は Game 側のライトプールが受けもつ）
     this.sway = 0;
     this.torchHot = false;

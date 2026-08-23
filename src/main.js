@@ -7,10 +7,11 @@ import * as S from "./save.js";
 import { Cloud } from "./cloud.js";
 import { Player } from "./player.js";
 import { Human, HUMAN_SCALE } from "./human.js";
-import { Pickup, Trap, Summon, FloatText, RedLady } from "./entities.js";
+import { Pickup, Trap, Summon, FloatText, RedLady, Cat, Confession } from "./entities.js";
 import { UI } from "./ui.js";
 import { Audio } from "./audio.js";
-import { MATERIALS, TRAPS, GHOSTS, HUMAN_TYPES, RANKS } from "./data.js";
+import { MATERIALS, TRAPS, GHOSTS, RANKS } from "./data.js";
+import { Roster } from "./people.js";
 import { clamp, rand, randi, choice, dist } from "./util.js";
 const FLOOR_HEIGHT_HALF = 3.2;
 
@@ -103,6 +104,7 @@ class Game {
     this.scareFx = 0;
     this.rankName = RANKS[0].name;
 
+    this.roster = new Roster(100);
     this.humans = [];
     this.pickups = [];
     this.traps = [];
@@ -175,6 +177,8 @@ class Game {
     }
 
     this.redLady = new RedLady(this.scene);
+    this.cat = new Cat(this.scene);
+    this.confession = new Confession(this.scene);
 
     this.player = new Player(this.scene, this.world);
     this.player.x = 0; this.player.z = 16;
@@ -210,21 +214,16 @@ class Game {
   // --- 人間の襲来 --------------------------------------------
   spawnWave() {
     this.wave++;
-    const n = clamp(2 + Math.floor(this.wave / 2), 2, 5);
-    const pool = [...HUMAN_TYPES];
-    // 波が進むほど肝の据わった人が来る
-    pool.sort((a, b) => (a.courage - b.courage) * (this.wave > 2 ? -1 : 1));
-    const picks = [];
-    for (let i = 0; i < n; i++) picks.push(pool[(i + this.wave) % pool.length]);
-
-    for (let i = 0; i < picks.length; i++) {
-      const e = this.world.entry;
-      const h = new Human(this.scene, this.world, picks[i], e.x + rand(-2.5, 2.5), e.z + rand(-1.5, 1.5));
-      h.speak(choice(picks[i].idle), 4);
-      h.goTo(rand(-25, 25), rand(6, 26));
+    const group = this.roster.next();
+    const e = this.world.entry;
+    for (let i = 0; i < group.members.length; i++) {
+      const t = group.members[i];
+      const h = new Human(this.scene, this.world, t, e.x + rand(-3, 3), e.z + rand(-2, 2));
+      h.speak(choice(t.idle), 4 + i * 0.4);
+      h.goTo(rand(-25, 25), rand(8, 28), 0);
       this.humans.push(h);
     }
-    this.ui.toast("第" + this.wave + "陣、" + n + "人が校門をくぐった…", "bad");
+    this.ui.toast("第" + this.wave + "陣：" + group.label + "（" + group.members.length + "人）が来た…", "bad");
     this.audio.tone(180, 0.7, "sawtooth", 0.1, 90);
   }
 
@@ -277,6 +276,51 @@ class Game {
     this.ui.toast(TRAPS[id].name + " を設置した", "good");
   }
 
+  // --- 回収（置いた仕掛け・おばけを取りもどす） ---------------
+  //  近くの仕掛けは在庫にもどり、おばけは材料にもどる。
+  //  持ちなおして置きなおせるので、配置を何度でもやりなおせる。
+  retrieve() {
+    const p = this.player;
+    let best = null, bd = 3.4, kind = null;
+    for (const tr of this.traps) {
+      const d = dist(tr.x, tr.z, p.x, p.z);
+      if (d < bd) { bd = d; best = tr; kind = "trap"; }
+    }
+    for (const s of this.summons) {
+      const d = dist(s.x, s.z, p.x, p.z);
+      if (d < bd) { bd = d; best = s; kind = "ghost"; }
+    }
+    if (!best) {
+      this.audio.deny();
+      this.ui.toast("回収できるものが近くにない", "bad");
+      return;
+    }
+    if (kind === "trap") {
+      this.built[best.id] = (this.built[best.id] || 0) + 1;
+      this.selTrap = Object.keys(TRAPS).indexOf(best.id);
+      this.ui.setHotbar(this.built, this.selTrap);
+      this.texts.push(new FloatText(this.scene, "回収", best.x, 1.8, best.z, "#b6ffd0", 1.5));
+      this.ui.toast(best.def.name + " を回収した（F でまた置ける）", "good");
+      best.dispose();
+      this.traps.splice(this.traps.indexOf(best), 1);
+    } else {
+      // 召喚したおばけは、材料の半分をかえしてくれる
+      let back = 0;
+      for (const k in best.def.cost) {
+        const n = Math.max(1, Math.round(best.def.cost[k] * 0.5));
+        this.inv[k] = (this.inv[k] || 0) + n;
+        back += n;
+      }
+      this.ui.setBag(this.inv);
+      this.texts.push(new FloatText(this.scene, "…おやすみ", best.x, 2.0, best.z, "#c9a6ff", 1.6));
+      this.ui.toast(best.def.name + " を回収した（材料 " + back + " こ もどった）", "good");
+      best.dispose();
+      this.summons.splice(this.summons.indexOf(best), 1);
+    }
+    this.bump("retrieved");
+    this.audio.place();
+  }
+
   // --- おどかす ----------------------------------------------
   doScare() {
     const p = this.player;
@@ -289,6 +333,16 @@ class Game {
     }
     p.scareCooldown = 1.5;
     p.scarePose = 0.75;
+    // 告白の最中なら、台なしにする（材料はどっさり）
+    if (this.confession && this.confession.active &&
+        dist(this.confession.g.position.x, this.confession.g.position.z, p.x, p.z) < 6) {
+      this.confession.interrupt();
+      this.audio.scream(1.2);
+      this.bump("ruined");
+      this.ui.toast("💔 告白を台なしにしてしまった…", "bad");
+      for (let i = 0; i < 6; i++) this.dropAt("onnen", this.confession.g.position.x, this.confession.g.position.z, 0);
+      return;
+    }
     if (!best) {
       this.audio.tone(420, 0.14, "triangle", 0.06, 260);
       this.texts.push(new FloatText(this.scene, "わっ！", p.x, p.y + 2.1, p.z, "#8fa8c8", 1.4));
@@ -375,6 +429,7 @@ class Game {
     for (let i = 0; i < 6; i++) if (inp.once("Digit" + (i + 1))) { this.selTrap = i; this.audio.click(); }
     if (inp.wheel) { this.selTrap = (this.selTrap + inp.wheel + 6) % 6; this.audio.click(); }
     if (inp.once("KeyF")) this.placeTrap();
+    if (inp.once("KeyR")) this.retrieve();
     if (inp.once("KeyE")) this.doScare();
 
     p.update(dt, inp, this.camera, t);
@@ -428,6 +483,18 @@ class Game {
       if (h.out) {
         h.outT = (h.outT || 0) + dt;
         if (h.outT > 4) { this.scene.remove(h.group); this.humans.splice(i, 1); }
+      }
+    }
+
+    // --- 回収の案内 -----------------------------------------
+    {
+      let near = false;
+      for (const tr of this.traps) if (dist(tr.x, tr.z, p.x, p.z) < 3.4) { near = true; break; }
+      if (!near) for (const s of this.summons) if (dist(s.x, s.z, p.x, p.z) < 3.4) { near = true; break; }
+      if (near !== this.nearPlaced) {
+        this.nearPlaced = near;
+        const el = document.getElementById("bTake");
+        if (el) el.classList.toggle("ready", near);
       }
     }
 
@@ -498,6 +565,23 @@ class Game {
       this.bump("redLady");
       if (!this.sawRedLady) { this.sawRedLady = true; this.ui.toast("⋯窓の外を、なにかが通った気がした", "bad"); }
     }
+    if (this.cat && this.cat.update(dt, t, w, p) === "appeared") {
+      if (!this.sawCat) { this.sawCat = true; this.ui.toast("🐈 …ネコだ。こっちを見ている", "good"); }
+      this.bump("cat");
+    }
+    if (this.cat && this.cat.active && !this.cat.found &&
+        dist(this.cat.g.position.x, this.cat.g.position.z, p.x, p.z) < 2.2) {
+      this.cat.found = true;
+      this.bump("catClose");
+      this.ui.toast("🐈 ネコに近づけた（おばけは怖くないらしい）", "gold");
+      this.texts.push(new FloatText(this.scene, "にゃー", this.cat.g.position.x, 0.9, this.cat.g.position.z, "#ffe27a", 1.5));
+      for (let i = 0; i < 3; i++) this.dropAt("onnen", this.cat.g.position.x, this.cat.g.position.z, 0);
+    }
+    if (this.confession && this.confession.update(dt, t, w, p) === "appeared") {
+      if (!this.sawConfess) { this.sawConfess = true; this.ui.toast("💌 体育館の裏に、だれかいる…", "good"); }
+      this.bump("confession");
+    }
+
     for (const pr of w.props) {
       if (pr.kind !== "poop" || pr.found) continue;
       if (dist(pr.x, pr.z, p.x, p.z) > 1.6) continue;
@@ -576,7 +660,8 @@ class Game {
       const d = dist(p.x, p.z, h.x, h.z);
       if (d < nd) { nd = d; near = h; }
     }
-    if (w.inStairShaft && w.isIndoors(p.x, p.z) && w.inStairShaft(p.x, p.z)) {
+    if (this.nearPlaced) hint = this.touch ? "「もどす」で回収できる" : "R キーで回収できる";
+    if (w.inStairShaft && w.isIndoors(p.x, p.z, p.y) && w.inStairShaft(p.x, p.z)) {
       hint = "階段：おくへ進むと上の階、てまえへ戻ると下の階";
     }
     for (const b of w.colliders.near(p.x, p.z, 2.2)) {
