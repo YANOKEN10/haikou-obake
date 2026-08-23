@@ -231,16 +231,16 @@ export const NAMED = [
     scared: ["ひぃっ！パクチー落とした！", "香りが…香りが飛んだ！", "こわいけどパクチーは離さない"],
     flee: ["パクチーだけは死守する！！", "また来る！パクチー持ってくる！", "うわああ束がほどけたああ"] },
 
-  { name: "画家の宮崎駿", arch: "artist", sex: "m", hair: 0xd8d4cc, blazer: 0x4a4438,
+  { name: "画家のハヤオさん", arch: "artist", sex: "m", hair: 0xd8d4cc, blazer: 0x4a4438,
     trim: 0xc8c0a8, acc: "glasses", courage: 168, speed: 2.0,
     idle: ["この崩れかた、じつにいい。描かせてもらうよ", "ここには、風が通っている", "手を動かしなさい。話はそれからだ",
       "腐った柱ほど、絵になるものはない"],
     scared: ["…ほう。そういう出かたをするか", "むっ、いまのは描けん。速すぎる", "生きものの動きだな。うん、いい"],
     flee: ["きょうはここまで！スケッチは持って帰る！", "取材は終わりだ！撤収！", "また来る。こんどは朝に来る！"] },
 
-  { name: "配信者のヒカキン", arch: "streamer", sex: "m", hair: 0x1f1a1c, blazer: 0x2f3a5a,
+  { name: "配信者のヒカルン", arch: "streamer", sex: "m", hair: 0x1f1a1c, blazer: 0x2f3a5a,
     trim: 0xa8d8ff, acc: "headphone", courage: 142, speed: 2.9,
-    idle: ["ブンブンハローはいきょう、どうもーー", "きょうは廃校に来ておりまーす", "高評価、よろしくお願いしまーす",
+    idle: ["ブンブンハロー廃校、どうもーー", "きょうは廃校に来ておりまーす", "高評価、よろしくお願いしまーす",
       "この音、マイクひろってますかね？"],
     scared: ["ちょっと待って待って待って！！", "でたーー！！いま完全にでました！！", "カメラ回ってる？回ってるよね？"],
     flee: ["今回はここまで！次回、次回！", "編集でモザイクかけます！！", "みんなは絶対にマネしないでね！！"] },
@@ -279,6 +279,118 @@ export const NAMED = [
       "頭が濡れてるから、風が冷たくてな", "近道するつもりだったんだ。ほんとだぞ"],
     scared: ["ひゃあ！せっかく温まったのに！", "鳥肌！鳥肌が立った！湯冷めする！", "桶！桶を落とした！"],
     flee: ["もういっぺん風呂入りなおす！！", "コーヒー牛乳が！こぼれる！！", "サンダルが脱げたああ！！"] },
+
+  { name: "帰宅部のユウゾウ", arch: "kids", sex: "m", hair: 0x2f2620, blazer: 0x3a4048,
+    trim: 0xa8b0b8, acc: "hood", courage: 70, speed: 3.0,
+    idle: ["おれ帰宅部なんで、帰るのが部活なんですよ", "もう帰っていいですか", "なんで来ちゃったんだろう",
+      "家に帰るまでが肝だめしです"],
+    scared: ["ほら！帰ろうって言ったのに！", "帰宅部の本気、見せてやる", "うわあ帰りたい帰りたい帰りたい"],
+    flee: ["帰宅！！これぞ帰宅！！", "部活動、終了ーー！", "おれの得意分野だここは！！"] },
+
+  { name: "全てが似合ってないミチコ", arch: "gal", sex: "f", hair: 0xc8a83a, blazer: 0x8a3a6a,
+    trim: 0x6ae8c8, skirt: 0xe8a03a, acc: "ribbon", courage: 92, speed: 2.9,
+    idle: ["この服、めっちゃ似合ってるでしょ？", "きょうの帽子、自信あるんだ", "みんな見すぎ。てれるって",
+      "この靴で来たの、ちょっと後悔してる"],
+    scared: ["きゃー！せっかくキメたのに！", "髪！髪だけはやめて！", "写真だけは撮らないで！いまは！"],
+    flee: ["だっさい顔で逃げてるとこ見ないで！", "ヒールで走れるわけないでしょ！", "また明日ちがう服で来る！"] },
+
+  { name: "おばけ評論家のミカコ", arch: "occult", sex: "f", hair: 0x2b2228, blazer: 0x3a2f4a,
+    trim: 0xc8a8e8, skirt: 0x4a3a5a, acc: "glasses", courage: 178, speed: 2.2,
+    idle: ["ふむ。この校舎、5点満点で3.8といったところ", "出かたに工夫がほしいですね", "評論家なので、正直に書きます",
+      "うわさ通りの物件です。期待できます"],
+    scared: ["いまの！いまのは4.5点！", "おみごと。減点なしです", "ちょっと待って、メモ、メモを取らせて"],
+    flee: ["満点です！満点だから許して！", "星5つ！星5つあげるから！", "評価は帰ってから書きます！！"] },
+
+  { name: "占い師のハットリ", arch: "medium", sex: "m", hair: 0x1f1a1c, blazer: 0x2a2a4a,
+    trim: 0xe8c86a, acc: "hood", courage: 188, speed: 2.1,
+    idle: ["きょうのあなたの運勢、大凶と出ております", "水晶は持ってきた。電池は忘れた",
+      "この先に、よくないものが見える…気がする", "当たるも八卦、当たらぬも八卦"],
+    scared: ["当たった！当たってしまった！", "こんなに当たると こわいんですけど", "占いより先に来ないでください"],
+    flee: ["きょうの運勢、書きかえます！", "凶！大凶！おおいに凶！", "水晶は置いていく！命は持ってく！"] },
+
+  { name: "ロングスリーパーのアツシ", arch: "coward", sex: "m", hair: 0x3a2f28, blazer: 0x44404a,
+    trim: 0x9aa0a8, acc: "beanie", courage: 82, speed: 2.1,
+    idle: ["ねむい。12時間寝ないと無理なんだって", "教室で寝ていい？だめ？", "ここ、意外と寝心地よさそう",
+      "…zzz……あ、起きてる。起きてます"],
+    scared: ["うわっ！目がさめた！", "こんなに起きたの ひさしぶり", "びっくりして 眠気が飛んだ！"],
+    flee: ["起きたばっかりなのに走らせるな！", "帰って寝る！ぜったい寝る！", "ねむい！でも走る！ねむい！"] },
+
+  { name: "ショートスリーパーのネルオ", arch: "runner", sex: "m", hair: 0x2b2228, blazer: 0x2f4a5a,
+    trim: 0x8ad8e8, acc: "towel", courage: 138, speed: 3.7,
+    idle: ["おれ3時間で足りるから、夜が長いんだ", "名まえはネルオだけど、寝ないよ", "夜中がいちばん元気なんだよね",
+      "朝までぜんぶ回れるよ、この校舎"],
+    scared: ["おっ！いいね！目が冴える！", "アドレナリン！出た！", "こういうの待ってた！…けどこわい"],
+    flee: ["まだ走れる！まだ走れるってば！", "きょうも寝ないで済みそう！！", "いったん外！外に出る！"] },
+
+  { name: "マザコンのダイチ", arch: "coward", sex: "m", hair: 0x3f3028, blazer: 0x3a4a3a,
+    trim: 0xa8c8a8, acc: "backpack", courage: 62, speed: 3.1,
+    idle: ["おかんが おにぎり持たせてくれた", "門限、9時なんだよね", "おかんに電話していい？いま",
+      "この校舎、おかんの母校らしいよ"],
+    scared: ["おかーーーーん！！！", "おかんに言いつけるからな！", "おかんが心配する！おれじゃなくて！"],
+    flee: ["おかん！むかえに来て！！", "おにぎり落とした！おかんごめん！", "門限にはぜったい間に合わせる！！"] },
+
+  { name: "犬の散歩帰りのホリ", arch: "salary", sex: "m", hair: 0x4a3f38, blazer: 0x53483a,
+    trim: 0xd8c8a0, acc: "cap", courage: 128, speed: 2.6,
+    idle: ["うちのポチが、ここで動かなくなってな", "犬は正直だよ。なにか感じてる", "リードは持ってる。犬はいない",
+      "散歩コースを変えるべきかもしれん"],
+    scared: ["ポチ！ポチが正しかった！", "犬より先に逃げるとは思わなんだ", "リードだけ握りしめてる…"],
+    flee: ["ポチーー！先に帰ってろーー！", "散歩コース、あすから変える！！", "うちの犬に あわせる顔がない！"] },
+
+  { name: "ベジタリアンのトム", arch: "foodie", sex: "m", hair: 0x8a6a3a, blazer: 0x3a5a3a,
+    trim: 0x9ee88a, acc: "scarf", courage: 112, speed: 2.6,
+    idle: ["ぼく、お肉たべないので おばけも大丈夫かなって", "この校舎の裏、野草がすごいですね",
+      "非常食はナッツです。分けますよ", "おばけって、なに食べるんですか？"],
+    scared: ["ヒィ！野菜！野菜の力を！", "ナッツこぼした！もったいない！", "ぼく食べてもおいしくないですよ！"],
+    flee: ["野草はまた採りに来ます！！", "肉食のものからは逃げる！！", "ぼくは草食です！草食！！"] },
+
+  { name: "スーパー先生のソリマチ", arch: "senpai", sex: "m", hair: 0x2f2620, blazer: 0x2a3a5a,
+    trim: 0xd8d8c8, acc: "glasses", courage: 172, speed: 2.7,
+    idle: ["先生が来たからには、もう安心だぞ", "はい、二列にならんで。はぐれるな", "この学校、じつは前の勤務先でな",
+      "夜の学校では、静かにするのが基本だ"],
+    scared: ["せ、先生はこういうのも 想定ずみだ！", "落ちついて！先生が落ちつくから！", "教科書には…載ってなかったな"],
+    flee: ["生徒が先！先生は最後！…やっぱり先！", "職員会議にかける！かけます！", "全員点呼！走りながら点呼ーー！"] },
+
+  { name: "卓球部のマエス", arch: "runner", sex: "m", hair: 0x2b2228, blazer: 0x3a4a2f,
+    trim: 0xc8e88a, acc: "headphone", courage: 132, speed: 3.2,
+    idle: ["ラケット持ってきた。相手いないけど", "反射神経なら だれにも負けない", "この床、卓球台おけそうじゃない？",
+      "ピン球ひとつ落としちゃったんだよね"],
+    scared: ["いまのサーブ、速すぎるって！", "レシーブ！…できるわけない！", "反射神経が追いつかない！！"],
+    flee: ["ラリー終了！！おれの負け！！", "ラケットは置いてく！！", "また練習して出直す！！"] },
+
+  { name: "借金取りのゼンキチ", arch: "salary", sex: "m", hair: 0x1f1a1c, blazer: 0x2a2a2f,
+    trim: 0x8a8a8a, acc: "mask", courage: 160, speed: 2.5,
+    idle: ["ここに逃げこんだって聞いたんだがな", "おたく、心あたりは？", "こわいものは とっくに見てきた",
+      "おれの仕事、夜が多いんでね"],
+    scared: ["おいおい、聞いてない！こんなの契約にないぞ！", "取り立てる相手が ちがった！", "こ、こっちが逃げる番か！"],
+    flee: ["きょうのところは 引きあげる！！", "利子はつけとくからな！！", "また来る！…来ないかも！！"] },
+
+  { name: "ヤンキーのリュウヤ", arch: "senpai", sex: "m", hair: 0xc8a83a, blazer: 0x4a2a2a,
+    trim: 0xe86a5a, acc: "mask", courage: 148, speed: 3.0,
+    idle: ["ここ、おれの中学んときのたまり場な", "だれだよ こんなとこ こわがるやつ", "おれがついてっからよ、安心しろ",
+      "上等だよ、出てこいや"],
+    scared: ["ちょ、まっ、タンマ！タンマだって！", "ダチ！ダチ呼ぶわ！いま呼ぶわ！", "こわくねーし。こわくねーし！"],
+    flee: ["おぼえてろよーー！！", "ダチんち行くわ！おれ帰るわ！", "きょうは気分じゃねーんだよ！！"] },
+
+  { name: "ヤンママのチエ", arch: "gal", sex: "f", hair: 0xc86a3a, blazer: 0x6a2a4a,
+    trim: 0xffa8c8, skirt: 0x3a2a3a, acc: "ponytail", courage: 126, speed: 2.8,
+    idle: ["うちの子、いま実家にあずけてきたんよ", "ママ友に すすめられて来たんだけど", "こう見えて三児の母だから",
+      "ここ、うちの子の学区だったんだよね"],
+    scared: ["ちょっと！子どもがいたらどうすんの！", "うちの子には ぜったい見せない！", "ママをなめんじゃないよ！…こわい！"],
+    flee: ["子どもが待ってる！帰る！！", "ママ友に言いふらしてやる！！", "PTAに報告するからね！！"] },
+
+  { name: "チアガールのヤスコ", arch: "runner", sex: "f", hair: 0xd8b06a, blazer: 0x8a2a3a,
+    trim: 0xffe08a, skirt: 0xffffff, acc: "ponytail", courage: 134, speed: 3.3,
+    idle: ["みんなーー！元気だしていこーー！", "ポンポン持ってきた。夜でも振る", "応援なら まかせて！",
+      "V！I！C！T！O！R！Y！"],
+    scared: ["ふれー！ふれー！…わたし！", "ポンポンが宙を舞った！", "笑顔！笑顔をたもって…むり！"],
+    flee: ["いったん！ベンチにもどりまーす！", "応援しながら逃げまーす！！", "つぎの試合で挽回しまーす！！"] },
+
+  { name: "ガソリン入れたいハマダ", arch: "senpai", sex: "m", hair: 0x3a2f28, blazer: 0x3f4a53,
+    trim: 0xa8c0d8, acc: "towel", courage: 122, speed: 2.4,
+    idle: ["さっきから 給油ランプ ついてるんだよ", "この辺、スタンドないの？", "帰り、たどりつけるかな",
+      "だれかガソリン持ってない？…持ってないか"],
+    scared: ["うわっ！エンジンより先に 心臓が止まる！", "こんなときに 給油ランプ！", "ガス欠でここに置いてかれるのは いやだ！"],
+    flee: ["車！車まで もつか！？", "押していく！押してでも帰る！", "セルフのスタンドを さがす！！"] },
 ];
 
 // ============================================================
@@ -294,6 +406,7 @@ function makePerson(archId, seed, forceSex) {
   const pool = sex === "f" ? NAMES_F : NAMES_M;
   return {
     id: archId + "_" + seed,
+    seed,
     name: pick(A.title, seed) + pick(pool, seed * 7 + 3),
     arch: archId,
     sex,
@@ -321,12 +434,30 @@ function namedToType(n) {
   };
 }
 
+// 同じ組のなかで名まえがぶつかったら、別の人に取りかえる
+function uniquify(members, reserved) {
+  const seen = new Set();
+  for (let i = 0; i < members.length; i++) {
+    let m = members[i];
+    let tries = 0;
+    // 指名の人と同じ名まえになった一般の人も、取りかえる
+    while ((seen.has(m.name) || (!m.named && reserved.has(m.name))) && tries < 60) {
+      tries++;
+      m = makePerson(m.arch, (m.seed || 1) + tries * 101 + 7);
+      members[i] = m;
+    }
+    seen.add(m.name);
+  }
+  return members;
+}
+
 // グループの呼び名
 const GROUP_LABEL = ["の一行", "たち", "のグループ", "御一行", "の仲間", "とその友達"];
 
 export function buildRoster(count = 100) {
   const groups = [];
   const named = NAMED.map(namedToType);
+  const namedNames = new Set(named.map((n) => n.name));
 
   for (let g = 0; g < count; g++) {
     const size = 2 + ((g * 3) % 4);              // 2〜5人
@@ -343,6 +474,9 @@ export function buildRoster(count = 100) {
       const n = named[((g - 1) / 3 | 0) % named.length];
       members[members.length - 1] = n;
     }
+    // 同じ組に、同じ名まえの人がふたりいないようにする
+    //  （名まえは「肩書き＋名」の組みあわせなので、たまたま重なることがある）
+    uniquify(members, namedNames);
     groups.push({
       id: g,
       label: members[0].name + pick(GROUP_LABEL, g),
@@ -359,6 +493,22 @@ export function buildRoster(count = 100) {
   const oji = ["銭湯帰りのヨシダ", "体重100キロのコムスビ", "原チャのお坊さんクマキチ"]
     .map((nm) => named.find((n) => n.name === nm)).filter(Boolean);
   if (oji.length === 3) groups[31] = { id: 31, label: "湯上がりの三人組", members: oji };
+
+  // 指名の人が ひとりも出そこねないよう、最後に確かめて入れなおす
+  //  （組み合わせを決めうちした組があるので、はじき出される人が出る）
+  const appear = new Set();
+  for (const gr of groups) for (const m of gr.members) if (m.named) appear.add(m.name);
+  let slot = 0;
+  for (const n of named) {
+    if (appear.has(n.name)) continue;
+    // 指名の人がいない組をさがして、そこへ入れる
+    while (slot < groups.length && groups[slot].members.some((m) => m.named)) slot++;
+    if (slot >= groups.length) break;
+    groups[slot].members[groups[slot].members.length - 1] = n;
+    uniquify(groups[slot].members, namedNames);
+    appear.add(n.name);
+    slot++;
+  }
 
   // 実況コンビ
   const kiyo = named.find((n) => n.name.indexOf("キヨ") >= 0);

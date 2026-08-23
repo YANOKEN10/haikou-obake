@@ -156,8 +156,8 @@ function buildFloor(ctx, f) {
   //  木造校舎らしく、下見板張り＋柱＋格子窓＋ひさし で仕上げる
   const north = windowRow(BX1 + 2, BX2 - 2, 3.0, 4.6, y0 + 0.95, y0 + 2.55);
   wallWithHoles(mb, col, { axis: "x", fixed: RZ1, from: BX1, to: BX2, y1: y0, y2: y1, thick: WALL_T, color: C.wall, holes: north });
-  siding(mb, "x", RZ1, BX1, BX2, y0, y1, -1);
-  posts(mb, "x", RZ1, BX1, BX2, y0, y1, -1);
+  siding(mb, "x", RZ1, BX1, BX2, y0, y1, -1, 0.42, north);
+  posts(mb, "x", RZ1, BX1, BX2, y0, y1, -1, 4.6, north);
   for (const h of north) sash(mb, "x", RZ1 - 0.06, h.a, h.b, h.y1, h.y2, 2);
   eave(mb, "x", RZ1, BX1, BX2, y0 + 2.78, 0.72, -1);
 
@@ -165,8 +165,8 @@ function buildFloor(ctx, f) {
     .filter((h) => f > 0 || h.b < -7.5 || h.a > 7.5);
   if (f === 0) south.push({ a: -3, b: 3, y1: y0, y2: y0 + 2.5 });
   wallWithHoles(mb, col, { axis: "x", fixed: HZ2, from: BX1, to: BX2, y1: y0, y2: y1, thick: WALL_T, color: C.wall, holes: south });
-  siding(mb, "x", HZ2, BX1, BX2, y0, y1, 1);
-  posts(mb, "x", HZ2, BX1, BX2, y0, y1, 1);
+  siding(mb, "x", HZ2, BX1, BX2, y0, y1, 1, 0.42, south);
+  posts(mb, "x", HZ2, BX1, BX2, y0, y1, 1, 4.6, south);
   for (const h of south) {
     if (f === 0 && h.a === -3) continue;                 // 昇降口は枠なし
     sash(mb, "x", HZ2 + 0.06, h.a, h.b, h.y1, h.y2, 2);
@@ -184,9 +184,9 @@ function buildFloor(ctx, f) {
   // 下のほうの階ほど、蔦がびっしり這っている
   if (f < 2) {
     const dens = f === 0 ? 40 : 20;
-    ivy(mb, "x", RZ1, BX1 + 1, BX2 - 1, y0, FLOOR_H, -1, dens);
-    ivy(mb, "x", HZ2, BX1 + 1, -9, y0, FLOOR_H, 1, dens * 0.6);
-    ivy(mb, "x", HZ2, 9, BX2 - 1, y0, FLOOR_H, 1, dens * 0.6);
+    ivy(mb, "x", RZ1, BX1 + 1, BX2 - 1, y0, FLOOR_H, -1, dens, north);
+    ivy(mb, "x", HZ2, BX1 + 1, -9, y0, FLOOR_H, 1, dens * 0.6, south);
+    ivy(mb, "x", HZ2, 9, BX2 - 1, y0, FLOOR_H, 1, dens * 0.6, south);
     ivy(mb, "z", BX1, RZ1 + 1, HZ2 - 1, y0, FLOOR_H, -1, dens * 0.5);
     ivy(mb, "z", BX2, RZ1 + 1, HZ2 - 1, y0, FLOOR_H, 1, dens * 0.5);
   }
@@ -202,11 +202,9 @@ function buildFloor(ctx, f) {
     }
   }
   wallWithHoles(mb, col, { axis: "x", fixed: RZ2, from: BX1, to: BX2, y1: y0, y2: y1, thick: WALL_T, color: C.plaster, holes });
-  // 腰板（廊下がわ・教室がわ）と、ぐるりの回り縁
-  for (const side of [-1, 1]) {
-    mb.box(0, y0 + 0.52, RZ2 + 0.13 * side, BX2 - BX1, 1.04, 0.06, C.wains, { jitter: 0.16 });
-    mb.box(0, y0 + 1.08, RZ2 + 0.15 * side, BX2 - BX1, 0.07, 0.09, C.post, { jitter: 0.1 });
-  }
+  // 腰板（廊下がわ・教室がわ）と、ぐるりの回り縁。
+  //  入口の前は切りぬいて、ちゃんと通れるように見せる
+  for (const side of [-1, 1]) wainscot(mb, "x", RZ2, BX1, BX2, y0, side, holes);
   for (let i = 1; i < list.length; i++) {
     wallWithHoles(mb, col, { axis: "z", fixed: list[i].x1, from: RZ1, to: RZ2, y1: y0, y2: y1, thick: WALL_T, color: C.wallDark });
   }
@@ -308,9 +306,10 @@ function buildEntranceHall(ctx) {
   }
   mb.box(0, 2.78, EH.z2 - 0.25, 4.2, 0.7, 0.3, C.wood, { jitter: 0.03 });
   // 玄関まわりも板張りに
+  const ehDoor = [{ a: -2.6, b: 2.6, y1: 0, y2: 2.6 }];
   siding(mb, "z", EH.x1, EH.z1, EH.z2, 0, FLOOR_H, -1);
   siding(mb, "z", EH.x2, EH.z1, EH.z2, 0, FLOOR_H, 1);
-  siding(mb, "x", EH.z2, EH.x1, EH.x2, 0, FLOOR_H, 1);
+  siding(mb, "x", EH.z2, EH.x1, EH.x2, 0, FLOOR_H, 1, 0.42, ehDoor);
   posts(mb, "z", EH.x1, EH.z1, EH.z2, 0, FLOOR_H, -1, 3.0);
   posts(mb, "z", EH.x2, EH.z1, EH.z2, 0, FLOOR_H, 1, 3.0);
 
@@ -753,22 +752,66 @@ function decorateCorridor(ctx, f, y0, decay) {
   for (const x of [BX1 + 1.2, BX2 - 1.2]) props.push(makeCobweb(x, y0 + FLOOR_H - 0.5, HZ1 + 1.0, 1.0));
 }
 
-// 下見板張り：壁の面に、横板の影を何本も走らせる
-function siding(mb, axis, fixed, from, to, y1, y2, side, pitch = 0.42) {
+// その高さで、あな（窓やドア）にじゃまされずに板を張れる範囲を返す
+//  これをしないと、通れるはずの入口の上に板が張られ、壁に見えてしまう
+function freeSpans(from, to, y, holes) {
+  const cut = (holes || [])
+    .filter((h) => y > (h.y1 === undefined ? -1e9 : h.y1) - 0.02 && y < (h.y2 === undefined ? 1e9 : h.y2) + 0.02)
+    .map((h) => [Math.min(h.a, h.b), Math.max(h.a, h.b)])
+    .sort((p, q) => p[0] - q[0]);
+  const out = [];
+  let cur = from;
+  for (const [a, b] of cut) {
+    if (b <= cur) continue;
+    if (a > cur) out.push([cur, Math.min(a, to)]);
+    cur = Math.max(cur, b);
+    if (cur >= to) break;
+  }
+  if (cur < to) out.push([cur, to]);
+  return out.filter((s) => s[1] - s[0] > 0.05);
+}
+
+// 下見板張り：壁の面に、横板の影を何本も走らせる（あなは避ける）
+function siding(mb, axis, fixed, from, to, y1, y2, side, pitch = 0.42, holes = null) {
   const off = 0.13 * side;
   for (let y = y1 + pitch; y < y2 - 0.05; y += pitch) {
-    if (axis === "x") mb.box((from + to) / 2, y, fixed + off, to - from, 0.055, 0.05, C.siding, { jitter: 0.4 });
-    else mb.box(fixed + off, y, (from + to) / 2, 0.05, 0.055, to - from, C.siding, { jitter: 0.4 });
+    for (const [a, b] of freeSpans(from, to, y, holes)) {
+      if (axis === "x") mb.box((a + b) / 2, y, fixed + off, b - a, 0.055, 0.05, C.siding, { jitter: 0.4 });
+      else mb.box(fixed + off, y, (a + b) / 2, 0.05, 0.055, b - a, C.siding, { jitter: 0.4 });
+    }
   }
 }
 
-// 柱：板張りのあいだに、たてに走る太い木
-function posts(mb, axis, fixed, from, to, y1, y2, side, pitch = 4.6) {
+// 柱：板張りのあいだに、たてに走る太い木（あなの前には立てない）
+function posts(mb, axis, fixed, from, to, y1, y2, side, pitch = 4.6, holes = null) {
   const off = 0.16 * side;
   for (let p = from + pitch / 2; p < to; p += pitch) {
+    // あなにかかる柱は、あなの上下に残った壁ぶんだけにする
+    const blocked = (holes || []).some((h) => p > Math.min(h.a, h.b) - 0.2 && p < Math.max(h.a, h.b) + 0.2);
+    if (blocked) continue;
     if (axis === "x") mb.box(p, (y1 + y2) / 2, fixed + off, 0.26, y2 - y1, 0.08, C.post, { jitter: 0.18 });
     else mb.box(fixed + off, (y1 + y2) / 2, p, 0.08, y2 - y1, 0.26, C.post, { jitter: 0.18 });
   }
+}
+
+// 腰板と回り縁：ドアの前は切りぬく
+function wainscot(mb, axis, fixed, from, to, y0, side, holes) {
+  const off = 0.13 * side;
+  for (const [a, b] of freeSpans(from, to, y0 + 0.5, holes)) {
+    if (axis === "x") {
+      mb.box((a + b) / 2, y0 + 0.52, fixed + off, b - a, 1.04, 0.06, C.wains, { jitter: 0.16 });
+      mb.box((a + b) / 2, y0 + 1.08, fixed + off * 1.15, b - a, 0.07, 0.09, C.post, { jitter: 0.1 });
+    } else {
+      mb.box(fixed + off, y0 + 0.52, (a + b) / 2, 0.06, 1.04, b - a, C.wains, { jitter: 0.16 });
+      mb.box(fixed + off * 1.15, y0 + 1.08, (a + b) / 2, 0.09, 0.07, b - a, C.post, { jitter: 0.1 });
+    }
+  }
+}
+
+// 蔦も、窓やドアの前には垂らさない
+function ivyFree(holes, p, y) {
+  return !(holes || []).some((h) => p > Math.min(h.a, h.b) - 0.2 && p < Math.max(h.a, h.b) + 0.2 &&
+    y > (h.y1 === undefined ? -1e9 : h.y1) - 0.2 && y < (h.y2 === undefined ? 1e9 : h.y2) + 0.2);
 }
 
 // 窓わく：白木の枠と、たて・よこの桟（格子窓）
@@ -813,11 +856,12 @@ function eave(mb, axis, fixed, from, to, y, depth, side) {
 }
 
 // 蔦：壁をはい上がる葉のかたまり
-function ivy(mb, axis, fixed, from, to, y1, h, side, density = 26) {
+function ivy(mb, axis, fixed, from, to, y1, h, side, density = 26, holes = null) {
   const off = 0.15 * side;
   for (let i = 0; i < density; i++) {
     const p = rand(from, to);
     const yy = y1 + Math.pow(Math.random(), 1.7) * h;
+    if (!ivyFree(holes, p, yy)) continue;
     const s = rand(0.3, 0.95) * (1 - (yy - y1) / h * 0.5);
     if (axis === "x") mb.box(p, yy, fixed + off, s, s * rand(0.7, 1.5), 0.06, C.ivy, { jitter: 0.5, rotY: rand(0, 3.14) });
     else mb.box(fixed + off, yy, p, 0.06, s * rand(0.7, 1.5), s, C.ivy, { jitter: 0.5 });
@@ -1429,14 +1473,15 @@ function buildGym(ctx) {
     axis: "z", fixed: G.x2, from: G.z1, to: G.z2, y1: 0, y2: H, thick: 0.3, color: GW,
     holes: winSide.concat([{ a: GYM_DOOR.z - GYM_DOOR.w, b: GYM_DOOR.z + GYM_DOOR.w, y1: 0, y2: 3.0 }]),
   });
-  siding(mb, "x", G.z1, G.x1, G.x2, 0, H, -1, 0.5);
-  siding(mb, "x", G.z2, G.x1, G.x2, 0, H, 1, 0.5);
-  siding(mb, "z", G.x1, G.z1, G.z2, 0, H, -1, 0.5);
-  siding(mb, "z", G.x2, G.z1, G.z2, 0, H, 1, 0.5);
-  posts(mb, "x", G.z1, G.x1, G.x2, 0, H, -1, 5.0);
-  posts(mb, "x", G.z2, G.x1, G.x2, 0, H, 1, 5.0);
-  ivy(mb, "x", G.z1, G.x1 + 1, G.x2 - 1, 0, 5.0, -1, 34);
-  ivy(mb, "z", G.x1, G.z1 + 1, G.z2 - 1, 0, 5.0, -1, 30);
+  const gDoor = [{ a: GYM_DOOR.z - GYM_DOOR.w, b: GYM_DOOR.z + GYM_DOOR.w, y1: 0, y2: 3.0 }];
+  siding(mb, "x", G.z1, G.x1, G.x2, 0, H, -1, 0.5, nHoles);
+  siding(mb, "x", G.z2, G.x1, G.x2, 0, H, 1, 0.5, winRow);
+  siding(mb, "z", G.x1, G.z1, G.z2, 0, H, -1, 0.5, winSide.concat(winSideLow));
+  siding(mb, "z", G.x2, G.z1, G.z2, 0, H, 1, 0.5, winSide.concat(gDoor));
+  posts(mb, "x", G.z1, G.x1, G.x2, 0, H, -1, 5.0, nHoles);
+  posts(mb, "x", G.z2, G.x1, G.x2, 0, H, 1, 5.0, winRow);
+  ivy(mb, "x", G.z1, G.x1 + 1, G.x2 - 1, 0, 5.0, -1, 34, nHoles);
+  ivy(mb, "z", G.x1, G.z1 + 1, G.z2 - 1, 0, 5.0, -1, 30, winSideLow);
   // 窓の格子（外がわ・内がわ）と、内壁の腰の汚れ
   for (const h of nHoles) {
     sash(mb, "x", G.z1 - 0.06, h.a, h.b, h.y1, h.y2, 4);
@@ -1449,13 +1494,17 @@ function buildGym(ctx) {
   for (const h of winSide.concat(winSideLow)) sash(mb, "z", G.x1 + 0.06, h.a, h.b, h.y1, h.y2, 4);
   for (const h of winSide) sash(mb, "z", G.x2 - 0.06, h.a, h.b, h.y1, h.y2, 4);
   //  腰壁は、窓の下（高さ2.4まで）だけにする。窓をふさがないように
-  for (const [zz, side] of [[G.z1, 1], [G.z2, -1]]) {
-    mb.box(cx, 1.2, zz + 0.16 * side, G.x2 - G.x1, 2.4, 0.05, 0x7d7452, { jitter: 0.3 });   // 剥げかけた腰壁
-    mb.box(cx, 2.46, zz + 0.18 * side, G.x2 - G.x1, 0.14, 0.1, 0x4a4534, { jitter: 0.12 });
+  for (const [zz, side, hs] of [[G.z1, 1, nHoles], [G.z2, -1, winRow]]) {
+    for (const [a, b] of freeSpans(G.x1, G.x2, 1.2, hs)) {
+      mb.box((a + b) / 2, 1.2, zz + 0.16 * side, b - a, 2.4, 0.05, 0x7d7452, { jitter: 0.3 });   // 剥げかけた腰壁
+      mb.box((a + b) / 2, 2.46, zz + 0.18 * side, b - a, 0.14, 0.1, 0x4a4534, { jitter: 0.12 });
+    }
   }
-  for (const [xx, side] of [[G.x1, 1], [G.x2, -1]]) {
-    mb.box(xx + 0.16 * side, 1.2, cz, 0.05, 2.4, G.z2 - G.z1, 0x7d7452, { jitter: 0.3 });
-    mb.box(xx + 0.18 * side, 2.46, cz, 0.1, 0.14, G.z2 - G.z1, 0x4a4534, { jitter: 0.12 });
+  for (const [xx, side, hs] of [[G.x1, 1, winSideLow], [G.x2, -1, gDoor]]) {
+    for (const [a, b] of freeSpans(G.z1, G.z2, 1.2, hs)) {
+      mb.box(xx + 0.16 * side, 1.2, (a + b) / 2, 0.05, 2.4, b - a, 0x7d7452, { jitter: 0.3 });
+      mb.box(xx + 0.18 * side, 2.46, (a + b) / 2, 0.1, 0.14, b - a, 0x4a4534, { jitter: 0.12 });
+    }
   }
 
   // 屋根：波トタンの天井と、緑色にぬられた鉄骨のトラス

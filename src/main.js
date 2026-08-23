@@ -224,15 +224,25 @@ class Game {
     this.wave++;
     const group = this.roster.next();
     const e = this.world.entry;
+    // いま校舎にいる人と同じ名まえの人は、こんかいは来ない
+    //  （番号はずらさない。ともだちと遊ぶとき、おやとお客さんで番号がそろわなくなるため）
+    const live = new Set();
+    for (const h0 of this.humans) if (!h0.out) live.add(h0.name);
+    let came = 0;
     for (let i = 0; i < group.members.length; i++) {
       const t = group.members[i];
+      const hid = this.hidNext++;
+      if (live.has(t.name)) continue;
+      live.add(t.name);
+      came++;
       const h = new Human(this.scene, this.world, t, e.x + rand(-3, 3), e.z + rand(-2, 2));
-      h.hid = this.hidNext++;
+      h.hid = hid;
       h.speak(choice(t.idle), 4 + i * 0.4);
       h.goTo(rand(-25, 25), rand(8, 28), 0);
       this.humans.push(h);
     }
-    this.ui.toast("第" + this.wave + "陣：" + group.label + "（" + group.members.length + "人）が来た…", "bad");
+    if (came === 0) return;                       // 全員かぶったときは、なにも起きない
+    this.ui.toast("第" + this.wave + "陣：" + group.label + "（" + came + "人）が来た…", "bad");
     this.audio.tone(180, 0.7, "sawtooth", 0.1, 90);
   }
 
