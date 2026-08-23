@@ -153,9 +153,11 @@ module.exports = async function handler(req, res) {
       if (Array.isArray(b.placed)) me.placed = b.placed.slice(0, 24);
 
       // ホストだけが、人間たちのようすを書ける
-      if (room.host === pid && b.world && typeof b.world === "object") {
-        room.world = b.world;
-        room.acts = [];                              // 受けとった合図は使い切り
+      let deliver = [];
+      if (room.host === pid) {
+        if (b.world && typeof b.world === "object") room.world = b.world;
+        deliver = room.acts || [];                   // 先に受けとってから
+        room.acts = [];                              // 空にする（合図は使い切り）
       } else if (Array.isArray(b.acts) && b.acts.length) {
         room.acts = (room.acts || []).concat(b.acts.slice(0, 12)).slice(-40);
       }
@@ -163,7 +165,7 @@ module.exports = async function handler(req, res) {
       const alive = prune(room, now);
       if (!alive) { try { await del(roomKey(code)); } catch (e) {} res.status(200).json({ room: null }); return; }
       const out = view(room, pid);
-      out.acts = room.host === pid ? (room.acts || []) : [];   // 合図はホストだけが受けとる
+      out.acts = deliver;                          // 合図はホストだけが受けとる
       await writeRoom(room);
       res.status(200).json({ room: out });
       return;
