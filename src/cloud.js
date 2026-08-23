@@ -101,4 +101,14 @@ export class Cloud {
   async changePw(oldPw, newPw) {
     return await this.call("/api/save", { method: "POST", body: { oldPw, newPw } });
   }
+
+  // --- ともだち --------------------------------------------
+  async friends() { return await this.call("/api/friends"); }
+  async friendAct(body) { return await this.call("/api/friends", { method: "POST", body }); }
+  async findFriend(name) { return await this.friendAct({ action: "search", name }); }
+  async askFriend(id) { return await this.friendAct({ action: "request", id }); }
+  async answerFriend(act, id) { return await this.friendAct({ action: act, id }); }
+  async friendProfile(id) { return await this.friendAct({ action: "profile", id }); }
+  async inviteFriend(id, code) { return await this.friendAct({ action: "invite", id, code }); }
+  async clearInvite() { return await this.friendAct({ action: "clearInvite" }); }
 }

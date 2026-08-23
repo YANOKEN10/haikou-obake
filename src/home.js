@@ -48,7 +48,7 @@ export class Home {
     $("#rCreate").addEventListener("click", async () => {
       busy(true);
       g.ui.roomMsg("部屋をつくっています…", true);
-      const r = await g.roomCreate(this.profile().name);
+      const r = await g.roomCreate(this.playerName());
       busy(false);
       g.ui.roomMsg(r.ok ? "" : r.why);
       g.ui.setRoom(g.net);
@@ -65,7 +65,7 @@ export class Home {
       if (c.length !== 4) { g.ui.roomMsg("あいことばは4文字です"); return; }
       busy(true);
       g.ui.roomMsg("部屋をさがしています…", true);
-      const r = await g.roomJoin(c, this.profile().name);
+      const r = await g.roomJoin(c, this.playerName());
       busy(false);
       g.ui.roomMsg(r.ok ? "" : r.why);
       g.ui.setRoom(g.net);
@@ -99,6 +99,25 @@ export class Home {
     return n ? S.getProfile(n) : null;
   }
 
+  // 部屋のなかで、ともだちに見える なまえ
+  playerName() {
+    const c = this.game.cloud;
+    if (c && c.signedIn && c.name) return c.name;
+    const p = this.profile();
+    return (p && p.name) || "おばけ";
+  }
+
+  // 申請やさそいが来ていないか、そっと見にいく（タブの数字用）
+  async pollFriends(quiet) {
+    const c = this.game.cloud;
+    if (!c || !c.signedIn) { this.fr = null; this.updateBadge(); return; }
+    const r = await c.friends();
+    if (!r.ok) return;
+    this.fr = r.data;
+    this.updateBadge();
+    if (!quiet && this.tab === "friends") this.drawFriends();
+  }
+
   show(tab) {
     const again = this.tab === tab;
     this.tab = tab;
@@ -118,7 +137,216 @@ export class Home {
   render() {
     if (this.tab === "play") this.renderPlay();
     else if (this.tab === "login") this.renderLogin();
+    else if (this.tab === "friends") this.renderFriends();
     else this.renderProfile();
+  }
+
+  // ============================================================
+  //  ともだち
+  //   ・なまえが ぴったり合ったときだけ 見つかる
+  //   ・申請は、相手が「うける」を押すまで つながらない
+  //   ・「さそう」は、部屋のあいことばを相手にとどける
+  // ============================================================
+  async renderFriends() {
+    const body = $("#frBody");
+    const cloud = this.game.cloud;
+    if (!cloud.signedIn) {
+      body.innerHTML =
+        "<div class='frnote'>ともだちきのうは、<b>「👤 ログイン」→「☁ どの端末でも」</b>で" +
+        "なまえとあいことばを決めると使えます。<br>" +
+        "この端末だけの記録では、ともだちになれません。</div>" +
+        "<button class='bigbtn sub' id='frGoLogin'>ログインへ</button>";
+      const b = $("#frGoLogin");
+      if (b) b.addEventListener("click", () => { this.show("login"); this.showSub("mail"); });
+      return;
+    }
+    if (!this.fr) body.innerHTML = "<div class='frnote'>よみこみ中…</div>";
+    const r = await cloud.friends();
+    if (!r.ok) { body.innerHTML = "<div class='frmsg'>" + esc(r.why) + "</div>"; return; }
+    this.fr = r.data;
+    this.drawFriends();
+  }
+
+  // 申請やさそいがとどいていたら、タブに数を出す
+  updateBadge() {
+    const el = $("#frBadge");
+    if (!el) return;
+    const n = this.fr ? (this.fr.reqIn || []).length + (this.fr.invite ? 1 : 0) : 0;
+    el.hidden = n === 0;
+    el.textContent = String(n);
+  }
+
+  frMsg(text, ok) {
+    const e = $("#frMsg");
+    if (!e) return;
+    e.textContent = text || "";
+    e.classList.toggle("ok", !!ok);
+  }
+
+  drawFriends() {
+    const d = this.fr || { friends: [], reqIn: [], reqOut: [] };
+    const body = $("#frBody");
+    const row = (c, kind) => {
+      const sm = c.has
+        ? "👑 " + esc(c.rank || "?") + "　追い出した " + c.kicked + " 人　遊んだ時間 " + S.fmtTime(c.playSeconds)
+        : "まだ 記録がありません";
+      let btns = "";
+      if (kind === "friend") {
+        btns = "<button class='go' data-act='invite' data-id=\"" + esc(c.id) + "\">🎮 いっしょに あそぶ</button>" +
+               "<button data-act='detail' data-id=\"" + esc(c.id) + "\">📋 くわしく</button>" +
+               "<button class='no' data-act='remove' data-id=\"" + esc(c.id) + "\">やめる</button>";
+      } else if (kind === "in") {
+        btns = "<button class='yes' data-act='accept' data-id=\"" + esc(c.id) + "\">うける</button>" +
+               "<button class='no' data-act='reject' data-id=\"" + esc(c.id) + "\">ことわる</button>";
+      } else {
+        btns = "<button class='no' data-act='cancel' data-id=\"" + esc(c.id) + "\">とりけす</button>";
+      }
+      return "<div class='frrow' data-row=\"" + esc(c.id) + "\">" +
+        "<div class='top'><span class='nm'>" + esc(c.display) + "</span>" +
+        (kind === "friend" && c.has ? "<span class='rk'>👑 " + esc(c.rank || "") + "</span>" : "") + "</div>" +
+        "<div class='sm'>" + (kind === "friend" ? sm : "ともだち申請") + "</div>" +
+        "<div class='btns'>" + btns + "</div>" +
+        "<div class='detail' hidden></div></div>";
+    };
+
+    let html = "";
+    if (d.invite) {
+      html += "<div class='frinvite'><div class='t'>🎮 <b>" + esc(d.invite.display) +
+        "</b> が いっしょに あそぼうと さそっています</div>" +
+        "<div class='btns' style='display:flex;gap:6px;margin-top:7px'>" +
+        "<button class='go' id='frJoinInv'>入る</button>" +
+        "<button class='no' id='frDropInv'>あとで</button></div></div>";
+    }
+    html += "<div class='frnote'>なまえが <b>ぴったり合ったときだけ</b> 見つかります。" +
+      "ともだちに、なまえを教えてもらってね。</div>" +
+      "<div class='frfind'><input id='frName' maxlength='24' placeholder='ともだちのなまえ' " +
+      "autocomplete='off' spellcheck='false'><button id='frFind'>さがす</button></div>" +
+      "<div class='frmsg' id='frMsg'></div>";
+
+    html += "<div class='frsec'>🤝 ともだち（" + d.friends.length + "人）</div>";
+    html += d.friends.length
+      ? d.friends.map((c) => row(c, "friend")).join("")
+      : "<div class='frempty'>まだ ともだちがいません。うえの まどで さがしてみよう。</div>";
+
+    if (d.reqIn.length) {
+      html += "<div class='frsec'>📨 とどいた申請（" + d.reqIn.length + "）</div>";
+      html += d.reqIn.map((c) => row(c, "in")).join("");
+    }
+    if (d.reqOut.length) {
+      html += "<div class='frsec'>📤 おくった申請（" + d.reqOut.length + "）</div>";
+      html += d.reqOut.map((c) => row(c, "out")).join("");
+    }
+    body.innerHTML = html;
+    this.updateBadge();
+    this.bindFriends();
+  }
+
+  bindFriends() {
+    const cloud = this.game.cloud;
+    const name = $("#frName");
+    const find = $("#frFind");
+    if (find) {
+      const go = async () => {
+        const q = (name.value || "").trim();
+        if (q.length < 2) { this.frMsg("なまえを2文字いじょう入れてください"); return; }
+        find.disabled = true;
+        this.frMsg("さがしています…", true);
+        const r = await cloud.findFriend(q);
+        find.disabled = false;
+        if (!r.ok) { this.frMsg(r.why); return; }
+        const f = r.data;
+        if (!f.found) { this.frMsg(f.message || "見つかりませんでした"); return; }
+        if (f.already) { this.frMsg(f.display + " は もう ともだちです", true); return; }
+        if (f.sent) { this.frMsg(f.display + " には もう 申請ずみです", true); return; }
+        if (f.got) { this.frMsg(f.display + " から 申請がとどいています。下で「うける」を押してね", true); return; }
+        if (!confirm(f.display + " さんに ともだち申請を おくりますか？")) { this.frMsg(""); return; }
+        const s = await cloud.askFriend(f.id);
+        if (!s.ok) { this.frMsg(s.why); return; }
+        this.fr = s.data;
+        name.value = "";
+        this.drawFriends();
+        this.frMsg(f.display + " に 申請を おくりました", true);
+      };
+      find.addEventListener("click", go);
+      name.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+    }
+
+    const inv = $("#frJoinInv");
+    if (inv) {
+      inv.addEventListener("click", async () => {
+        const code = this.fr.invite.code;
+        await cloud.clearInvite();
+        if (!this.game.started) this.game.startGame(true);
+        const r = await this.game.roomJoin(code, this.playerName());
+        if (!r.ok) this.frMsg(r.why);
+      });
+    }
+    const drop = $("#frDropInv");
+    if (drop) {
+      drop.addEventListener("click", async () => {
+        const r = await cloud.clearInvite();
+        if (r.ok) { this.fr = r.data; this.drawFriends(); }
+      });
+    }
+
+    $("#frBody").querySelectorAll("button[data-act]").forEach((b) => {
+      b.addEventListener("click", async () => {
+        const act = b.dataset.act, id = b.dataset.id;
+        if (act === "detail") { this.showDetail(id); return; }
+        if (act === "invite") { this.inviteTo(id); return; }
+        if (act === "remove" && !confirm("ともだちを やめますか？")) return;
+        b.disabled = true;
+        const r = await cloud.answerFriend(act, id);
+        b.disabled = false;
+        if (!r.ok) { this.frMsg(r.why); return; }
+        this.fr = r.data;
+        this.drawFriends();
+        if (act === "accept") this.frMsg("ともだちに なりました！", true);
+      });
+    });
+  }
+
+  async showDetail(id) {
+    const rows = $("#frBody").querySelectorAll(".frrow");
+    let box = null;
+    for (const r of rows) if (r.getAttribute("data-row") === id) box = r.querySelector(".detail");
+    if (!box) return;
+    if (!box.hidden) { box.hidden = true; return; }
+    box.hidden = false;
+    box.innerHTML = "<div class='frempty'>よみこみ中…</div>";
+    const r = await this.game.cloud.friendProfile(id);
+    if (!r.ok) { box.innerHTML = "<div class='frmsg'>" + esc(r.why) + "</div>"; return; }
+    const c = r.data.card;
+    if (!c.has) { box.innerHTML = "<div class='frempty'>この人は まだ 記録をあずけていません。</div>"; return; }
+    const s = c.stats || {};
+    const st = (k, v) => "<div>" + k + "<b>" + v + "</b></div>";
+    box.innerHTML = "<div class='frstats'>" +
+      st("ランク", esc(c.rank || "?")) +
+      st("追い出した", c.kicked + " 人") +
+      st("いちばんの波", c.wave + " 陣") +
+      st("遊んだ時間", S.fmtTime(c.playSeconds)) +
+      st("おどかした", s.scares + " 回") +
+      st("ふいうち", s.behind + " 回") +
+      st("たたみかけ", s.combos + " 回") +
+      st("最大こわがらせ", s.biggest) +
+      st("仕掛けが動いた", s.trapsFired + " 回") +
+      st("生み出したおばけ", s.ghostsSummoned + " 体") +
+      st("集めた材料", s.materials + " 個") +
+      st("笑われた", s.laughed + " 回") +
+      "</div>";
+  }
+
+  async inviteTo(id) {
+    const g = this.game;
+    this.frMsg("部屋を よういしています…", true);
+    if (!g.started) g.startGame(true);
+    if (!g.net.on) {
+      const r = await g.roomCreate(this.playerName());
+      if (!r.ok) { this.frMsg(r.why); return; }
+    }
+    const r = await g.cloud.inviteFriend(id, g.net.code);
+    if (!r.ok) { this.frMsg(r.why); return; }
+    this.frMsg(r.data.display + " を さそいました！（5分いないに 入ってもらってね）", true);
   }
 
   // --- ゲームを始める ---------------------------------------

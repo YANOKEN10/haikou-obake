@@ -834,7 +834,7 @@ class Game {
   }
 
   async roomCreate(name) {
-    const r = await this.net.create(name || (this.profile && this.profile.name) || "おばけ");
+    const r = await this.net.create(name || (this.home && this.home.playerName ? this.home.playerName() : "おばけ"));
     if (!r.ok) return r;
     this.netReseed(r.data.seed);
     this.ui.toast("🚪 あいことば「" + this.net.code + "」でともだちを呼ぼう！", "gold");
@@ -843,7 +843,7 @@ class Game {
   }
 
   async roomJoin(code, name) {
-    const r = await this.net.join(code, name || (this.profile && this.profile.name) || "おばけ");
+    const r = await this.net.join(code, name || (this.home && this.home.playerName ? this.home.playerName() : "おばけ"));
     if (!r.ok) return r;
     this.netReseed(r.data.seed);
     this.ui.toast("🚪 部屋「" + this.net.code + "」に入りました", "gold");
@@ -998,7 +998,12 @@ game.cloud = new Cloud();
 game.home = new Home(game);
 game.cloud.restore().then((ok) => {
   if (ok && game.home.tab === "login" && game.home.sub === "mail") game.home.renderLogin();
+  if (ok) game.home.pollFriends(true);
 });
+// ホーム画面を見ているあいだだけ、申請やさそいが来ていないか ときどき見にいく
+setInterval(() => {
+  if (!game.started && game.cloud.signedIn && !document.hidden) game.home.pollFriends(game.home.tab !== "friends");
+}, 20000);
 document.getElementById("loading").textContent =
   "廃校の準備完了（" + game.world.triangles.toLocaleString() + " 面 / " + game.buildMs + "ms）";
 game.home.show("play");
