@@ -84,6 +84,7 @@ export class Home {
       if (kind === "join") g.ui.toast("👋 " + detail + " が来た！", "gold");
       else if (kind === "part") g.ui.toast("👋 " + detail + " が出ていった", "good");
       else if (kind === "host") g.ui.toast("👑 " + detail, "gold");
+      else if (kind === "back") g.ui.toast("🔌 " + detail, "good");
       else if (kind === "lost") { g.ui.toast("⚠ " + detail, "bad"); g.roomLeave(); }
       g.ui.setRoom(g.net);
     };

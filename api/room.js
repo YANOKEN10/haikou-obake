@@ -13,7 +13,7 @@ const L = require("./_lib");
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";   // 見まちがえる字は使わない
 const MAX_PLAYERS = 4;
-const STALE_MS = 20000;        // これだけ音沙汰がなければ、抜けたとみなす
+const STALE_MS = 45000;        // これだけ音沙汰がなければ、抜けたとみなす
 const ROOM_MAX = 24 * 1024;    // 部屋1つの上限
 
 const roomKey = (code) => "hobake/room/" + code + ".json";

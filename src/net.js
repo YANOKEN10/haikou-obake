@@ -25,7 +25,10 @@ export class Net {
     this.actSeen = new Map();    // だれの何番まで使ったか（同じ合図を二度きかせない）
     this.on = false;
     this.busy = false;
-    this.wait = 0;
+    this.lastSend = 0;
+    this.pending = null;
+    this.beat = null;
+    this.rejoining = false;
     this.fails = 0;
     this.status = "";
     this.onEvent = null;         // (kind, detail) => void
@@ -54,9 +57,11 @@ export class Net {
     const r = await this.call({ action: "create", name });
     if (!r.ok) return r;
     this.code = r.data.code; this.pid = r.data.pid; this.name = r.data.name;
-    this.isHost = true; this.on = true; this.wait = 0; this.fails = 0;
+    this.isHost = true; this.on = true; this.fails = 0;
     this.peers.clear(); this.remoteWorld = null;
     this.status = "部屋をつくりました";
+    this.lastSend = 0; this.pending = null;
+    this.startBeat();
     return r;
   }
 
@@ -64,14 +69,18 @@ export class Net {
     const r = await this.call({ action: "join", code, name });
     if (!r.ok) return r;
     this.code = r.data.code; this.pid = r.data.pid; this.name = r.data.name;
-    this.isHost = r.data.room.youAreHost; this.on = true; this.wait = 0; this.fails = 0;
+    this.isHost = r.data.room.youAreHost; this.on = true; this.fails = 0;
     this.peers.clear(); this.remoteWorld = null;
     this.apply(r.data.room);
     this.status = "部屋に入りました";
+    this.lastSend = 0; this.pending = null;
+    this.startBeat();
     return r;
   }
 
   async leave() {
+    this.stopBeat();
+    this.pending = null;
     const code = this.code, pid = this.pid;
     this.on = false; this.code = ""; this.pid = ""; this.isHost = false;
     this.peers.clear(); this.remoteWorld = null; this.outActs.length = 0;
@@ -95,6 +104,7 @@ export class Net {
   //  world = ホストのときだけ渡す {humans:[...], wave, kicked}
   update(dt, me, placed, world) {
     if (!this.on) return;
+    this.pending = { me, placed, world };
 
     // とどいた位置へ、なめらかに寄せる
     const k = Math.min(1, dt * 6);
@@ -107,11 +117,20 @@ export class Net {
       p.yaw += d * k;
     }
 
-    this.wait -= dt * 1000;
-    if (this.busy || this.wait > 0) return;
-    this.wait = (document.hidden ? TICK_SLOW : TICK) + this.fails * 1500;
+    this.send();
+  }
+
+  // ゲームの進みぐあいではなく、ほんとうの時計で数える。
+  // （画面を見ていないとタイマーがゆっくりになるブラウザがあるため）
+  send() {
+    if (!this.on || this.busy || !this.pending) return;
+    const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+    const gap = (document.hidden ? TICK_SLOW : TICK) + this.fails * 1500;
+    if (this.lastSend && now - this.lastSend < gap) return;
+    this.lastSend = now;
     this.busy = true;
 
+    const { me, placed, world } = this.pending;
     const body = { action: "sync", code: this.code, pid: this.pid, g: me, placed: placed || [] };
     if (this.isHost && world) body.world = world;
     else if (!this.isHost) body.acts = this.outActs;   // 消さずに、そのまま送りつづける
@@ -121,7 +140,10 @@ export class Net {
       if (!r.ok) {
         this.fails++;
         this.status = r.why;
-        if (r.code === "none" || this.fails > 6) {          // 部屋がなくなった
+        // しばらく画面を見ていないと、部屋からはずれることがある。
+        // そのときは、同じあいことばで だまって入りなおす
+        if (r.code === "none") { this.rejoin(); return; }
+        if (this.fails > 8) {
           this.on = false;
           this.peers.clear();
           if (this.onEvent) this.onEvent("lost", r.why);
@@ -134,6 +156,32 @@ export class Net {
       this.apply(r.data.room);
     });
   }
+
+  async rejoin() {
+    if (this.rejoining || !this.code) return;
+    this.rejoining = true;
+    const r = await this.call({ action: "join", code: this.code, name: this.name });
+    this.rejoining = false;
+    if (!r.ok) {
+      this.on = false;
+      this.peers.clear();
+      if (this.onEvent) this.onEvent("lost", "部屋がとじました");
+      return;
+    }
+    this.pid = r.data.pid;
+    this.isHost = r.data.room.youAreHost;
+    this.fails = 0;
+    this.peers.clear();
+    this.apply(r.data.room);
+    if (this.onEvent) this.onEvent("back", "部屋につなぎなおしました");
+  }
+
+  // ゲームの絵が止まっていても、部屋にいることだけは伝えつづける
+  startBeat() {
+    this.stopBeat();
+    this.beat = setInterval(() => { if (this.on) this.send(); }, 3000);
+  }
+  stopBeat() { if (this.beat) { clearInterval(this.beat); this.beat = null; } }
 
   apply(room) {
     const wasHost = this.isHost;
