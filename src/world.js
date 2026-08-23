@@ -1065,14 +1065,32 @@ function fence(mb, col, x1, z1, x2, z2) {
   col.add(Math.min(x1, x2) - t, Math.min(z1, z2) - t, Math.max(x1, x2) + t, Math.max(z1, z2) + t, 0, 2.2, "wall");
 }
 
+// 針葉樹。細い幹に、上へいくほど小さくなる枝の段を重ねて
+// とがった形をつくる。大きすぎないよう、ぜんたいで3.5mほど。
 function tree(mb, col, x, z, s) {
-  mb.box(x, 1.5 * s, z, 0.5 * s, 3.0 * s, 0.5 * s, 0x4a3524, { jitter: 0.12 });
-  for (let i = 0; i < 7; i++) {
-    const a = (i / 7) * Math.PI * 2, r = rand(0.9, 2.0) * s;
-    mb.box(x + Math.cos(a) * r, rand(3.2, 4.6) * s, z + Math.sin(a) * r,
-      rand(2.0, 3.2) * s, rand(1.2, 1.9) * s, rand(2.0, 3.2) * s, 0x27331f, { jitter: 0.26 });
+  const H = 3.4 * s;                       // 木のたかさ
+  const W = 1.55 * s;                      // いちばん下の枝のひろがり
+  // 幹
+  mb.box(x, 0.55 * s, z, 0.2 * s, 1.1 * s, 0.2 * s, 0x3f2f20, { jitter: 0.14 });
+  mb.box(x, H * 0.55, z, 0.13 * s, H * 0.9, 0.13 * s, 0x3a2b1d, { jitter: 0.12 });
+  // 枝の段（下ほど大きく、上へいくほど細く）
+  const tiers = 8;
+  const twist = rand(0, 1.57);
+  for (let i = 0; i < tiers; i++) {
+    const t = i / (tiers - 1);             // 0=下 1=上
+    const y = 0.72 * s + t * (H - 1.05 * s);
+    const wd = W * (1 - t * 0.8);
+    const th = (0.5 - t * 0.16) * s;       // 段どうしが かさなる厚み
+    const dark = i % 2 === 0 ? 0x243019 : 0x2c3c21;
+    // 十字に2枚かさねると、どの向きから見ても枝らしく見える
+    mb.box(x, y, z, wd, th, wd * 0.5, dark, { jitter: 0.22, rotY: twist + i * 0.42 });
+    mb.box(x, y + th * 0.16, z, wd * 0.5, th * 0.86, wd, dark, { jitter: 0.22, rotY: twist + i * 0.42 });
   }
-  col.add(x - 0.35 * s, z - 0.35 * s, x + 0.35 * s, z + 0.35 * s, 0, 3 * s, "wall");
+  // てっぺんのとがり
+  mb.box(x, H - 0.1 * s, z, 0.2 * s, 0.5 * s, 0.2 * s, 0x2b3a20, { jitter: 0.2 });
+  // 根もとの落ち葉と、下草
+  mb.box(x, 0.06, z, 1.5 * s, 0.05, 1.5 * s, 0x3a3320, { jitter: 0.35, rotY: twist });
+  col.add(x - 0.26 * s, z - 0.26 * s, x + 0.26 * s, z + 0.26 * s, 0, H * 0.8, "wall");
 }
 
 function scatterYardDetail(mb) {
