@@ -19,8 +19,10 @@ export class Net {
     this.isHost = false;
     this.peers = new Map();      // pid -> {name, tx,ty,tz,tyaw, x,y,z,yaw, placed, seen}
     this.remoteWorld = null;     // ホストからとどいた人間たち
-    this.outActs = [];           // ホストへ送る「おどかした」合図
+    this.outActs = [];           // ホストへ送る「おどかした」合図（番号つき・何回か送りなおす）
+    this.actNo = 1;
     this.inActs = [];            // ホストが受けとった合図
+    this.actSeen = new Map();    // だれの何番まで使ったか（同じ合図を二度きかせない）
     this.on = false;
     this.busy = false;
     this.wait = 0;
@@ -73,14 +75,18 @@ export class Net {
     const code = this.code, pid = this.pid;
     this.on = false; this.code = ""; this.pid = ""; this.isHost = false;
     this.peers.clear(); this.remoteWorld = null; this.outActs.length = 0;
+    this.inActs.length = 0; this.actSeen.clear(); this.actNo = 1;
     if (code && pid) await this.call({ action: "leave", code, pid });
   }
 
   // おどかしたことをホストへ知らせる（自分がホストなら、そのまま自分で使う）
   reportScare(hid, amount, why) {
-    if (!this.on) return;
-    if (this.isHost) this.inActs.push({ k: "scare", hid, a: amount, w: why });
-    else this.outActs.push({ k: "scare", hid, a: amount, w: why });
+    if (!this.on || hid == null) return;
+    if (this.isHost) { this.inActs.push({ k: "scare", hid, a: Math.round(amount), w: why }); return; }
+    // 1回とどかなくても大丈夫なように、しばらく同じ合図を送りつづける。
+    // おやは番号を見て、同じものは1回しか使わない
+    this.outActs.push({ i: this.actNo++, k: "scare", hid, a: Math.round(amount), w: why });
+    if (this.outActs.length > 8) this.outActs.shift();
   }
 
   // --- 毎フレーム ------------------------------------------
@@ -108,7 +114,7 @@ export class Net {
 
     const body = { action: "sync", code: this.code, pid: this.pid, g: me, placed: placed || [] };
     if (this.isHost && world) body.world = world;
-    else if (this.outActs.length) { body.acts = this.outActs.slice(0, 12); this.outActs.length = 0; }
+    else if (!this.isHost) body.acts = this.outActs;   // 消さずに、そのまま送りつづける
 
     this.call(body).then((r) => {
       this.busy = false;
@@ -159,7 +165,15 @@ export class Net {
     }
 
     if (!this.isHost) this.remoteWorld = room.world || null;
-    if (this.isHost && room.acts && room.acts.length) this.inActs.push(...room.acts);
+    if (this.isHost && room.acts && room.acts.length) {
+      for (const a of room.acts) {
+        const key = a.q || "?";
+        const last = this.actSeen.get(key) || 0;
+        if (!a.i || a.i <= last) continue;            // もう使った合図はとばす
+        this.actSeen.set(key, a.i);
+        this.inActs.push(a);
+      }
+    }
   }
 
   // ホストが、たまった合図を取りだす

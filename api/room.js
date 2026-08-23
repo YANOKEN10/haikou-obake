@@ -17,6 +17,10 @@ const STALE_MS = 20000;        // これだけ音沙汰がなければ、抜け�
 const ROOM_MAX = 24 * 1024;    // 部屋1つの上限
 
 const roomKey = (code) => "hobake/room/" + code + ".json";
+// 人間たちのようすは、おやだけが書くので、べつのファイルに分ける。
+// 同じファイルにすると、お客さんの書きこみが おやの新しいようすを
+// 上書きしてしまい、人間が止まって見えてしまう。
+const worldKey = (code) => "hobake/room/" + code + ".w.json";
 
 function newCode() {
   let s = "";
@@ -47,6 +51,27 @@ async function readRoom(code) {
   try { return JSON.parse(text); } catch (e) { return null; }
 }
 
+async function readWorld(code) {
+  let w;
+  try {
+    w = await get(worldKey(code), { access: "private", useCache: false });
+  } catch (e) {
+    if (e && /not.?found/i.test(e.message || "")) return null;
+    return null;
+  }
+  if (!w || w.statusCode !== 200) return null;
+  try { return JSON.parse(await new Response(w.stream).text()); } catch (e) { return null; }
+}
+
+async function writeWorld(code, world) {
+  const s = JSON.stringify(world);
+  if (Buffer.byteLength(s) > ROOM_MAX) return;
+  await put(worldKey(code), s, {
+    access: "private", addRandomSuffix: false, allowOverwrite: true,
+    contentType: "application/json", cacheControlMaxAge: 0,
+  });
+}
+
 async function writeRoom(room) {
   const s = JSON.stringify(room);
   if (Buffer.byteLength(s) > ROOM_MAX) return false;
@@ -70,7 +95,7 @@ function prune(room, now) {
   if (!room.players[room.host]) {
     ids.sort((a, b) => (room.players[a].joined || 0) - (room.players[b].joined || 0));
     room.host = ids[0];
-    room.world = null;      // 人間たちは、新しいホストが作りなおす
+    // 人間たちは、新しいおやが作りなおす
   }
   return true;
 }
@@ -85,7 +110,7 @@ function view(room, me) {
   }
   return {
     code: room.code, host: room.host, youAreHost: room.host === me, seed: room.seed || 1,
-    others, world: room.world || null, born: room.born,
+    others, world: null, born: room.born,
   };
 }
 
@@ -112,8 +137,7 @@ module.exports = async function handler(req, res) {
       const pid = newPid();
       const room = {
         code, host: pid, born: now, seed: crypto.randomBytes(4).readUInt32BE(0),
-        players: { [pid]: { name, joined: now, t: now, g: null, placed: [] } },
-        world: null, acts: [],
+        players: { [pid]: { name, joined: now, t: now, g: null, placed: [], acts: [] } },
       };
       await writeRoom(room);
       res.status(200).json({ code, pid, name, seed: room.seed, room: view(room, pid) });
@@ -132,7 +156,7 @@ module.exports = async function handler(req, res) {
         return;
       }
       const pid = newPid();
-      room.players[pid] = { name: cleanName(b.name), joined: now, t: now, g: null, placed: [] };
+      room.players[pid] = { name: cleanName(b.name), joined: now, t: now, g: null, placed: [], acts: [] };
       await writeRoom(room);
       res.status(200).json({ code, pid, name: room.players[pid].name, seed: room.seed || 1, room: view(room, pid) });
       return;
@@ -148,24 +172,36 @@ module.exports = async function handler(req, res) {
         return;
       }
       const me = room.players[pid];
+      const isHost = room.host === pid;
       me.t = now;
       if (b.g && typeof b.g === "object") me.g = b.g;
       if (Array.isArray(b.placed)) me.placed = b.placed.slice(0, 24);
-
-      // ホストだけが、人間たちのようすを書ける
-      let deliver = [];
-      if (room.host === pid) {
-        if (b.world && typeof b.world === "object") room.world = b.world;
-        deliver = room.acts || [];                   // 先に受けとってから
-        room.acts = [];                              // 空にする（合図は使い切り）
-      } else if (Array.isArray(b.acts) && b.acts.length) {
-        room.acts = (room.acts || []).concat(b.acts.slice(0, 12)).slice(-40);
-      }
+      // 合図は、送った本人のところに置く。
+      // 同じものを何回か送りつづけ、ホストは番号で重複をはじくので、
+      // 1回とどかなくても、つぎの回でちゃんととどく
+      if (!isHost && Array.isArray(b.acts)) me.acts = b.acts.slice(-8);
 
       const alive = prune(room, now);
-      if (!alive) { try { await del(roomKey(code)); } catch (e) {} res.status(200).json({ room: null }); return; }
+      if (!alive) {
+        try { await del(roomKey(code)); } catch (e) {}
+        try { await del(worldKey(code)); } catch (e) {}
+        res.status(200).json({ room: null });
+        return;
+      }
+
       const out = view(room, pid);
-      out.acts = deliver;                          // 合図はホストだけが受けとる
+      if (isHost) {
+        if (b.world && typeof b.world === "object") await writeWorld(code, b.world);
+        out.acts = [];
+        for (const q of Object.keys(room.players)) {
+          if (q === pid) continue;
+          for (const a of room.players[q].acts || []) out.acts.push({ q, i: a.i, k: a.k, hid: a.hid, a: a.a, w: a.w });
+        }
+        out.world = null;                            // 自分が書いたものは返さなくてよい
+      } else {
+        out.acts = [];
+        out.world = await readWorld(code);
+      }
       await writeRoom(room);
       res.status(200).json({ room: out });
       return;
@@ -178,7 +214,10 @@ module.exports = async function handler(req, res) {
       const room = await readRoom(code);
       if (room && room.players[pid]) {
         delete room.players[pid];
-        if (!prune(room, now)) { try { await del(roomKey(code)); } catch (e) {} }
+        if (!prune(room, now)) {
+          try { await del(roomKey(code)); } catch (e) {}
+          try { await del(worldKey(code)); } catch (e) {}
+        }
         else await writeRoom(room);
       }
       res.status(200).json({ left: true });
