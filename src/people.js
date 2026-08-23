@@ -795,6 +795,12 @@ export function buildRoster(count = 100) {
     .map((nm) => named.find((n) => n.name === nm)).filter(Boolean);
   if (oji.length === 3) groups[31] = { id: 31, label: "湯上がりの三人組", members: oji };
 
+  // 実況コンビ
+  const kiyo = named.find((n) => n.name.indexOf("キヨ") >= 0);
+  const hajimen = named.find((n) => n.name.indexOf("ハジメン") >= 0);
+  if (kiyo && hajimen) {
+    groups[19] = { id: 19, label: "コラボ企画の二人", members: [kiyo, hajimen, makePerson("photo", 501)] };
+  }
   // 指名の人が ひとりも出そこねないよう、最後に確かめて入れなおす
   //  （組み合わせを決めうちした組があるので、はじき出される人が出る）
   const appear = new Set();
@@ -811,12 +817,6 @@ export function buildRoster(count = 100) {
     slot++;
   }
 
-  // 実況コンビ
-  const kiyo = named.find((n) => n.name.indexOf("キヨ") >= 0);
-  const hajimen = named.find((n) => n.name.indexOf("ハジメン") >= 0);
-  if (kiyo && hajimen) {
-    groups[19] = { id: 19, label: "コラボ企画の二人", members: [kiyo, hajimen, makePerson("photo", 501)] };
-  }
   return groups;
 }
 
