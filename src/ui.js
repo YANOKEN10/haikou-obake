@@ -3,6 +3,10 @@ import { clamp } from "./util.js";
 
 const $ = (s) => document.querySelector(s);
 
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
 export class UI {
   constructor(game) {
     this.game = game;
@@ -73,20 +77,95 @@ export class UI {
   }
 
   // --- 人間リスト --------------------------------------------
-  setHumans(humans) {
-    const sig = humans.map((h) => h.name + "|" + Math.round(h.fear) + "|" + h.state + "|" + h.out).join(";");
+  setHumans(humans, peers) {
+    const extra = peers && peers.length ? peers.map((p) => p.name).join(",") : "";
+    const sig = humans.map((h) => h.name + "|" + Math.round(h.fear) + "|" + h.state + "|" + h.out).join(";") + "#" + extra;
     if (sig === this._humanSig) return;
     this._humanSig = sig;
     const label = { wander: "うろうろ", investigate: "様子を見に行った", spooked: "びくびく", panic: "パニック！", flee: "逃走中！！" };
-    $("#humanList").innerHTML = humans.map((h) => {
+    // まだ校舎にいる人・こわがっている人を先に見せる
+    const list = humans.slice().sort((a, b) => (a.out ? 1 : 0) - (b.out ? 1 : 0) || b.fear / b.maxFear - a.fear / a.maxFear);
+    const box = $("#humanList");
+    let html = "";
+    if (peers && peers.length) {
+      html += peers.map((p) =>
+        '<div class="hrow mate"><div class="n"><span>👻 ' + esc(p.name) + '</span><span class="st">ともだち</span></div></div>').join("");
+    }
+    html += list.map((h) => {
       const p = clamp(h.fear / h.maxFear, 0, 1);
       const hue = 165 - p * 165;
       const st = h.out ? "追い出した！" : (label[h.state] || h.state);
       return '<div class="hrow' + (h.out ? " gone" : "") + '">' +
-        '<div class="n"><span>' + h.name + '</span><span class="st">' + st + "</span></div>" +
+        '<div class="n"><span>' + esc(h.name) + '</span><span class="st">' + st + "</span></div>" +
         '<div class="hbar"><i style="width:' + (p * 100) + "%;background:hsl(" + hue + ',85%,58%)"></i></div></div>';
     }).join("");
+    box.innerHTML = html + '<div class="hmore" hidden></div>';
+    this.trimHumanList(box);
   }
+
+  // 入りきらない行は、まるごと隠して「ほか◯人」とまとめる
+  //  （行が中とちゅうで切れて読めなくなるのを防ぐ）
+  trimHumanList(box) {
+    const more = box.lastElementChild;
+    const rows = Array.prototype.slice.call(box.children, 0, -1);
+    for (const r of rows) r.hidden = false;
+    more.hidden = true;
+    const limit = box.clientHeight;
+    if (!limit || !rows.length) return;
+    const top = box.getBoundingClientRect().top;
+    const spare = Math.round(rows[0].getBoundingClientRect().height * 0.7);
+    let hidden = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i].getBoundingClientRect();
+      // 最後の1行以外は、「ほか◯人」の行のぶんも空けておく
+      const room = limit - (i < rows.length - 1 ? spare : 0);
+      if (r.bottom - top > room) {
+        for (let j = i; j < rows.length; j++) { rows[j].hidden = true; hidden++; }
+        break;
+      }
+    }
+    if (hidden > 0) { more.hidden = false; more.textContent = "ほか " + hidden + " 人"; }
+  }
+
+  // ともだちと あそぶ画面のようす
+  setRoom(net) {
+    const on = net && net.on;
+    const chip = $("#roomChip");
+    chip.hidden = !on;
+    if (on) {
+      const s = "👥 あいことば " + net.code + "　" + net.playerCount + "人" + (net.isHost ? "（おや）" : "");
+      if (s !== this._chip) { this._chip = s; chip.textContent = s; }
+    } else this._chip = "";
+    const box = document.getElementById("room");
+    if (!box || !box.classList.contains("on")) return;
+    $("#roomOut").hidden = !!on;
+    $("#roomIn").hidden = !on;
+    if (!on) return;
+    $("#rCodeBig").textContent = net.code;
+    $("#rRole").textContent = net.isHost
+      ? "あなたが「おや」です。人間たちは あなたの画面が動かしています。"
+      : "「おや」が人間たちを動かしています。";
+    const rows = ['<div class="rmem"><span>' + esc(net.name) + '（あなた）</span><span class="tag">' +
+      (net.isHost ? "おや" : "") + "</span></div>"];
+    for (const p of net.peers.values()) {
+      rows.push('<div class="rmem"><span>' + esc(p.name) + "</span><span class=\"tag\"></span></div>");
+    }
+    $("#rMembers").innerHTML = rows.join("");
+  }
+
+  roomMsg(text, ok) {
+    const e = $("#rMsg");
+    e.textContent = text || "";
+    e.classList.toggle("ok", !!ok);
+  }
+
+  openRoom(net) {
+    document.getElementById("room").classList.add("on");
+    this.roomMsg("");
+    this.setRoom(net);
+  }
+  closeRoom() { document.getElementById("room").classList.remove("on"); }
+  get roomOpen() { return document.getElementById("room").classList.contains("on"); }
 
   setGauges(phase, stamina) {
     $("#phaseBar").firstElementChild.style.width = phase + "%";

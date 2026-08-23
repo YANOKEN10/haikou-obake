@@ -556,6 +556,41 @@ export class Human {
     this.render(dt, t, mv, ctx);
   }
 
+  // --- ともだちと遊ぶとき ---------------------------------
+  //  おや（部屋を作った人）から来た位置に、そっと合わせていく。
+  //  1秒に1回しか来ないので、そのあいだは自分でなめらかにつなぐ
+  setNet(x, y, z, yaw, fear, state, out) {
+    this.netT = { x, y, z, yaw };
+    this.fear = fear;
+    if (!this.out) this.state = state;
+    if (out && !this.out) { this.out = true; this.outT = 0; return true; }
+    return false;
+  }
+
+  updateRemote(dt, t, ctx) {
+    const n = this.netT;
+    if (!n) return;
+    const px = this.x, pz = this.z;
+    if (Math.abs(n.x - this.x) > 12 || Math.abs(n.z - this.z) > 12) {
+      this.x = n.x; this.y = n.y; this.z = n.z;      // ワープしたときは、いきなり合わせる
+    } else {
+      const k = Math.min(1, dt * 5);
+      this.x += (n.x - this.x) * k;
+      this.y += (n.y - this.y) * k;
+      this.z += (n.z - this.z) * k;
+    }
+    let d = ((n.yaw - this.yaw + Math.PI) % (Math.PI * 2)) - Math.PI;
+    if (d < -Math.PI) d += Math.PI * 2;
+    this.yaw += d * Math.min(1, dt * 6);
+    this.floor = Math.max(0, Math.round(this.y / 3.6));
+
+    const mv = Math.hypot(this.x - px, this.z - pz) / Math.max(dt, 1e-4);
+    this.walkPhase += dt * (2.2 + mv * 1.3);
+    this.talkT -= dt;
+    this.updateGag(dt, t);
+    this.render(dt, t, mv, ctx);
+  }
+
   render(dt, t, mv, ctx) {
     const panic = this.state === "panic" || this.state === "flee";
     this.group.position.set(this.x, this.y, this.z);

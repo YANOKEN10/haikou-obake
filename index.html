@@ -62,7 +62,13 @@ canvas{display:block}
   border-radius:9px;padding:4px 12px;font-size:13px;color:var(--mint)}
 
 /* --- 右上：人間リスト --- */
-#humanList{position:absolute;right:14px;top:12px;width:216px;display:flex;flex-direction:column;gap:5px;max-height:calc(100vh - 230px);overflow:hidden}
+#humanList{position:absolute;right:14px;top:12px;width:216px;display:flex;flex-direction:column;gap:5px;
+  max-height:calc(100dvh - 180px);overflow:hidden}
+.hrow[hidden]{display:none}
+.hmore{align-self:flex-end;background:rgba(18,15,38,.72);border:1px solid var(--edge);border-radius:8px;
+  padding:2px 9px;font-size:10.5px;color:var(--muted)}
+.hrow.mate{border-color:#ffd45e;background:rgba(58,46,20,.62)}
+.hrow.mate .st{color:#ffd45e}
 .hrow{background:var(--panel);border:1px solid var(--edge);border-radius:9px;padding:5px 9px;font-size:12px}
 .hrow .n{display:flex;justify-content:space-between;align-items:center}
 .hrow .st{font-size:10px;color:var(--muted)}
@@ -188,6 +194,41 @@ body.touch .hpanel, body.touch .namelist, body.touch .cwrap{-webkit-overflow-scr
 #bPlace{right:122px;bottom:122px;width:60px;height:60px}
 #bCraft{left:24px;bottom:158px;width:62px;height:62px;border-color:var(--gold);color:var(--gold)}
 
+
+/* ともだちと あそぶ */
+#room{position:fixed;inset:0;z-index:46;display:none;align-items:center;justify-content:center;
+  background:rgba(6,5,14,.82);padding:18px;overflow:auto}
+#room.on{display:flex}
+.rbox{background:var(--panel);border:1px solid var(--edge2);border-radius:16px;padding:20px 22px;
+  width:min(420px,100%);text-align:center;box-shadow:0 18px 60px rgba(0,0,0,.6)}
+.rbox h3{margin:0 0 10px;font-size:19px;color:var(--gold)}
+.rnote{font-size:12px;color:var(--muted);line-height:1.6;margin:8px 0}
+.rsep{font-size:11.5px;color:var(--muted);margin:14px 0 8px}
+.rjoin{display:flex;gap:8px}
+.rjoin input{flex:1;min-width:0;background:rgba(10,9,20,.8);border:1px solid var(--edge2);border-radius:10px;
+  color:var(--ink);font:700 24px/1 'DotGothic16',monospace;letter-spacing:.28em;text-align:center;padding:10px 8px;
+  text-transform:uppercase}
+.rjoin .pbtn{flex:0 0 92px;margin:0}
+#rCodeBig{font:700 40px/1.1 'DotGothic16',monospace;letter-spacing:.22em;color:var(--gold);
+  background:rgba(10,9,20,.7);border:1px dashed var(--edge2);border-radius:12px;padding:12px 6px;margin:8px 0 12px}
+#rMembers{display:flex;flex-direction:column;gap:5px;margin:10px 0}
+.rmem{background:rgba(10,9,20,.6);border:1px solid var(--edge);border-radius:9px;padding:5px 10px;
+  font-size:12.5px;display:flex;justify-content:space-between;align-items:center}
+.rmem .tag{font-size:10px;color:var(--gold)}
+#rMsg{font-size:12px;min-height:18px;margin:8px 0;color:#ff9aa8}
+#rMsg.ok{color:#8fe6b0}
+#roomChip{position:absolute;left:50%;transform:translateX(-50%);top:8px;background:rgba(18,15,38,.78);
+  border:1px solid var(--gold);border-radius:999px;padding:3px 12px;font-size:11.5px;color:var(--gold);
+  white-space:nowrap;pointer-events:none}
+#roomChip[hidden]{display:none}
+@media (max-height:560px){
+  .rbox{padding:14px 16px}
+  .rbox h3{font-size:16px}
+  #rCodeBig{font-size:30px;padding:8px 6px}
+  .rnote{font-size:11px;margin:5px 0}
+  #roomChip{top:4px;font-size:10.5px;padding:2px 10px}
+}
+
 /* 縦持ちのときの案内 */
 #rotate{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
   background:#07060f;text-align:center;padding:28px;flex-direction:column;gap:14px}
@@ -201,7 +242,8 @@ body.touch.portrait #rotate{display:flex}
   #rankName{font-size:13px} #rankNote{display:none} #kicked{font-size:11px;margin-top:2px}
   #kicked b{font-size:15px} #progWrap{height:5px}
   #place{top:84px;font-size:11px;padding:2px 9px}
-  #humanList{width:152px;gap:3px;top:8px;right:8px;max-height:150px;overflow:hidden}
+  #humanList{width:152px;gap:3px;top:8px;right:8px;max-height:calc(100dvh - 140px);overflow:hidden}
+  .hmore{padding:1px 7px;font-size:9.5px}
   .hrow{padding:3px 6px;font-size:10px;border-radius:7px}
   .hrow .st{font-size:9px}
   body.touch #bag{left:324px;top:8px;right:auto;bottom:auto;padding:4px 9px;
@@ -484,6 +526,7 @@ body.touch #craftClose{display:block}
     <button class="sysbtn" id="btnSave">💾 セーブ</button>
   </div>
   <div id="hint"></div>
+  <div id="roomChip" hidden></div>
   <div id="toasts"></div>
 </div>
 
@@ -510,8 +553,35 @@ body.touch #craftClose{display:block}
     <div class="psub">おばけの時間が止まっています</div>
     <button class="pbtn" id="pResume">▶ つづける <kbd>ESC</kbd></button>
     <button class="pbtn" id="pSave">💾 セーブする <kbd>S</kbd></button>
+    <button class="pbtn" id="pRoom">👥 ともだちと あそぶ</button>
     <button class="pbtn" id="pHome">↩ ホームにもどる <kbd>H</kbd></button>
     <div class="pnote">「ホームにもどる」を押すと、<br>ここまでの記録は自動でセーブされます。</div>
+  </div>
+</div>
+
+
+<div id="room">
+  <div class="rbox">
+    <h3>👥 ともだちと あそぶ</h3>
+    <div id="roomOut">
+      <div class="rnote">同じ「あいことば」を入れた人どうしで、<br>おなじ廃校をいっしょに探検できます（4人まで）。</div>
+      <button class="pbtn" id="rCreate">🚪 あたらしい部屋をつくる</button>
+      <div class="rsep">または、教えてもらったあいことばを入れる</div>
+      <div class="rjoin">
+        <input id="rCode" maxlength="4" placeholder="ABCD" autocomplete="off"
+               autocapitalize="characters" spellcheck="false" inputmode="text">
+        <button class="pbtn" id="rJoin">入る</button>
+      </div>
+    </div>
+    <div id="roomIn" hidden>
+      <div class="rnote">この あいことばを ともだちに おしえてね</div>
+      <div id="rCodeBig">----</div>
+      <div id="rMembers"></div>
+      <div class="rnote" id="rRole"></div>
+      <button class="pbtn" id="rLeave">👋 部屋を出る</button>
+    </div>
+    <div id="rMsg"></div>
+    <button class="pbtn sub" id="rClose">とじる</button>
   </div>
 </div>
 

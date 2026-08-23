@@ -7,7 +7,8 @@ import * as S from "./save.js";
 import { Cloud } from "./cloud.js";
 import { Player } from "./player.js";
 import { Human, HUMAN_SCALE } from "./human.js";
-import { Pickup, Trap, Summon, FloatText, RedLady, Cat, Confession } from "./entities.js";
+import { Pickup, Trap, Summon, FloatText, RedLady, Cat, Confession, PeerGhost } from "./entities.js";
+import { Net } from "./net.js";
 import { UI } from "./ui.js";
 import { Audio } from "./audio.js";
 import { MATERIALS, TRAPS, GHOSTS, RANKS } from "./data.js";
@@ -73,6 +74,8 @@ function pickQuality() {
   return { name: "desktop", torches: 5, lamps: 4, dust: 700, pickups: 60, maxPickups: 110, pixelRatio: 1.75, aa: true, far: 260, fov: 62 };
 }
 
+const NET_STATES = ["wander", "investigate", "spooked", "panic", "flee"];
+
 class Game {
   constructor() {
     this.q = pickQuality();
@@ -106,6 +109,9 @@ class Game {
 
     this.roster = new Roster(100);
     this.humans = [];
+    this.net = new Net();
+    this.peerGhosts = new Map();
+    this.hidNext = 1;
     this.pickups = [];
     this.traps = [];
     this.summons = [];
@@ -213,12 +219,14 @@ class Game {
 
   // --- 人間の襲来 --------------------------------------------
   spawnWave() {
+    if (this.isGuest && !this._netSpawn) return;   // お客さんは、おやに合わせてだけ出す
     this.wave++;
     const group = this.roster.next();
     const e = this.world.entry;
     for (let i = 0; i < group.members.length; i++) {
       const t = group.members[i];
       const h = new Human(this.scene, this.world, t, e.x + rand(-3, 3), e.z + rand(-2, 2));
+      h.hid = this.hidNext++;
       h.speak(choice(t.idle), 4 + i * 0.4);
       h.goTo(rand(-25, 25), rand(8, 28), 0);
       this.humans.push(h);
@@ -357,6 +365,7 @@ class Game {
     if (best.seenGhostT > 0.2) amount *= 0.7;      // 見られていると効きが悪い
 
     const eff = best.addFear(amount, p.x, p.z, "direct", "おどかし");
+    if (this.net.on) this.net.reportScare(best.hid, amount, "direct");
     this.texts.push(new FloatText(this.scene, "わっ！", p.x, p.y + 2.1, p.z, "#ffe27a", 2.3));
 
     if (eff > 0) {
@@ -462,6 +471,7 @@ class Game {
       // 仲間が近くにいるか（ひとりだと怖さ倍率アップ）
       h.alone = true;
       for (const o of this.humans) if (o !== h && !o.out && dist(o.x, o.z, h.x, h.z) < 9) { h.alone = false; break; }
+      if (this.isGuest) { h.updateRemote(dt, t, ctx); continue; }
       h.update(dt, t, ctx);
 
       // おばけが見えていると、じわじわ怖くなる
@@ -508,6 +518,7 @@ class Game {
         if (d > tr.def.radius) continue;
         if (!w.colliders.lineOfSight(tr.x, tr.z, h.x, h.z, 1.2, 0.7)) continue;
         const eff = h.addFear(tr.def.fear, tr.x, tr.z, "trap:" + tr.id, tr.def.name);
+        if (this.net.on) this.net.reportScare(h.hid, tr.def.fear, "trap:" + tr.id);
         tr.fire();
         this.bump("trapsFired");
         if (dist(tr.x, tr.z, p.x, p.z) < 34) this.audio.trapSound(tr.id);
@@ -556,7 +567,7 @@ class Game {
     // --- 次の波 ---------------------------------------------
     if (alive === 0) {
       this.waveTimer -= dt;
-      if (this.waveTimer <= 0) { this.spawnWave(); this.waveTimer = 26; }
+      if (this.waveTimer <= 0 && !this.isGuest) { this.spawnWave(); this.waveTimer = 26; }
     } else this.waveTimer = 26;
 
     // --- 隠し要素 -------------------------------------------
@@ -644,13 +655,15 @@ class Game {
     this.ui.setPlace(w.roomAt(p.x, p.z, p.y));
     this.ui.setBag(this.inv);
     this.ui.setHotbar(this.built, this.selTrap);
-    this.ui.setHumans(this.humans);
+    this.ui.setHumans(this.humans, this.netPeerList());
     this.ui.setGauges(Math.round(p.phase), Math.round(p.stamina));
 
     this.scareFx = Math.max(0, this.scareFx - dt * 1.4);
     let danger = this.scareFx;
     for (const h of this.humans) if (!h.out && h.state === "panic" && dist(h.x, h.z, p.x, p.z) < 12) danger = Math.max(danger, 0.35);
     this.ui.vignette(danger);
+
+    if (this.net.on) this.syncNet(dt, t);
 
     // 状況に応じたヒント
     let hint = "";
@@ -796,6 +809,120 @@ class Game {
     }
   }
 
+
+  // ============================================================
+  //  ともだちと一緒にあそぶ
+  //   ・部屋を作った人（おや）が人間たちを動かす
+  //   ・ほかの人は、その人間たちを見て、おどかした合図を送る
+  //   ・おばけの位置は、みんながそれぞれ送りあう
+  // ============================================================
+  get isGuest() { return this.net.on && !this.net.isHost; }
+
+  netPeerList() {
+    if (!this.net.on) return null;
+    return Array.from(this.net.peers.values()).map((p) => ({ name: p.name }));
+  }
+
+  // 部屋に入ったら、来る人たちの順番をそろえる
+  netReseed(seed) {
+    this.roster = new Roster(100, seed);
+    for (const h of this.humans) this.scene.remove(h.group);
+    this.humans = [];
+    this.wave = 0;
+    this.hidNext = 1;
+    this.waveTimer = this.net.isHost ? 4 : 9e9;
+  }
+
+  async roomCreate(name) {
+    const r = await this.net.create(name || (this.profile && this.profile.name) || "おばけ");
+    if (!r.ok) return r;
+    this.netReseed(r.data.seed);
+    this.ui.toast("🚪 あいことば「" + this.net.code + "」でともだちを呼ぼう！", "gold");
+    this.audio.rankUp();
+    return r;
+  }
+
+  async roomJoin(code, name) {
+    const r = await this.net.join(code, name || (this.profile && this.profile.name) || "おばけ");
+    if (!r.ok) return r;
+    this.netReseed(r.data.seed);
+    this.ui.toast("🚪 部屋「" + this.net.code + "」に入りました", "gold");
+    this.audio.rankUp();
+    return r;
+  }
+
+  async roomLeave() {
+    await this.net.leave();
+    for (const [, g] of this.peerGhosts) g.dispose();
+    this.peerGhosts.clear();
+    this.waveTimer = 6;
+    this.ui.toast("ひとりで遊ぶモードに もどりました", "good");
+  }
+
+  hostSnapshot() {
+    const hs = [];
+    for (const h of this.humans) {
+      hs.push([h.hid, +h.x.toFixed(2), +h.y.toFixed(2), +h.z.toFixed(2), +h.yaw.toFixed(2),
+        Math.round(h.fear), NET_STATES.indexOf(h.state), h.out ? 1 : 0]);
+    }
+    return { wave: this.wave, hs };
+  }
+
+  applyRemoteWorld(rw) {
+    let guard = 0;
+    this._netSpawn = true;
+    while (this.wave < rw.wave && guard++ < 24) this.spawnWave();
+    this._netSpawn = false;   // 同じ順番で同じ人たちが来る
+    const by = new Map();
+    for (const h of this.humans) by.set(h.hid, h);
+    for (const a of rw.hs || []) {
+      const h = by.get(a[0]);
+      if (!h) continue;
+      if (h.setNet(a[1], a[2], a[3], a[4], a[5], NET_STATES[a[6]] || "wander", a[7])) this.onEscape(h);
+    }
+  }
+
+  syncNet(dt, t) {
+    const p = this.player;
+    const me = {
+      x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), yaw: +p.yaw.toFixed(2),
+      p: p.phasing ? 1 : 0, s: p.scarePose > 0 ? 1 : 0,
+    };
+    const placed = [];
+    for (const tr of this.traps) placed.push({ k: "t", id: tr.id, x: +tr.x.toFixed(1), z: +tr.z.toFixed(1) });
+    for (const s of this.summons) placed.push({ k: "g", id: s.id, x: +s.x.toFixed(1), z: +s.z.toFixed(1) });
+
+    this.net.update(dt, me, placed, this.net.isHost ? this.hostSnapshot() : null);
+
+    if (this.net.isHost) {
+      // ともだちが おどかしたぶんを、こちらで反映する
+      for (const a of this.net.takeActs()) {
+        if (a.k !== "scare") continue;
+        for (const h of this.humans) {
+          if (h.hid !== a.hid || h.out) continue;
+          h.addFear(a.a, h.x, h.z, a.w || "mate", "ともだち");
+          break;
+        }
+      }
+    } else if (this.net.remoteWorld) {
+      this.applyRemoteWorld(this.net.remoteWorld);
+    }
+
+    // ともだちのおばけを出す
+    const seen = new Set();
+    for (const [pid, pr] of this.net.peers) {
+      seen.add(pid);
+      let g = this.peerGhosts.get(pid);
+      if (!g) { g = new PeerGhost(this.scene, this.peerGhosts.size, pr.name); this.peerGhosts.set(pid, g); }
+      g.setName(pr.name);
+      g.update(dt, t, pr);
+    }
+    for (const [pid, g] of this.peerGhosts) {
+      if (!seen.has(pid)) { g.dispose(); this.peerGhosts.delete(pid); }
+    }
+    this.ui.setRoom(this.net);
+  }
+
   setPaused(on) {
     this.paused = on;
     document.getElementById("pause").classList.toggle("on", on);
@@ -805,6 +932,8 @@ class Game {
   }
 
   goHome() {
+    if (this.net.on) this.roomLeave();
+    this.ui.closeRoom();
     // ゲーム中でなくても、ポーズ画面は必ず閉じる
     this.setPaused(false);
     this.ui.closeCraft();

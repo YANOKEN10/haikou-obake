@@ -6,7 +6,7 @@ import { FLOOR_H, FLOORS, stairSurface } from "./world.js";
 //  プレイヤー（おばけ）と3人称カメラ
 // ============================================================
 // おばけの大きさ（1.0 が以前の大きさ。人間より小さくして、こそこそ感を出す）
-export const GHOST_SCALE = 0.62;
+export const GHOST_SCALE = 0.5;
 
 export class Player {
   constructor(scene, world) {

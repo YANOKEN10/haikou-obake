@@ -1,9 +1,26 @@
 // 汎用ユーティリティ ------------------------------------------
 export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 export const lerp = (a, b, t) => a + (b - a) * t;
-export const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
+
+// 種をあたえると、いつも同じ順番の乱数になる（mulberry32）
+// ともだちと遊ぶとき、全員が同じ校舎・同じ人たちを見るために使う
+export function makeRng(seed) {
+  let a = (seed >>> 0) || 1;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+let _rng = Math.random;
+// seed に数を渡すと種つき、null にもどすと、ふつうのランダムにもどる
+export function seedRandom(seed) { _rng = (seed == null) ? Math.random : makeRng(seed); }
+
+export const rand = (a = 0, b = 1) => a + _rng() * (b - a);
 export const randi = (a, b) => Math.floor(rand(a, b + 1));
-export const choice = (arr) => arr[Math.floor(Math.random() * arr.length)];
+export const choice = (arr) => arr[Math.floor(_rng() * arr.length)];
 export const dist2 = (ax, az, bx, bz) => { const dx = ax - bx, dz = az - bz; return dx * dx + dz * dz; };
 export const dist = (ax, az, bx, bz) => Math.sqrt(dist2(ax, az, bx, bz));
 

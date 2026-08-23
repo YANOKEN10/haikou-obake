@@ -36,6 +36,58 @@ export class Home {
     $("#pHome").addEventListener("click", () => this.game.goHome());
     $("#btnSave").addEventListener("click", () => this.game.saveNow(true));
 
+    // --- ともだちと あそぶ ---------------------------------
+    const g = this.game;
+    const busy = (on) => {
+      for (const id of ["#rCreate", "#rJoin", "#rLeave"]) $(id).disabled = on;
+    };
+    $("#pRoom").addEventListener("click", () => g.ui.openRoom(g.net));
+    $("#rClose").addEventListener("click", () => g.ui.closeRoom());
+    $("#room").addEventListener("click", (e) => { if (e.target.id === "room") g.ui.closeRoom(); });
+
+    $("#rCreate").addEventListener("click", async () => {
+      busy(true);
+      g.ui.roomMsg("部屋をつくっています…", true);
+      const r = await g.roomCreate(this.profile().name);
+      busy(false);
+      g.ui.roomMsg(r.ok ? "" : r.why);
+      g.ui.setRoom(g.net);
+    });
+
+    const code = $("#rCode");
+    code.addEventListener("input", () => {
+      code.value = code.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+    });
+    code.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#rJoin").click(); });
+
+    $("#rJoin").addEventListener("click", async () => {
+      const c = code.value.trim();
+      if (c.length !== 4) { g.ui.roomMsg("あいことばは4文字です"); return; }
+      busy(true);
+      g.ui.roomMsg("部屋をさがしています…", true);
+      const r = await g.roomJoin(c, this.profile().name);
+      busy(false);
+      g.ui.roomMsg(r.ok ? "" : r.why);
+      g.ui.setRoom(g.net);
+    });
+
+    $("#rLeave").addEventListener("click", async () => {
+      busy(true);
+      await g.roomLeave();
+      busy(false);
+      code.value = "";
+      g.ui.roomMsg("部屋を出ました", true);
+      g.ui.setRoom(g.net);
+    });
+
+    g.net.onEvent = (kind, detail) => {
+      if (kind === "join") g.ui.toast("👋 " + detail + " が来た！", "gold");
+      else if (kind === "part") g.ui.toast("👋 " + detail + " が出ていった", "good");
+      else if (kind === "host") g.ui.toast("👑 " + detail, "gold");
+      else if (kind === "lost") { g.ui.toast("⚠ " + detail, "bad"); g.roomLeave(); }
+      g.ui.setRoom(g.net);
+    };
+
     if (!S.storageAvailable()) {
       $("#loginMsg").textContent = "このブラウザでは記録を保存できません（プライベートモードかも）";
     }

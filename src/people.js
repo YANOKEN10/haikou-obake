@@ -1,3 +1,4 @@
+import { makeRng } from "./util.js";
 // ============================================================
 //  廃校にやってくる人間たち
 //   ・見た目の部品（髪・服・持ち物）を組み合わせて作る
@@ -307,16 +308,18 @@ export function buildRoster(count = 100) {
 
 // 同じ組が続けて来ないよう、順番を混ぜて配る
 export class Roster {
-  constructor(count = 100) {
+  // seed をわたすと、来る順番が全員で同じになる（ともだちと遊ぶとき用）
+  constructor(count = 100, seed = null) {
     this.groups = buildRoster(count);
     this.order = this.groups.map((g, i) => i);
+    this.pick = seed == null ? Math.random : makeRng(seed ^ 0x5bf03635);
     this.shuffle();
     this.at = 0;
     this.round = 1;
   }
   shuffle() {
     for (let i = this.order.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(this.pick() * (i + 1));
       const t = this.order[i]; this.order[i] = this.order[j]; this.order[j] = t;
     }
   }
