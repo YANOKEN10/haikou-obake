@@ -8,14 +8,21 @@ export function buildSky(scene) {
   const geo = new THREE.SphereGeometry(170, 28, 18);
   const pos = geo.attributes.position;
   const col = new Float32Array(pos.count * 3);
-  const top = new THREE.Color(0x0a0d1e);
-  const mid = new THREE.Color(0x1b2141);
-  const low = new THREE.Color(0x2f2b4a);
+  // 上は墨のような闇、地平ぎわは血のような赤。あいだを紫でつなぐ
+  const top = new THREE.Color(0x07060f);
+  const mid = new THREE.Color(0x281333);
+  const low = new THREE.Color(0x5e1526);
+  const ember = new THREE.Color(0x8c2118);
   const c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const h = Math.max(0, pos.getY(i) / 170);
-    if (h > 0.35) c.copy(mid).lerp(top, (h - 0.35) / 0.65);
-    else c.copy(low).lerp(mid, Math.max(0, h) / 0.35);
+    const ax = Math.atan2(pos.getZ(i), pos.getX(i));
+    if (h > 0.42) c.copy(mid).lerp(top, (h - 0.42) / 0.58);
+    else c.copy(low).lerp(mid, Math.max(0, h) / 0.42);
+    // 地平のちかくに、赤い雲のむらを走らせる
+    const swirl = Math.sin(ax * 3.0 + h * 7.0) * Math.sin(ax * 1.7 - h * 4.0);
+    const k = Math.max(0, (0.34 - h) / 0.34) * Math.max(0, swirl) * 0.55;
+    c.lerp(ember, k);
     col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
   }
   geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
@@ -24,7 +31,7 @@ export function buildSky(scene) {
   scene.add(dome);
 
   // 星
-  const N = 950;
+  const N = 420;
   const sp = new Float32Array(N * 3);
   const sc = new Float32Array(N * 3);
   for (let i = 0; i < N; i++) {
@@ -33,8 +40,8 @@ export function buildSky(scene) {
     sp[i * 3] = Math.sin(ph) * Math.cos(th) * r;
     sp[i * 3 + 1] = Math.cos(ph) * r;
     sp[i * 3 + 2] = Math.sin(ph) * Math.sin(th) * r;
-    const b = rand(0.45, 1);
-    sc[i * 3] = b; sc[i * 3 + 1] = b * rand(0.9, 1); sc[i * 3 + 2] = b;
+    const b = rand(0.3, 0.8);
+    sc[i * 3] = b; sc[i * 3 + 1] = b * rand(0.8, 0.95); sc[i * 3 + 2] = b * rand(0.85, 1);
   }
   const sg = new THREE.BufferGeometry();
   sg.setAttribute("position", new THREE.BufferAttribute(sp, 3));
@@ -46,7 +53,7 @@ export function buildSky(scene) {
   // 月
   const moon = new THREE.Mesh(
     new THREE.SphereGeometry(7.5, 20, 16),
-    new THREE.MeshBasicMaterial({ color: 0xf6f1d8, fog: false })
+    new THREE.MeshBasicMaterial({ color: 0xd8b08a, fog: false })
   );
   moon.position.set(-72, 96, 96);
   moon.renderOrder = -8;
@@ -54,7 +61,7 @@ export function buildSky(scene) {
 
   const halo = new THREE.Mesh(
     new THREE.SphereGeometry(15, 16, 12),
-    new THREE.MeshBasicMaterial({ color: 0xbcd0f0, transparent: true, opacity: 0.11, fog: false, depthWrite: false })
+    new THREE.MeshBasicMaterial({ color: 0xc06a4a, transparent: true, opacity: 0.16, fog: false, depthWrite: false })
   );
   halo.position.copy(moon.position);
   scene.add(halo);

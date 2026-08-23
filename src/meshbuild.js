@@ -75,6 +75,42 @@ export class MeshBuilder {
       Math.abs(x2 - x1), thick, Math.abs(z2 - z1), color, opt);
   }
 
+  // 草の葉：下が太く上が細い、両面から見える板きれ1枚（4三角形）
+  //  草むらを安く大量に描くために使う
+  blade(x, y, z, w, h, rotY, colLow, colTop, leanX = 0, leanZ = 0) {
+    const cos = Math.cos(rotY), sin = Math.sin(rotY);
+    const hw = w / 2;
+    const rot = (vx, vz) => [vx * cos - vz * sin, vx * sin + vz * cos];
+    const b0 = rot(-hw, 0), b1 = rot(hw, 0);
+    const t0 = rot(-hw * 0.18 + leanX, leanZ), t1 = rot(hw * 0.18 + leanX, leanZ);
+    const lc = new THREE.Color(colLow), tc = new THREE.Color(colTop);
+    for (const s of [1, -1]) {
+      const n = rot(0, s);
+      const i = this.count;
+      this.pos.push(x + b0[0], y, z + b0[1]);  this.col.push(lc.r, lc.g, lc.b);
+      this.pos.push(x + b1[0], y, z + b1[1]);  this.col.push(lc.r, lc.g, lc.b);
+      this.pos.push(x + t1[0], y + h, z + t1[1]); this.col.push(tc.r, tc.g, tc.b);
+      this.pos.push(x + t0[0], y + h, z + t0[1]); this.col.push(tc.r, tc.g, tc.b);
+      for (let k = 0; k < 4; k++) this.nor.push(n[0], 0.35, n[1]);
+      if (s > 0) this.idx.push(i, i + 1, i + 2, i, i + 2, i + 3);
+      else this.idx.push(i, i + 2, i + 1, i, i + 3, i + 2);
+      this.count += 4;
+    }
+    return this;
+  }
+
+  // 草むら：数枚の葉を十字に立てる
+  tuft(x, z, y, h, colLow, colTop, n = 3, spread = 0.26) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI;
+      const hh = h * (0.6 + Math.random() * 0.7);
+      this.blade(x + (Math.random() - 0.5) * spread, y, z + (Math.random() - 0.5) * spread,
+        hh * (0.12 + Math.random() * 0.11), hh, a, colLow, colTop,
+        (Math.random() - 0.5) * hh * 0.55, (Math.random() - 0.5) * hh * 0.55);
+    }
+    return this;
+  }
+
   finish(material) {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(this.pos, 3));

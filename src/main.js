@@ -69,9 +69,9 @@ class Input {
 function pickQuality() {
   const touch = isTouchDevice();
   const small = Math.min(innerWidth, innerHeight) < 520;
-  if (touch && small) return { name: "mobile", torches: 2, lamps: 2, dust: 200, pickups: 40, maxPickups: 70, pixelRatio: 1.0, aa: false, far: 190, fov: 68 };
-  if (touch) return { name: "tablet", torches: 3, lamps: 3, dust: 380, pickups: 50, maxPickups: 90, pixelRatio: 1.25, aa: true, far: 220, fov: 65 };
-  return { name: "desktop", torches: 5, lamps: 4, dust: 700, pickups: 60, maxPickups: 110, pixelRatio: 1.75, aa: true, far: 260, fov: 62 };
+  if (touch && small) return { name: "mobile", torches: 2, lamps: 2, dust: 200, grass: 0.4, pickups: 40, maxPickups: 70, pixelRatio: 1.0, aa: false, far: 190, fov: 68 };
+  if (touch) return { name: "tablet", torches: 3, lamps: 3, dust: 380, grass: 0.65, pickups: 50, maxPickups: 90, pixelRatio: 1.25, aa: true, far: 220, fov: 65 };
+  return { name: "desktop", torches: 5, lamps: 4, dust: 700, grass: 1, pickups: 60, maxPickups: 110, pixelRatio: 1.75, aa: true, far: 260, fov: 62 };
 }
 
 const NET_STATES = ["wander", "investigate", "spooked", "panic", "flee"];
@@ -82,7 +82,7 @@ class Game {
     this.renderer = new THREE.WebGLRenderer({ antialias: this.q.aa, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.q.pixelRatio));
     this.renderer.setSize(Math.max(1, innerWidth || 1), Math.max(1, innerHeight || 1));
-    this.renderer.setClearColor(0x0a0d1e);
+    this.renderer.setClearColor(0x0b0510);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
     document.getElementById("app").appendChild(this.renderer.domElement);
@@ -144,17 +144,18 @@ class Game {
     // 隠し要素：全階のトイレから、毎回ランダムにひとつ選ぶ
     const toilets = [];
     for (let f = 1; f <= 4; f++) { toilets.push("wc_m" + f, "wc_f" + f); }
-    this.world = buildWorld(this.scene, { dust: this.q.dust, poopRoom: choice(toilets) });
+    this.world = buildWorld(this.scene, { dust: this.q.dust, grass: this.q.grass, poopRoom: choice(toilets) });
 
     this.sky = buildSky(this.scene);
 
     // 照明（夜だけど、ちゃんと見える明るさ）
-    this.scene.add(new THREE.AmbientLight(0x4b5c86, 2.4));
-    this.scene.add(new THREE.HemisphereLight(0x8fa6d8, 0x5b6280, 2.6));
-    const moon = new THREE.DirectionalLight(0xbfd2f5, 1.9);
+    // 見えなくならない明るさは保ちつつ、色を赤黒く寄せる
+    this.scene.add(new THREE.AmbientLight(0x5b4a60, 3.0));
+    this.scene.add(new THREE.HemisphereLight(0xac7f84, 0x554a40, 3.1));
+    const moon = new THREE.DirectionalLight(0xf0cdae, 2.3);
     moon.position.set(-60, 80, 80);
     this.scene.add(moon);
-    const fill = new THREE.DirectionalLight(0x6d5f9a, 0.5);
+    const fill = new THREE.DirectionalLight(0x8a4a58, 0.7);
     fill.position.set(40, 30, -50);
     this.scene.add(fill);
 

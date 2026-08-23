@@ -1,6 +1,6 @@
 import * as THREE from "../lib/three.module.js";
 import { MeshBuilder, wallWithHoles } from "./meshbuild.js";
-import { Colliders, NavGraph, rand, choice } from "./util.js";
+import { Colliders, NavGraph, rand, choice, clamp } from "./util.js";
 import { FLOOR_ROOMS, FLOOR_LABEL, ST_W, ST_E } from "./rooms.js";
 
 export const FLOOR_H = 3.6;
@@ -8,13 +8,17 @@ export const WALL_T = 0.22;
 export const FLOORS = 4;
 
 // --- 配色（廃墟らしい退色パレット） --------------------------
+// 木造校舎。長い年月で黒ずんだ下見板張りと、飴色になった床板。
 const C = {
-  wall: 0x8a8375, wallDark: 0x6e685c, ceil: 0x7d7869,
-  floorHall: 0x5c6352, floorRoom: 0x7a6952, floorTile: 0x77766e,
-  board: 0x2e3d31, desk: 0x9a7c50, metal: 0x555c62, locker: 0x76858d,
-  ground: 0x54503f, grass: 0x36462f, concrete: 0x6a6a63,
-  fence: 0x4e545a, wood: 0x6b5334, shelf: 0x7d6242, stone: 0x6f6f68, sakura: 0x53384a,
-  rust: 0x5a4034, stain: 0x4a4438, mold: 0x44503c, curtain: 0x8e8b7e,
+  wall: 0x4b3b2b, wallDark: 0x3f3122, siding: 0x5a4630, post: 0x2f2519,
+  plaster: 0x6a6151, wains: 0x4d3a26,          // 内壁：上は古い漆喰、下は腰板
+  ceil: 0x453a2c,
+  floorHall: 0x4a3520, floorRoom: 0x574227, floorTile: 0x5b5a50,
+  board: 0x1f2b25, desk: 0x7a5f3a, metal: 0x414846, locker: 0x58635e,
+  ground: 0x453f30, grass: 0x2c3a24, grassDry: 0x565033, concrete: 0x545449,
+  fence: 0x3c423e, wood: 0x4c3b25, shelf: 0x5e472e, stone: 0x555549, sakura: 0x3b2934,
+  rust: 0x4a3226, stain: 0x362f1e, mold: 0x2f3a28, curtain: 0x6a6454,
+  sash: 0x9a927c, tile: 0x2e3138, ivy: 0x2b3a22,   // 窓枠（白木）・瓦・蔦
 };
 
 const RZ1 = -14, RZ2 = -4;        // 部屋の奥行き
@@ -149,15 +153,43 @@ function buildFloor(ctx, f) {
   }
 
   // --- 外壁（南北）------------------------------------------
+  //  木造校舎らしく、下見板張り＋柱＋格子窓＋ひさし で仕上げる
   const north = windowRow(BX1 + 2, BX2 - 2, 3.0, 4.6, y0 + 0.95, y0 + 2.55);
   wallWithHoles(mb, col, { axis: "x", fixed: RZ1, from: BX1, to: BX2, y1: y0, y2: y1, thick: WALL_T, color: C.wall, holes: north });
+  siding(mb, "x", RZ1, BX1, BX2, y0, y1, -1);
+  posts(mb, "x", RZ1, BX1, BX2, y0, y1, -1);
+  for (const h of north) sash(mb, "x", RZ1 - 0.06, h.a, h.b, h.y1, h.y2, 2);
+  eave(mb, "x", RZ1, BX1, BX2, y0 + 2.78, 0.72, -1);
+
   const south = windowRow(BX1 + 2, BX2 - 2, 3.2, 4.6, y0 + 0.95, y0 + 2.6)
     .filter((h) => f > 0 || h.b < -7.5 || h.a > 7.5);
   if (f === 0) south.push({ a: -3, b: 3, y1: y0, y2: y0 + 2.5 });
   wallWithHoles(mb, col, { axis: "x", fixed: HZ2, from: BX1, to: BX2, y1: y0, y2: y1, thick: WALL_T, color: C.wall, holes: south });
+  siding(mb, "x", HZ2, BX1, BX2, y0, y1, 1);
+  posts(mb, "x", HZ2, BX1, BX2, y0, y1, 1);
+  for (const h of south) {
+    if (f === 0 && h.a === -3) continue;                 // 昇降口は枠なし
+    sash(mb, "x", HZ2 + 0.06, h.a, h.b, h.y1, h.y2, 2);
+  }
+  eave(mb, "x", HZ2, BX1, BX2, y0 + 2.84, 0.78, 1);
+
   // 渡り廊下へ出る口（2階のみ）
   wallWithHoles(mb, col, { axis: "z", fixed: BX1, from: RZ1, to: HZ2, y1: y0, y2: y1, thick: WALL_T, color: C.wall });
   wallWithHoles(mb, col, { axis: "z", fixed: BX2, from: RZ1, to: HZ2, y1: y0, y2: y1, thick: WALL_T, color: C.wall });
+  siding(mb, "z", BX1, RZ1, HZ2, y0, y1, -1);
+  siding(mb, "z", BX2, RZ1, HZ2, y0, y1, 1);
+  posts(mb, "z", BX1, RZ1, HZ2, y0, y1, -1, 3.4);
+  posts(mb, "z", BX2, RZ1, HZ2, y0, y1, 1, 3.4);
+
+  // 下のほうの階ほど、蔦がびっしり這っている
+  if (f < 2) {
+    const dens = f === 0 ? 40 : 20;
+    ivy(mb, "x", RZ1, BX1 + 1, BX2 - 1, y0, FLOOR_H, -1, dens);
+    ivy(mb, "x", HZ2, BX1 + 1, -9, y0, FLOOR_H, 1, dens * 0.6);
+    ivy(mb, "x", HZ2, 9, BX2 - 1, y0, FLOOR_H, 1, dens * 0.6);
+    ivy(mb, "z", BX1, RZ1 + 1, HZ2 - 1, y0, FLOOR_H, -1, dens * 0.5);
+    ivy(mb, "z", BX2, RZ1 + 1, HZ2 - 1, y0, FLOOR_H, 1, dens * 0.5);
+  }
 
   // --- 廊下と部屋のあいだ -----------------------------------
   const holes = [];
@@ -169,7 +201,12 @@ function buildFloor(ctx, f) {
       holes.push({ a: cx + 1.6, b: r.x2 - 1.2, y1: y0 + 1.0, y2: y0 + 2.4 });
     }
   }
-  wallWithHoles(mb, col, { axis: "x", fixed: RZ2, from: BX1, to: BX2, y1: y0, y2: y1, thick: WALL_T, color: C.wallDark, holes });
+  wallWithHoles(mb, col, { axis: "x", fixed: RZ2, from: BX1, to: BX2, y1: y0, y2: y1, thick: WALL_T, color: C.plaster, holes });
+  // 腰板（廊下がわ・教室がわ）と、ぐるりの回り縁
+  for (const side of [-1, 1]) {
+    mb.box(0, y0 + 0.52, RZ2 + 0.13 * side, BX2 - BX1, 1.04, 0.06, C.wains, { jitter: 0.16 });
+    mb.box(0, y0 + 1.08, RZ2 + 0.15 * side, BX2 - BX1, 0.07, 0.09, C.post, { jitter: 0.1 });
+  }
   for (let i = 1; i < list.length; i++) {
     wallWithHoles(mb, col, { axis: "z", fixed: list[i].x1, from: RZ1, to: RZ2, y1: y0, y2: y1, thick: WALL_T, color: C.wallDark });
   }
@@ -187,7 +224,7 @@ function buildFloor(ctx, f) {
 
   // --- 廊下の備品と荒れ具合 ---------------------------------
   for (let x = BX1 + 5; x < BX2 - 4; x += 9) {
-    mb.box(x, y0 + 0.55, HZ1 + 0.45, 0.32, 1.1, 0.32, 0xa03a2a, { jitter: 0.1 });
+    mb.box(x, y0 + 0.55, HZ1 + 0.45, 0.32, 1.1, 0.32, 0x8a2f22, { jitter: 0.14 });
     spawnSpots.push({ x: x + rand(-3, 3), z: rand(HZ1 + 0.9, HZ2 - 0.9), y: y0, floor: f });
   }
   for (let x = BX1 + 3; x < BX2 - 3; x += 12) lightSpots.push({ x, y: y1 - 0.45, z: -2, floor: f });
@@ -270,10 +307,24 @@ function buildEntranceHall(ctx) {
     }
   }
   mb.box(0, 2.78, EH.z2 - 0.25, 4.2, 0.7, 0.3, C.wood, { jitter: 0.03 });
-  // ひさし
-  tiled(mb, EH.x1 - 0.4, EH.z1, EH.x2 + 0.4, EH.z2 + 0.4, FLOOR_H + 0.4, 0.4, 0x55524b, 4);
-  mb.box(0, FLOOR_H + 0.05, EH.z2 + 1.4, 7.0, 0.28, 2.4, 0x6f6a5f, { jitter: 0.04 });
-  for (const dx of [-3.0, 3.0]) mb.box(dx, (FLOOR_H - 0.1) / 2, EH.z2 + 2.3, 0.22, FLOOR_H - 0.1, 0.22, 0x5d5952);
+  // 玄関まわりも板張りに
+  siding(mb, "z", EH.x1, EH.z1, EH.z2, 0, FLOOR_H, -1);
+  siding(mb, "z", EH.x2, EH.z1, EH.z2, 0, FLOOR_H, 1);
+  siding(mb, "x", EH.z2, EH.x1, EH.x2, 0, FLOOR_H, 1);
+  posts(mb, "z", EH.x1, EH.z1, EH.z2, 0, FLOOR_H, -1, 3.0);
+  posts(mb, "z", EH.x2, EH.z1, EH.z2, 0, FLOOR_H, 1, 3.0);
+
+  // ひさし：木の垂木のうえに瓦をふいた、こしのある屋根
+  tiled(mb, EH.x1 - 0.4, EH.z1, EH.x2 + 0.4, EH.z2 + 0.4, FLOOR_H + 0.4, 0.4, C.wood, 4);
+  mb.box(0, FLOOR_H + 0.1, EH.z2 + 1.5, 7.4, 0.2, 2.8, C.wood, { jitter: 0.06 });
+  for (let x = -3.4; x <= 3.4; x += 0.55) {                 // 垂木
+    mb.box(x, FLOOR_H - 0.06, EH.z2 + 1.5, 0.1, 0.12, 2.8, C.post, { jitter: 0.14 });
+  }
+  for (let x = -3.6; x <= 3.6; x += 0.42) {                 // 瓦
+    mb.box(x, FLOOR_H + 0.26, EH.z2 + 1.5, 0.36, 0.12, 2.9, C.tile, { jitter: 0.18 });
+  }
+  mb.box(0, FLOOR_H + 0.36, EH.z2 + 0.15, 7.6, 0.2, 0.34, C.tile, { jitter: 0.1 });   // 棟
+  for (const dx of [-3.0, 3.0]) mb.box(dx, (FLOOR_H - 0.1) / 2, EH.z2 + 2.4, 0.22, FLOOR_H - 0.1, 0.22, C.post);
   for (let x = -14; x <= 14; x += 7) lightSpots.push({ x, y: FLOOR_H - 0.5, z: 4.5, floor: 0 });
   rooms.push({ id: "entrance", name: "昇降口", floor: 0, cx: 0, cz: 4.5, y: 0, x1: EH.x1, x2: EH.x2, z1: EH.z1, z2: EH.z2, kind: "entrance", label: "昇降口" });
 }
@@ -569,26 +620,62 @@ function furnish(ctx, r, f, y0, cx, cz, decay) {
   if (K === "toilet") {
     const male = r.sex === "m";
     const n = Math.max(2, Math.floor((r.x2 - r.x1 - 1.2) / 1.5));
+    // 木の個室。仕切りと、あけっぱなしの引き戸が奥にならぶ
+    const DOOR = 0x5a4831, PART = 0x6a563a;
     for (let i = 0; i <= n; i++) {
       const x = r.x1 + 0.9 + i * 1.5;
-      mb.box(x - 0.75, y0 + 1.1, RZ1 + 2.2, 0.09, 2.2, 2.4, 0x8d9a8f, { jitter: 0.07 });
+      mb.box(x - 0.75, y0 + 1.1, RZ1 + 2.2, 0.09, 2.2, 2.4, PART, { jitter: 0.16 });
+      // 仕切りの板目
+      for (let k = 0; k < 5; k++) {
+        mb.box(x - 0.71, y0 + 0.35 + k * 0.42, RZ1 + 2.2, 0.02, 0.05, 2.35, 0x483a26, { jitter: 0.3 });
+      }
       col.add(x - 0.8, RZ1 + 1.0, x - 0.7, RZ1 + 3.4, y0, y0 + 2.2, "wall");
-      if (i < n) mb.box(x, y0 + 0.3, RZ1 + 1.6, 0.55, 0.6, 0.85, 0xd8d6cc, { jitter: 0.06 });
+      if (i < n) {
+        mb.box(x, y0 + 0.3, RZ1 + 1.6, 0.55, 0.6, 0.85, 0xd8d6cc, { jitter: 0.06 });   // 便器
+        mb.box(x, y0 + 0.02, RZ1 + 2.6, 1.3, 0.05, 1.4, 0x6b5a3c, { jitter: 0.22 });   // すのこ
+        // 戸（半びらき・ぜんぶ閉まっている・外れている、のどれか）
+        const st = Math.random();
+        if (st < 0.4) {
+          mb.box(x, y0 + 1.05, RZ1 + 3.36, 1.36, 2.1, 0.07, DOOR, { jitter: 0.18 });   // 閉まっている
+          mb.box(x + 0.5, y0 + 1.05, RZ1 + 3.3, 0.12, 0.16, 0.06, 0x8a7a52);           // 取っ手
+        } else if (st < 0.78) {
+          mb.box(x - 0.55, y0 + 1.05, RZ1 + 3.1, 0.07, 2.1, 1.3, DOOR,
+            { jitter: 0.18, rotY: 0.6 });                                              // 半びらき
+        } else {
+          mb.box(x, y0 + 0.06, RZ1 + 4.1, 1.3, 0.09, 2.0, DOOR, { jitter: 0.2, rotY: rand(-0.3, 0.3) });
+        }
+      }
     }
+    // 入口のすぐ内がわに、目かくしの板（通り道はあけておく）
+    mb.box(r.x2 - 0.42, y0 + 1.0, RZ2 - 1.5, 0.1, 2.0, 2.6, PART, { jitter: 0.16 });
+    col.add(r.x2 - 0.5, RZ2 - 2.8, r.x2 - 0.34, RZ2 - 0.2, y0, y0 + 2.0, "wall");
+    // 床のすのこ（入口から奥へ、まっすぐ1本）
+    for (let z = RZ2 - 1.2; z > RZ1 + 3.8; z -= 0.34) {
+      mb.box(cx, y0 + 0.04, z, 1.1, 0.06, 0.22, 0x6b5a3c, { jitter: 0.26 });
+    }
+    // 入口は RZ2 の壁のまんなか（cx ± 0.9）にある。
+    // そこをふさがないよう、手洗いも小便器も「横の壁」に寄せて並べる。
+    const wallX = r.x1 + 0.32;                 // 西がわの壁ぎわ
     if (male) {
       for (let i = 0; i < 3; i++) {
-        const x = r.x1 + 1.0 + i * 1.1;
-        if (x > r.x2 - 0.8) break;
-        mb.box(x, y0 + 0.85, RZ2 - 0.5, 0.42, 0.9, 0.34, 0xdedad0, { jitter: 0.05 });
-        col.add(x - 0.24, RZ2 - 0.72, x + 0.24, RZ2 - 0.28, y0, y0 + 1.0, "furn");
+        const z = RZ2 - 2.3 - i * 1.1;
+        mb.box(wallX, y0 + 0.85, z, 0.34, 0.9, 0.42, 0xdedad0, { jitter: 0.05 });
+        col.add(wallX - 0.2, z - 0.24, wallX + 0.22, z + 0.24, y0, y0 + 1.0, "furn");
       }
+      // 足もとの受け
+      mb.box(wallX, y0 + 0.06, RZ2 - 3.4, 0.44, 0.12, 3.0, 0xc4c2b6, { jitter: 0.06 });
     } else {
-      mb.box(cx, y0 + 0.82, RZ2 - 1.0, r.x2 - r.x1 - 1.6, 0.16, 0.6, 0xc9c6ba, { jitter: 0.05 });
-      col.add(r.x1 + 0.8, RZ2 - 1.3, r.x2 - 0.8, RZ2 - 0.7, y0, y0 + 0.9, "furn");
+      const z0 = RZ2 - 2.2, z1b = RZ2 - 5.2;
+      mb.box(wallX + 0.06, y0 + 0.82, (z0 + z1b) / 2, 0.6, 0.16, z0 - z1b, 0xc9c6ba, { jitter: 0.05 });
+      col.add(wallX - 0.24, z1b, wallX + 0.36, z0, y0, y0 + 0.9, "furn");
+      for (let i = 0; i < 3; i++) {            // 蛇口
+        mb.box(wallX - 0.06, y0 + 0.95, z0 - 0.5 - i * 1.0, 0.1, 0.12, 0.1, 0x6f6a58, { jitter: 0.12 });
+      }
     }
-    // 鏡（割れていることもある）
-    mb.box(cx, y0 + 1.9, RZ2 - 0.78, r.x2 - r.x1 - 1.8, 0.9, 0.08,
+    // 鏡（割れていることもある）。手洗いと同じ、横の壁に
+    mb.box(wallX - 0.14, y0 + 1.75, RZ2 - 3.6, 0.07, 0.9, 2.6,
       Math.random() < decay ? 0x3a3038 : 0x2a3138, { jitter: 0.1 });
+    // 入口のまわりは、なにも置かない（通れることを守る）
     props.push(makeSign(cx, y0 + 2.5, RZ2 + 0.06, male));
     // 隠し要素：どこかの個室にひとつだけ
     if (opts && opts.poopRoom === r.id) {
@@ -664,6 +751,77 @@ function decorateCorridor(ctx, f, y0, decay) {
   }
   // くもの巣（角）
   for (const x of [BX1 + 1.2, BX2 - 1.2]) props.push(makeCobweb(x, y0 + FLOOR_H - 0.5, HZ1 + 1.0, 1.0));
+}
+
+// 下見板張り：壁の面に、横板の影を何本も走らせる
+function siding(mb, axis, fixed, from, to, y1, y2, side, pitch = 0.42) {
+  const off = 0.13 * side;
+  for (let y = y1 + pitch; y < y2 - 0.05; y += pitch) {
+    if (axis === "x") mb.box((from + to) / 2, y, fixed + off, to - from, 0.055, 0.05, C.siding, { jitter: 0.4 });
+    else mb.box(fixed + off, y, (from + to) / 2, 0.05, 0.055, to - from, C.siding, { jitter: 0.4 });
+  }
+}
+
+// 柱：板張りのあいだに、たてに走る太い木
+function posts(mb, axis, fixed, from, to, y1, y2, side, pitch = 4.6) {
+  const off = 0.16 * side;
+  for (let p = from + pitch / 2; p < to; p += pitch) {
+    if (axis === "x") mb.box(p, (y1 + y2) / 2, fixed + off, 0.26, y2 - y1, 0.08, C.post, { jitter: 0.18 });
+    else mb.box(fixed + off, (y1 + y2) / 2, p, 0.08, y2 - y1, 0.26, C.post, { jitter: 0.18 });
+  }
+}
+
+// 窓わく：白木の枠と、たて・よこの桟（格子窓）
+function sash(mb, axis, fixed, a, b, y1, y2, mullions = 2) {
+  const t = 0.09, d = 0.16;
+  const put = (p, y, len, hh) => {
+    if (axis === "x") mb.box(p, y, fixed, len, hh, d, C.sash, { jitter: 0.14 });
+    else mb.box(fixed, y, p, d, hh, len, C.sash, { jitter: 0.14 });
+  };
+  const mid = (a + b) / 2, wlen = b - a;
+  put(mid, y1 + t / 2, wlen, t);            // 下枠
+  put(mid, y2 - t / 2, wlen, t);            // 上枠
+  put(a + t / 2, (y1 + y2) / 2, t, y2 - y1);   // 左
+  put(b - t / 2, (y1 + y2) / 2, t, y2 - y1);   // 右
+  // たての桟
+  for (let i = 1; i <= mullions; i++) {
+    put(a + (wlen * i) / (mullions + 1), (y1 + y2) / 2, 0.055, y2 - y1);
+  }
+  // よこの桟（腰高のところに1本）
+  put(mid, y1 + (y2 - y1) * 0.52, wlen, 0.055);
+}
+
+// ひさし：窓の上に張り出す小さな木の屋根
+function eave(mb, axis, fixed, from, to, y, depth, side) {
+  const off = (depth / 2 + 0.16) * side;
+  if (axis === "x") {
+    mb.box((from + to) / 2, y, fixed + off, to - from, 0.2, depth, C.wood, { jitter: 0.14 });
+    // 瓦を1枚ずつ並べて、へりのぎざぎざを出す
+    for (let p = from; p < to; p += 0.44) {
+      mb.box(p, y + 0.19, fixed + off * 1.04, 0.38, 0.13, depth * 0.96, C.tile, { jitter: 0.2 });
+    }
+    // 垂木の小口
+    for (let p = from; p < to; p += 0.9) {
+      mb.box(p, y - 0.16, fixed + off * 1.1, 0.11, 0.14, depth * 0.5, C.post, { jitter: 0.16 });
+    }
+  } else {
+    mb.box(fixed + off, y, (from + to) / 2, depth, 0.2, to - from, C.wood, { jitter: 0.14 });
+    for (let p = from; p < to; p += 0.44) {
+      mb.box(fixed + off * 1.04, y + 0.19, p, depth * 0.96, 0.13, 0.38, C.tile, { jitter: 0.2 });
+    }
+  }
+}
+
+// 蔦：壁をはい上がる葉のかたまり
+function ivy(mb, axis, fixed, from, to, y1, h, side, density = 26) {
+  const off = 0.15 * side;
+  for (let i = 0; i < density; i++) {
+    const p = rand(from, to);
+    const yy = y1 + Math.pow(Math.random(), 1.7) * h;
+    const s = rand(0.3, 0.95) * (1 - (yy - y1) / h * 0.5);
+    if (axis === "x") mb.box(p, yy, fixed + off, s, s * rand(0.7, 1.5), 0.06, C.ivy, { jitter: 0.5, rotY: rand(0, 3.14) });
+    else mb.box(fixed + off, yy, p, 0.06, s * rand(0.7, 1.5), s, C.ivy, { jitter: 0.5 });
+  }
 }
 
 function windowRow(from, to, w, pitch, y1, y2) {
@@ -762,11 +920,25 @@ function buildYard(ctx, dustCount) {
   for (let x = -84; x < 84; x += 8)
     for (let z = -44; z < 64; z += 8)
       mb.slab(x, z, x + 8, z + 8, -0.02, 0.5, C.ground, { jitter: 0.3 });
-  for (let x = YARD.x1; x < YARD.x2; x += 6)
-    for (let z = 1.6; z < YARD.z2; z += 6)
-      mb.slab(x, z, Math.min(x + 6, YARD.x2), Math.min(z + 6, YARD.z2), 0.0, 0.3, 0x5c5340, { jitter: 0.34 });
+  // 中庭も、もう手入れされていない。校舎から離れるほど草が出てくる
+  for (let x = YARD.x1; x < YARD.x2; x += 4)
+    for (let z = 1.6; z < YARD.z2; z += 4) {
+      const e = Math.min(1, Math.max(0, (z - 3) / 26));
+      const c = new THREE.Color(C.ground).lerp(new THREE.Color(C.grass), clamp(e * 0.55 + rand(-0.14, 0.14), 0, 1));
+      mb.slab(x, z, Math.min(x + 4, YARD.x2), Math.min(z + 4, YARD.z2), 0.0, 0.3, c.getHex(), { jitter: 0.28 });
+    }
   for (let x = BX1; x < BX2; x += 6)
     mb.slab(x, 0, Math.min(x + 6, BX2), 2.4, 0.04, 0.2, C.concrete, { jitter: 0.22 });
+  // ひび割れから伸びた雑草。校舎ぎわと、フェンスぎわに多い
+  const YQ = ctx.opts && ctx.opts.grass !== undefined ? ctx.opts.grass : 1;
+  for (let i = 0; i < 900 * YQ; i++) {
+    const x = rand(YARD.x1 + 0.5, YARD.x2 - 0.5), z = rand(2.6, YARD.z2 - 0.5);
+    const nearWall = z < 4.6 ? 1 : 0;
+    const nearFence = z > YARD.z2 - 4 || x < YARD.x1 + 4 || x > YARD.x2 - 4 ? 1 : 0;
+    const e = Math.min(1, (z - 2) / 30) * 0.7 + nearWall * 0.5 + nearFence * 0.6;
+    if (Math.random() > 0.1 + e * 0.75) continue;
+    mb.tuft(x, z, 0.04, rand(0.12, 0.34) + e * rand(0.1, 0.5), 0x334523, choice([0x53603a, 0x625a3c]), 3, 0.2);
+  }
 
   fence(mb, col, YARD.x1, 0.5, YARD.x1, YARD.z2);
   fence(mb, col, YARD.x2, 0.5, YARD.x2, YARD.z2);
@@ -854,7 +1026,7 @@ function tree(mb, col, x, z, s) {
   for (let i = 0; i < 7; i++) {
     const a = (i / 7) * Math.PI * 2, r = rand(0.9, 2.0) * s;
     mb.box(x + Math.cos(a) * r, rand(3.2, 4.6) * s, z + Math.sin(a) * r,
-      rand(2.0, 3.2) * s, rand(1.2, 1.9) * s, rand(2.0, 3.2) * s, C.sakura, { jitter: 0.22 });
+      rand(2.0, 3.2) * s, rand(1.2, 1.9) * s, rand(2.0, 3.2) * s, 0x27331f, { jitter: 0.26 });
   }
   col.add(x - 0.35 * s, z - 0.35 * s, x + 0.35 * s, z + 0.35 * s, 0, 3 * s, "wall");
 }
@@ -981,11 +1153,11 @@ function makeCobweb(x, y, z, s) {
 }
 
 // --- 破れたカーテン（風でゆれる） ----------------------------
-function makeCurtain(x, y, z, h) {
-  const g = new THREE.PlaneGeometry(0.9, h, 6, 5);
+function makeCurtain(x, y, z, h, color = C.curtain, wide = 0.9) {
+  const g = new THREE.PlaneGeometry(wide, h, 6, 5);
   const base = g.attributes.position.array.slice();
   const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({
-    color: C.curtain, transparent: true, opacity: 0.82, side: THREE.DoubleSide,
+    color, transparent: true, opacity: 0.9, side: THREE.DoubleSide,
   }));
   m.position.set(x, y, z);
   return {
@@ -1053,10 +1225,19 @@ function buildField(ctx) {
   const { mb, col, rooms, spawnSpots, props } = ctx;
   const F = FIELD;
 
-  // 土のグラウンド（タイルに分けて色ムラを出す）
-  for (let x = F.x1; x < F.x2; x += 8)
-    for (let z = F.z1; z < F.z2; z += 8)
-      mb.slab(x, z, Math.min(x + 8, F.x2), Math.min(z + 8, F.z2), 0.02, 0.3, 0x5e5340, { jitter: 0.32 });
+  // 土のグラウンド。ながく使われていないので、隅へ行くほど草に飲まれている
+  //  中央は土のまま、へりは草の色。あいだはまだらに。
+  const edgeness = (x, z) => {
+    const ex = Math.min(x - F.x1, F.x2 - x) / ((F.x2 - F.x1) / 2);
+    const ez = Math.min(z - F.z1, F.z2 - z) / ((F.z2 - F.z1) / 2);
+    return 1 - Math.min(1, Math.min(ex, ez) * 1.35);      // 0=まんなか 1=すみ
+  };
+  for (let x = F.x1; x < F.x2; x += 4)
+    for (let z = F.z1; z < F.z2; z += 4) {
+      const e = edgeness(x + 2, z + 2);
+      const c = new THREE.Color(C.ground).lerp(new THREE.Color(C.grass), clamp(e * 1.25 + rand(-0.18, 0.18), 0, 1));
+      mb.slab(x, z, Math.min(x + 4, F.x2), Math.min(z + 4, F.z2), 0.02, 0.3, c.getHex(), { jitter: 0.26 });
+    }
 
   // トラックの白線（消えかけた楕円）
   const cxT = 15, czT = 54, rx = 27, rz = 13;
@@ -1110,18 +1291,97 @@ function buildField(ctx) {
   for (const dx of [-0.35, 0.35]) for (const dz of [-0.35, 0.35]) mb.box(42 + dx, 0.42, 60 + dz, 0.09, 0.85, 0.09, C.wood);
   col.add(41.4, 59.4, 42.6, 60.6, 0, 1.8, "wall");
 
+  // 二宮金次郎の像（運動場の、校舎がわの奥）
+  //  台座のうえに、薪を背負って本を読む すがた
+  {
+    const sx = 23, sz = F.z1 + 3.2;
+    mb.box(sx, 0.5, sz, 2.0, 1.0, 2.0, C.stone, { jitter: 0.06 });          // 台座（下）
+    mb.box(sx, 1.25, sz, 1.4, 0.6, 1.4, C.stone, { jitter: 0.05 });         // 台座（上）
+    mb.box(sx, 1.58, sz + 0.72, 0.9, 0.3, 0.08, 0x6a6258, { jitter: 0.06 }); // 名まえの札
+    const by = 1.55;                                                         // 像の足もと
+    const BR = 0x6d675c;                                                     // にぶく光る銅
+    mb.box(sx - 0.13, by + 0.35, sz, 0.16, 0.7, 0.18, BR, { jitter: 0.05 }); // 左足
+    mb.box(sx + 0.14, by + 0.33, sz + 0.18, 0.16, 0.66, 0.18, BR, { jitter: 0.05 });
+    mb.box(sx, by + 1.0, sz + 0.05, 0.44, 0.66, 0.28, BR, { jitter: 0.05 }); // 胴
+    mb.box(sx, by + 1.5, sz + 0.02, 0.3, 0.32, 0.3, BR, { jitter: 0.05 });   // 頭
+    mb.box(sx, by + 1.66, sz - 0.02, 0.34, 0.1, 0.34, 0x5c564c, { jitter: 0.08 });
+    // 背負った薪（たきぎ）
+    for (let i = 0; i < 5; i++) {
+      mb.box(sx + rand(-0.16, 0.16), by + 1.05 + i * 0.09, sz - 0.28, 0.5, 0.09, 0.12,
+        0x4a3a26, { jitter: 0.24, rotY: rand(-0.25, 0.25) });
+    }
+    // 前へ差し出した うでと、ひらいた本
+    mb.box(sx - 0.28, by + 1.1, sz + 0.26, 0.13, 0.13, 0.42, BR, { jitter: 0.06 });
+    mb.box(sx + 0.28, by + 1.1, sz + 0.26, 0.13, 0.13, 0.42, BR, { jitter: 0.06 });
+    mb.box(sx, by + 1.14, sz + 0.48, 0.46, 0.06, 0.32, 0xa89f88, { jitter: 0.08 });
+    col.add(sx - 1.0, sz - 1.0, sx + 1.0, sz + 1.0, 0, 3.4, "wall");
+    spawnSpots.push({ x: sx + 2.4, z: sz + 2.0, y: 0, floor: 0 });
+    // 台座のまわりは草に埋もれかけている
+    for (let i = 0; i < 60 * (ctx.opts && ctx.opts.grass !== undefined ? ctx.opts.grass : 1); i++) {
+      const a = rand(0, 6.3), rr = rand(1.0, 2.6);
+      mb.tuft(sx + Math.cos(a) * rr, sz + Math.sin(a) * rr, 0.16, rand(0.3, 0.8), 0x334523, 0x53603a, 3, 0.28);
+    }
+  }
+
   // 外周の木立
   for (const t of [[-44, 68, 1.2], [-30, 69, 1.0], [8, 69.5, 1.15], [30, 69, 1.05], [45, 66, 1.1],
                    [45, 44, 1.0], [45, 52, 0.9], [-46, 38, 1.0]]) {
     tree(mb, col, t[0], t[1], t[2]);
     spawnSpots.push({ x: t[0] + 2.2, z: t[1] - 2, y: 0, floor: 0 });
   }
-  // 雑草と小石
-  for (let i = 0; i < 200; i++) {
+  // 草。運動場のすみほど背が高く、びっしり生えている
+  const inGym = (x, z) => x > GYM.x1 - 1.4 && x < GYM.x2 + 1.4 && z > GYM.z1 - 1.4 && z < GYM.z2 + 1.4;
+  const gLow = 0x334523, gTop = 0x53603a, gDry = 0x6d6242;
+  const GQ = ctx.opts && ctx.opts.grass !== undefined ? ctx.opts.grass : 1;
+  let tufts = 0;
+  for (let i = 0; i < 9000 && tufts < 2600 * GQ; i++) {
+    const x = rand(F.x1 + 0.5, F.x2 - 0.5), z = rand(F.z1 + 0.5, F.z2 - 0.5);
+    if (inGym(x, z)) continue;
+    const e = edgeness(x, z);
+    // まんなかは 8% ほど、すみは ほぼ確実に生える
+    if (Math.random() > 0.06 + e * e * 1.05) continue;
+    const h = (0.16 + e * 0.75) * rand(0.6, 1.35);
+    const dry = Math.random() < 0.28;
+    mb.tuft(x, z, 0.16, h, gLow, dry ? gDry : gTop, h > 0.5 ? 4 : 3, 0.22 + e * 0.3);
+    tufts++;
+  }
+  // すみの4か所は、腰までのススキの原
+  for (const [ax, az] of [[F.x1 + 5, F.z1 + 5], [F.x2 - 5, F.z1 + 5], [F.x1 + 5, F.z2 - 5], [F.x2 - 5, F.z2 - 5]]) {
+    for (let i = 0; i < 150 * GQ; i++) {
+      const x = ax + rand(-7, 7), z = az + rand(-7, 7);
+      if (x < F.x1 || x > F.x2 || z < F.z1 || z > F.z2 || inGym(x, z)) continue;
+      mb.tuft(x, z, 0.16, rand(0.7, 1.5), gLow, choice([gTop, gDry, 0x6e653f]), 4, 0.4);
+    }
+  }
+  // フェンスぎわにも、線のように草が伸びている
+  for (let i = 0; i < 320 * GQ; i++) {
+    const side = Math.floor(rand(0, 4));
+    let x, z;
+    if (side === 0) { x = rand(F.x1, F.x2); z = F.z1 + rand(0, 1.6); }
+    else if (side === 1) { x = rand(F.x1, F.x2); z = F.z2 - rand(0, 1.6); }
+    else if (side === 2) { x = F.x1 + rand(0, 1.6); z = rand(F.z1, F.z2); }
+    else { x = F.x2 - rand(0, 1.6); z = rand(F.z1, F.z2); }
+    if (inGym(x, z)) continue;
+    mb.tuft(x, z, 0.16, rand(0.6, 1.3), gLow, choice([gTop, gDry]), 4, 0.32);
+  }
+  // 体育館のきわは、雨だれのあとに草がびっしり
+  for (let i = 0; i < 420 * GQ; i++) {
+    const side = Math.floor(rand(0, 4));
+    let x, z;
+    if (side === 0) { x = rand(GYM.x1 - 1, GYM.x2 + 1); z = GYM.z1 - rand(0.4, 2.2); }
+    else if (side === 1) { x = rand(GYM.x1 - 1, GYM.x2 + 1); z = GYM.z2 + rand(0.4, 2.2); }
+    else if (side === 2) { x = GYM.x1 - rand(0.4, 2.2); z = rand(GYM.z1 - 1, GYM.z2 + 1); }
+    else { x = GYM.x2 + rand(0.4, 2.2); z = rand(GYM.z1 - 1, GYM.z2 + 1); }
+    if (x < F.x1 || x > F.x2 || z < F.z1 || z > F.z2) continue;
+    mb.tuft(x, z, 0.16, rand(0.5, 1.2), gLow, choice([gTop, gDry]), 4, 0.3);
+  }
+
+  // 小石
+  for (let i = 0; i < 90; i++) {
     const x = rand(F.x1 + 1, F.x2 - 1), z = rand(F.z1 + 1, F.z2 - 1);
-    if (x > GYM.x1 - 1 && x < GYM.x2 + 1 && z > GYM.z1 - 1 && z < GYM.z2 + 1) continue;
-    const h = rand(0.03, 0.1);
-    mb.box(x, 0.18 + h / 2, z, rand(0.25, 0.8), h, rand(0.25, 0.8), 0x4e5540, { jitter: 0.45, rotY: rand(0, 3.14) });
+    if (inGym(x, z)) continue;
+    const h = rand(0.03, 0.09);
+    mb.box(x, 0.18 + h / 2, z, rand(0.2, 0.6), h, rand(0.2, 0.6), 0x4e4a3e, { jitter: 0.45, rotY: rand(0, 3.14) });
   }
   for (let i = 0; i < 34; i++) spawnSpots.push({ x: rand(F.x1 + 3, F.x2 - 3), z: rand(F.z1 + 3, F.z2 - 3), y: 0, floor: 0 });
 
@@ -1140,53 +1400,149 @@ function buildGym(ctx) {
   // 板張りの床（コートの線を引く）
   for (let x = G.x1; x < G.x2; x += 6)
     for (let z = G.z1; z < G.z2; z += 6)
-      mb.slab(x, z, Math.min(x + 6, G.x2), Math.min(z + 6, G.z2), 0.24, 0.3, 0x9a7a4e, { jitter: 0.16 });
+      mb.slab(x, z, Math.min(x + 6, G.x2), Math.min(z + 6, G.z2), 0.24, 0.3, 0x6a5232, { jitter: 0.24 });
   // コートの白線
   const cL = { x1: G.x1 + 3, x2: G.x2 - 3, z1: G.z1 + 3, z2: G.z2 - 3 };
   for (const e of [[cL.x1, cL.z1, cL.x2, cL.z1], [cL.x1, cL.z2, cL.x2, cL.z2],
                    [cL.x1, cL.z1, cL.x1, cL.z2], [cL.x2, cL.z1, cL.x2, cL.z2],
                    [cL.x1, cz, cL.x2, cz]]) {
-    mb.wall(e[0], e[1], e[2], e[3], 0.26, 0.285, 0.12, 0xe0dcc8, { jitter: 0.14 });
+    mb.wall(e[0], e[1], e[2], e[3], 0.26, 0.285, 0.12, 0xa8a390, { jitter: 0.26 });
   }
   for (let i = 0; i < 40; i++) {
     const a = (i / 40) * Math.PI * 2;
-    mb.box(cx + Math.cos(a) * 2.4, 0.27, cz + Math.sin(a) * 2.4, 0.34, 0.02, 0.12, 0xe0dcc8, { jitter: 0.2, rotY: a });
+    mb.box(cx + Math.cos(a) * 2.4, 0.27, cz + Math.sin(a) * 2.4, 0.34, 0.02, 0.12, 0xa8a390, { jitter: 0.3, rotY: a });
   }
 
-  // 壁（東面に入口、南北の高いところに窓）
+  // 壁（東面に入口、南北の高いところに窓の帯）
+  //  外は下見板張り、中は腰まで剥げかけた壁、その上に格子窓がずらりと並ぶ
+  const GW = 0x453626;                              // 板張りの外壁
+  // 高いところに長い窓の帯、その下にも腰高の窓。4つの壁ぜんぶに入れる
   const winRow = windowRow(G.x1 + 3, G.x2 - 3, 3.2, 5.0, 5.4, 7.6);
-  wallWithHoles(mb, col, { axis: "x", fixed: G.z1, from: G.x1, to: G.x2, y1: 0, y2: H, thick: 0.3, color: 0x8e8676, holes: winRow });
-  wallWithHoles(mb, col, { axis: "x", fixed: G.z2, from: G.x1, to: G.x2, y1: 0, y2: H, thick: 0.3, color: 0x8e8676, holes: winRow });
-  wallWithHoles(mb, col, { axis: "z", fixed: G.x1, from: G.z1, to: G.z2, y1: 0, y2: H, thick: 0.3, color: 0x8e8676 });
+  const winLow = windowRow(G.x1 + 4, G.x2 - 4, 2.6, 5.0, 2.5, 4.4);
+  const winSide = windowRow(G.z1 + 3, G.z2 - 3, 3.0, 5.0, 5.4, 7.6);
+  const winSideLow = windowRow(G.z1 + 4, G.z2 - 8, 2.6, 5.0, 2.5, 4.4);
+  const nHoles = winRow.concat(winLow);
+  wallWithHoles(mb, col, { axis: "x", fixed: G.z1, from: G.x1, to: G.x2, y1: 0, y2: H, thick: 0.3, color: GW, holes: nHoles });
+  wallWithHoles(mb, col, { axis: "x", fixed: G.z2, from: G.x1, to: G.x2, y1: 0, y2: H, thick: 0.3, color: GW, holes: winRow });
+  wallWithHoles(mb, col, { axis: "z", fixed: G.x1, from: G.z1, to: G.z2, y1: 0, y2: H, thick: 0.3, color: GW, holes: winSide.concat(winSideLow) });
   wallWithHoles(mb, col, {
-    axis: "z", fixed: G.x2, from: G.z1, to: G.z2, y1: 0, y2: H, thick: 0.3, color: 0x8e8676,
-    holes: [{ a: GYM_DOOR.z - GYM_DOOR.w, b: GYM_DOOR.z + GYM_DOOR.w, y1: 0, y2: 3.0 }],
+    axis: "z", fixed: G.x2, from: G.z1, to: G.z2, y1: 0, y2: H, thick: 0.3, color: GW,
+    holes: winSide.concat([{ a: GYM_DOOR.z - GYM_DOOR.w, b: GYM_DOOR.z + GYM_DOOR.w, y1: 0, y2: 3.0 }]),
   });
-  // 屋根と梁
-  tiled(mb, G.x1, G.z1, G.x2, G.z2, H, 0.36, 0x4f4c46, 7);
-  for (let z = G.z1 + 3; z < G.z2; z += 4.2) {
-    mb.box(cx, H - 0.55, z, G.x2 - G.x1 - 0.6, 0.22, 0.3, 0x5f5a50, { jitter: 0.08 });
-    for (const sx of [-0.32, 0.32]) mb.box(cx + (G.x2 - G.x1) * sx, H - 1.1, z, 0.18, 0.9, 0.18, 0x5f5a50, { jitter: 0.1 });
+  siding(mb, "x", G.z1, G.x1, G.x2, 0, H, -1, 0.5);
+  siding(mb, "x", G.z2, G.x1, G.x2, 0, H, 1, 0.5);
+  siding(mb, "z", G.x1, G.z1, G.z2, 0, H, -1, 0.5);
+  siding(mb, "z", G.x2, G.z1, G.z2, 0, H, 1, 0.5);
+  posts(mb, "x", G.z1, G.x1, G.x2, 0, H, -1, 5.0);
+  posts(mb, "x", G.z2, G.x1, G.x2, 0, H, 1, 5.0);
+  ivy(mb, "x", G.z1, G.x1 + 1, G.x2 - 1, 0, 5.0, -1, 34);
+  ivy(mb, "z", G.x1, G.z1 + 1, G.z2 - 1, 0, 5.0, -1, 30);
+  // 窓の格子（外がわ・内がわ）と、内壁の腰の汚れ
+  for (const h of nHoles) {
+    sash(mb, "x", G.z1 - 0.06, h.a, h.b, h.y1, h.y2, 4);
+    sash(mb, "x", G.z1 + 0.06, h.a, h.b, h.y1, h.y2, 4);
   }
-  // 入口のひさし
-  mb.box(G.x2 + 0.9, 3.2, GYM_DOOR.z, 2.0, 0.28, 4.4, 0x6f6a5f, { jitter: 0.05 });
-  for (const dz of [-1.8, 1.8]) mb.box(G.x2 + 1.7, 1.6, GYM_DOOR.z + dz, 0.2, 3.2, 0.2, 0x5d5952);
+  for (const h of winRow) {
+    sash(mb, "x", G.z2 + 0.06, h.a, h.b, h.y1, h.y2, 4);
+    sash(mb, "x", G.z2 - 0.06, h.a, h.b, h.y1, h.y2, 4);
+  }
+  for (const h of winSide.concat(winSideLow)) sash(mb, "z", G.x1 + 0.06, h.a, h.b, h.y1, h.y2, 4);
+  for (const h of winSide) sash(mb, "z", G.x2 - 0.06, h.a, h.b, h.y1, h.y2, 4);
+  //  腰壁は、窓の下（高さ2.4まで）だけにする。窓をふさがないように
+  for (const [zz, side] of [[G.z1, 1], [G.z2, -1]]) {
+    mb.box(cx, 1.2, zz + 0.16 * side, G.x2 - G.x1, 2.4, 0.05, 0x7d7452, { jitter: 0.3 });   // 剥げかけた腰壁
+    mb.box(cx, 2.46, zz + 0.18 * side, G.x2 - G.x1, 0.14, 0.1, 0x4a4534, { jitter: 0.12 });
+  }
+  for (const [xx, side] of [[G.x1, 1], [G.x2, -1]]) {
+    mb.box(xx + 0.16 * side, 1.2, cz, 0.05, 2.4, G.z2 - G.z1, 0x7d7452, { jitter: 0.3 });
+    mb.box(xx + 0.18 * side, 2.46, cz, 0.1, 0.14, G.z2 - G.z1, 0x4a4534, { jitter: 0.12 });
+  }
+
+  // 屋根：波トタンの天井と、緑色にぬられた鉄骨のトラス
+  const TRUSS = 0x3d5544;                            // 体育館らしい くすんだ緑
+  tiled(mb, G.x1, G.z1, G.x2, G.z2, H, 0.36, 0x554c3e, 7);
+  for (let z = G.z1 + 2.4; z < G.z2; z += 3.0) {
+    // 山形の梁（まんなかが高い）
+    for (const s of [-1, 1]) {
+      mb.box(cx + s * (G.x2 - G.x1) * 0.25, H - 1.15, z, (G.x2 - G.x1) * 0.52, 0.2, 0.22, TRUSS,
+        { jitter: 0.1, rotY: 0 });
+    }
+    mb.box(cx, H - 0.62, z, 1.6, 0.2, 0.22, TRUSS, { jitter: 0.1 });
+    for (const sx of [-0.36, -0.18, 0.18, 0.36]) {
+      mb.box(cx + (G.x2 - G.x1) * sx, H - 1.6, z, 0.12, 0.95, 0.14, TRUSS, { jitter: 0.14 });
+    }
+    for (const sx of [-0.32, 0.32]) mb.box(cx + (G.x2 - G.x1) * sx, H - 1.05, z, 0.16, 1.2, 0.16, TRUSS, { jitter: 0.1 });
+  }
+  // 母屋（もや）：梁と直角に走る細い材
+  for (let x = G.x1 + 2; x < G.x2; x += 1.9) {
+    mb.box(x, H - 0.85, cz, 0.11, 0.13, G.z2 - G.z1 - 1.0, TRUSS, { jitter: 0.16 });
+  }
+  // 雨もりのしみ
+  for (let i = 0; i < 26; i++) {
+    mb.box(rand(G.x1 + 2, G.x2 - 2), H - 0.4, rand(G.z1 + 2, G.z2 - 2),
+      rand(1.2, 3.4), 0.03, rand(1.0, 3.0), 0x2a2418, { jitter: 0.4 });
+  }
+  // 天井からたれ下がる のぼり綱
+  for (const [rx, rz] of [[cx + 4.5, G.z1 + 8], [cx + 4.5, G.z1 + 11], [cx - 5.2, G.z1 + 9.5]]) {
+    const top = H - 1.3, bot = 1.1;
+    mb.box(rx, (top + bot) / 2, rz, 0.05, top - bot, 0.05, 0x6e5a34, { jitter: 0.2 });
+    mb.box(rx, bot - 0.06, rz, 0.09, 0.14, 0.09, 0x5a4826, { jitter: 0.1 });   // 綱のこぶ
+  }
+
+  // 入口のひさし（木の垂木に瓦）
+  mb.box(G.x2 + 0.9, 3.2, GYM_DOOR.z, 2.0, 0.24, 4.4, C.wood, { jitter: 0.08 });
+  mb.box(G.x2 + 0.9, 3.36, GYM_DOOR.z, 2.1, 0.1, 4.5, C.tile, { jitter: 0.12 });
+  for (const dz of [-1.8, 1.8]) mb.box(G.x2 + 1.7, 1.6, GYM_DOOR.z + dz, 0.2, 3.2, 0.2, C.post);
 
   // 舞台（南のはし）
   const stZ = G.z2 - 5.5;
   mb.box(cx, 0.85, stZ + 2.6, G.x2 - G.x1 - 1.2, 1.2, 5.2, 0x7a5f3a, { jitter: 0.08 });
   col.add(G.x1 + 0.6, stZ, G.x2 - 0.6, G.z2 - 0.4, 0, 1.45, "wall");
   mb.box(cx, 1.5, stZ, G.x2 - G.x1 - 1.2, 0.1, 0.3, 0x5a4326, { jitter: 0.06 });
-  // 舞台の緞帳（左右に開いたまま、ぼろぼろ）
-  props.push(makeCurtain(G.x1 + 3.5, 4.2, stZ - 0.2, 5.2));
-  props.push(makeCurtain(G.x2 - 3.5, 4.2, stZ - 0.2, 5.2));
-  mb.box(cx, 6.9, stZ - 0.25, G.x2 - G.x1 - 1.0, 0.9, 0.24, 0x6b2230, { jitter: 0.1 });
+  // 舞台の緞帳。まっ赤な幕が、左右にひらいたまま垂れさがっている
+  const RED = 0x8e1b26;
+  for (const [ex, side] of [[G.x1 + 2.6, 1], [G.x2 - 2.6, -1]]) {
+    props.push(makeCurtain(ex, 4.0, stZ - 0.25, 5.6, RED, 3.4));
+    props.push(makeCurtain(ex + side * 2.0, 4.0, stZ - 0.32, 5.6, 0x741620, 2.2));
+    // 幕をたばねるふさ
+    mb.box(ex + side * 1.5, 3.4, stZ - 0.4, 0.16, 0.5, 0.16, 0xb8963c, { jitter: 0.12 });
+  }
+  mb.box(cx, 6.9, stZ - 0.25, G.x2 - G.x1 - 1.0, 0.95, 0.26, RED, { jitter: 0.12 });   // 上部の幕
+  for (let x = G.x1 + 1; x < G.x2 - 0.5; x += 0.5) {                                    // ひだ
+    mb.box(x, 6.9, stZ - 0.4, 0.16, 0.95, 0.14, 0x741620, { jitter: 0.24 });
+  }
+  mb.box(cx, 7.45, stZ - 0.3, G.x2 - G.x1 - 0.8, 0.16, 0.34, 0x3a2a1c, { jitter: 0.08 }); // 幕のレール
+
+  // ステージのうえの、ふたが開いたままのピアノ
+  {
+    const px = cx + 4.2, pz = stZ + 2.4, py = 1.45;          // 舞台の高さ
+    mb.box(px, py + 0.55, pz, 1.5, 0.55, 1.55, 0x241c22, { jitter: 0.05 });     // 本体
+    mb.box(px, py + 0.86, pz, 1.56, 0.09, 1.6, 0x181218, { jitter: 0.05 });     // 天板
+    mb.box(px + 0.1, py + 1.3, pz - 0.5, 1.3, 0.06, 1.0, 0x2c2028,
+      { jitter: 0.06, rotY: 0.0 });                                             // 開いたふた
+    mb.box(px + 0.72, py + 1.06, pz - 0.1, 0.07, 0.5, 0.07, 0x6a5a3a);          // つっかえ棒
+    mb.box(px, py + 0.66, pz + 0.56, 1.24, 0.06, 0.32, 0xc4c0b0, { jitter: 0.05 }); // 鍵ばん
+    mb.box(px, py + 0.8, pz + 0.7, 1.42, 0.22, 0.1, 0x1c161a, { jitter: 0.06 });   // 鍵ばんのふた
+    for (let i = 0; i < 14; i++) {                                              // 黒鍵
+      mb.box(px - 0.56 + i * 0.086, py + 0.71, pz + 0.5, 0.035, 0.04, 0.18, 0x14100f, { jitter: 0.1 });
+    }
+    for (const dx of [-0.62, 0.62]) for (const dz of [-0.5, 0.5]) {
+      mb.box(px + dx, py + 0.14, pz + dz * 1.2, 0.11, 0.56, 0.11, 0x241c22);      // 脚
+    }
+    mb.box(px, py + 0.06, pz + 0.94, 0.5, 0.12, 0.3, 0x241c22, { jitter: 0.06 }); // ペダル箱
+    // ピアノいす（たおれている）
+    mb.box(px - 1.6, py + 0.12, pz + 0.9, 0.7, 0.24, 0.4, 0x3a2c22, { jitter: 0.1, rotY: 0.5 });
+    col.add(px - 0.9, pz - 0.8, px + 0.9, pz + 1.1, 1.45, 2.6, "furn");
+    props.push(makePiano(px, py, pz + 0.6));      // ひとりでに鳴る、あの音
+    spawnSpots.push({ x: px - 2.6, z: pz, y: 1.45, floor: 0 });
+  }
 
   // バスケットゴール（片方は傾いている）
   for (const [gz, tilt] of [[G.z1 + 2.2, 0], [stZ - 2.0, 0.22]]) {
-    mb.box(cx, 3.5, gz, 3.0, 1.9, 0.12, 0xdedad0, { jitter: 0.05, rotY: 0 });
-    mb.box(cx, 3.0, gz + 0.34, 1.2, 0.08, 0.7, 0xd8721f, { jitter: 0.06 });
-    mb.box(cx, 5.0, gz - 0.2, 0.16, 2.4, 0.16, C.metal, { jitter: 0.08 });
+    mb.box(cx, 4.3, gz, 1.8, 1.05, 0.09, 0xcfc9b8, { jitter: 0.06 });        // 板
+    mb.box(cx, 4.15, gz - 0.05, 0.62, 0.48, 0.03, 0x8a3f2c, { jitter: 0.08 }); // 四角い印
+    mb.box(cx, 3.72, gz + 0.3, 0.52, 0.06, 0.5, 0xa8571c, { jitter: 0.08 });   // リング
+    mb.box(cx, 5.4, gz - 0.2, 0.14, 2.2, 0.14, C.metal, { jitter: 0.08 });     // 吊り金具
     if (tilt) mb.box(cx + 1.2, 2.6, gz + 0.5, 2.2, 0.1, 0.5, 0xdedad0, { jitter: 0.1, rotY: tilt });
   }
 
