@@ -362,6 +362,26 @@ class Game {
       for (let i = 0; i < 6; i++) this.dropAt("onnen", this.confession.g.position.x, this.confession.g.position.z, 0);
       return;
     }
+    // ネコも おどろく（人間より すこし近くでないと気づかない）
+    if (this.cat && this.cat.active && this.cat.startled <= 0) {
+      const cp = this.cat.g.position;
+      if (dist(cp.x, cp.z, p.x, p.z) < 4.2 &&
+          this.world.colliders.lineOfSight(p.x, p.z, cp.x, cp.z, 1.0, 0.6) &&
+          this.cat.scare(p.x, p.z)) {
+        this.audio.scare();
+        this.audio.tone(900, 0.22, "sawtooth", 0.07, 380);      // ふしゃーっ
+        this.ui.flash(0.24);
+        this.texts.push(new FloatText(this.scene, "シャーッ！！", cp.x, 1.1, cp.z, "#ffe27a", 2.0));
+        this.bump("catScared");
+        if (!this.catScaredOnce) {
+          this.catScaredOnce = true;
+          this.ui.toast("🐈 ネコをおどろかせた！（おばけの実力）", "gold");
+        }
+        for (let i = 0; i < 4; i++) this.dropAt("onnen", cp.x + rand(-1, 1), cp.z + rand(-1, 1), 0);
+        return;
+      }
+    }
+
     if (!best) {
       this.audio.tone(420, 0.14, "triangle", 0.06, 260);
       this.texts.push(new FloatText(this.scene, "わっ！", p.x, p.y + 2.1, p.z, "#8fa8c8", 1.4));
@@ -446,8 +466,13 @@ class Game {
     if (this.ui.craftOpen || this.paused) { w.update(0, t); this.sky.update(0, t); this.renderer.render(this.scene, this.camera); inp.endFrame(); return; }
 
     // 仕掛けの選択
-    for (let i = 0; i < 6; i++) if (inp.once("Digit" + (i + 1))) { this.selTrap = i; this.audio.click(); }
-    if (inp.wheel) { this.selTrap = (this.selTrap + inp.wheel + 6) % 6; this.audio.click(); }
+    // 仕掛けは12種あるので、1〜9 と 0 でえらべるようにする
+    const nTrap = Object.keys(TRAPS).length;
+    for (let i = 0; i < 9 && i < nTrap; i++) {
+      if (inp.once("Digit" + (i + 1))) { this.selTrap = i; this.audio.click(); }
+    }
+    if (nTrap > 9 && inp.once("Digit0")) { this.selTrap = 9; this.audio.click(); }
+    if (inp.wheel) { this.selTrap = (this.selTrap + inp.wheel + nTrap) % nTrap; this.audio.click(); }
     if (inp.once("KeyF")) this.placeTrap();
     if (inp.once("KeyR")) this.retrieve();
     if (inp.once("KeyE")) this.doScare();
@@ -522,6 +547,25 @@ class Game {
     // --- 仕掛けの発動 ---------------------------------------
     for (const tr of this.traps) {
       tr.update(dt, t);
+      // ツルツルトラップ：上を通った人間は みんな すべる。おばけは 浮いているので平気
+      if (tr.def.slip) {
+        for (const h of this.humans) {
+          if (h.out || h.slipCool > 0) continue;
+          if (dist(tr.x, tr.z, h.x, h.z) > tr.def.radius) continue;
+          const line = h.slip();
+          if (!line) continue;
+          h.addFear(tr.def.fear, tr.x, tr.z, "trap:" + tr.id, tr.def.name);
+          if (this.net.on) this.net.reportScare(h.hid, tr.def.fear, "trap:" + tr.id);
+          h.speak(line, 3.0);
+          this.bump("slipped");
+          tr.fire();
+          if (dist(tr.x, tr.z, p.x, p.z) < 34) this.audio.trapSound(tr.id);
+          this.texts.push(new FloatText(this.scene, "ツルーッ！", h.x, 2.4, h.z, "#ffd97a", 1.8));
+          const drop = h.takeDrop();
+          if (drop) this.dropAt(drop, h.x, h.z, h.y);
+        }
+        continue;
+      }
       if (tr.cool > 0) continue;
       for (const h of this.humans) {
         if (h.out) continue;

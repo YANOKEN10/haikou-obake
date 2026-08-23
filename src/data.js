@@ -11,10 +11,12 @@ export const MATERIALS = {
   onnen:   { name: "怨念",           icon: "💢", color: 0x8b2ee0, desc: "人間を驚かすと落とす。おばけの主食。" },
   denchi:  { name: "液漏れ電池",     icon: "🔋", color: 0x4cc9ff, desc: "理科室の残骸。まだちょっと動く。" },
   nurunuru:{ name: "ぬめり",         icon: "🫧", color: 0x6fd48a, desc: "水道の下にたまってたやつ。触感は最悪。" },
+  wax:     { name: "床用ワックス",   icon: "🪣", color: 0xffd97a, desc: "用務員室で40年ねむっていた。ぬればピカピカ、ぬりすぎればツルツル。" },
+  kami:    { name: "しめった半紙",   icon: "📜", color: 0xe8e4d4, desc: "書道の時間の残り。まだ字が読める。読まないほうがいい。" },
 };
 
 // 人間が落とす（ドロップ）テーブル
-export const HUMAN_DROPS = ["onnen", "onnen", "denchi", "pan", "hokori"];
+export const HUMAN_DROPS = ["onnen", "onnen", "denchi", "pan", "hokori", "wax", "kami"];
 
 // --- 仕掛け（トラップ） --------------------------------------
 export const TRAPS = {
@@ -60,6 +62,51 @@ export const TRAPS = {
     desc: "理科室の人体模型が手招きする。内臓は落とす。",
     line: "オイデ…オイデ…（内臓ボトッ）",
   },
+
+  // 上を通ったものを、みんな すべらせる。おばけには効かない。
+  tsuru: {
+    name: "ツルツルトラップ", icon: "🧴",
+    cost: { wax: 4, nurunuru: 3 },
+    fear: 14, radius: 3.4, cooldown: 0.6,
+    slip: true,
+    desc: "ワックスをぬりすぎた床。上を通った人間は みんな すべってコケる。おばけは浮いているので平気。",
+    line: "ツルーーッ！！",
+  },
+  kagami: {
+    name: "うつらない鏡", icon: "🪞",
+    cost: { chalk: 3, denchi: 2, onnen: 2 },
+    fear: 30, radius: 7.5, cooldown: 12,
+    desc: "のぞきこんでも 自分が映らない。かわりに 知らない人が映る。",
+    line: "…だれ？（鏡のなかで手をふる）",
+  },
+  housou: {
+    name: "校内放送ジャック", icon: "📢",
+    cost: { denchi: 3, onnen: 3, kami: 2 },
+    fear: 38, radius: 26, cooldown: 20,
+    desc: "スピーカーから 昔の下校放送が流れる。声は だんだん ずれていく。",
+    line: "ピンポンパンポーン…『げこうの じかん です』",
+  },
+  fumikiri: {
+    name: "ふりまわる竹ぼうき", icon: "🧹",
+    cost: { hokori: 5, uwabaki: 2 },
+    fear: 20, radius: 5.5, cooldown: 8,
+    desc: "そうじの時間に置きざりにされた竹ぼうき。まだ そうじをしている。",
+    line: "ザッ…ザッ…（ひとりでに掃いている）",
+  },
+  ofuda: {
+    name: "はがれたお札", icon: "📜",
+    cost: { kami: 4, onnen: 4 },
+    fear: 46, radius: 9, cooldown: 16,
+    desc: "だれかが 昔 貼ったお札。はがすと、おさえていたものが 出てくる。",
+    line: "ペリッ…（なにかが ほどけた音）",
+  },
+  kyuushoku: {
+    name: "動く給食ワゴン", icon: "🍽",
+    cost: { pan: 4, denchi: 2, hokori: 3 },
+    fear: 28, radius: 8, cooldown: 13,
+    desc: "だれも押していないのに 廊下を進んでくる。献立は40年前のまま。",
+    line: "ガラガラガラ…（きょうは あげぱん）",
+  },
 };
 
 // --- 召喚できるおばけ ----------------------------------------
@@ -87,6 +134,38 @@ export const GHOSTS = {
     fear: 55, radius: 9, speed: 0, life: 240,
     desc: "その場に居座る。近づいた人間は問答無用で泣く。動かないのは体力の問題。",
     lines: ["はぁーい", "３番目の個室にどうぞ", "手、洗った？"],
+  },
+  kubinashi: {
+    name: "くびなし体操服", icon: "🎽",
+    cost: { onnen: 10, uwabaki: 5, hokori: 6 },
+    unlockAt: 5,
+    fear: 34, radius: 5.5, speed: 3.0, life: 130,
+    desc: "体操服だけが 準備運動をしている。中身は ない。数だけは 数える。",
+    lines: ["いち、に、さん、し…", "つぎ、うでを まわして", "（体操服が おじぎした）"],
+  },
+  kagerou: {
+    name: "かげろう先生", icon: "🕴",
+    cost: { onnen: 18, chalk: 6, kami: 4 },
+    unlockAt: 12,
+    fear: 60, radius: 10, speed: 1.6, life: 200,
+    desc: "廊下のはしに立つ、細長い影。近づくほど 背がのびる。授業には おくれない。",
+    lines: ["…しずかに", "きょうは なんの じかんですか", "せきに つきなさい"],
+  },
+  ranchi: {
+    name: "からっぽ椅子の大合唱", icon: "🪑",
+    cost: { onnen: 22, denchi: 6, pan: 5 },
+    unlockAt: 18,
+    fear: 70, radius: 13, speed: 0.9, life: 200,
+    desc: "教室じゅうの椅子が いっせいに 鳴る。だれも すわっていないのに 音楽会がはじまる。",
+    lines: ["ギィ…ギィ…", "（いっせいに 立ちあがる音）", "つぎは 2番、いきます"],
+  },
+  ookami: {
+    name: "巨大てるてる坊主", icon: "🎐",
+    cost: { onnen: 30, kami: 10, nurunuru: 8 },
+    unlockAt: 26,
+    fear: 88, radius: 15, speed: 1.2, life: 240,
+    desc: "運動会の前の日に つるされたまま、40年 待っている。もう だれも 来ないのに。",
+    lines: ["…あした、はれる？", "みんな、まだ？", "（ゆっくり ふりむいた）"],
   },
 };
 

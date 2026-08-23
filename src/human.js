@@ -78,6 +78,7 @@ export class Human {
     this.seenGhostT = 0;
     this.habit = {};          // 仕掛け種別ごとの慣れ
     this.dropped = 0;
+    this.slipCool = 0;
     this.out = false;
     this.scaredCount = 0;
     this.lookYaw = 0;
@@ -265,6 +266,22 @@ export class Human {
   //   女子 → ド派手に一回転して尻もち、頭に星、上履きが飛ぶ
   //   男子 → 上着が弾けとんで、下のランニングシャツ姿で逃げる
   // ==========================================================
+  // ツルツルトラップの上を通った：男女どちらも すべって転ぶ
+  slip() {
+    if (this.out || this.slipCool > 0) return null;
+    this.slipCool = 2.6;
+    if (this.gagT > 0) return null;
+    this.gag = "tumble";
+    this.gagT = 2.0;
+    this.shoeFly = { x: rand(-1, 1), y: 3.4, z: rand(-1, 1), t: 0 };
+    this.makeStars();
+    // すべった いきおいで、すこし飛ぶ
+    this.vx *= -0.4; this.vz *= -0.4;
+    this.stateT = Math.max(this.stateT, 1.8);
+    return choice(["うわああツルッ！！", "しりもち ついた！", "なんで こんなとこ ワックス！？",
+      "つるつるじゃんここ！！", "立てない！立てないって！"]);
+  }
+
   startGag(strength) {
     if (this.gagT > 0) return null;
     const f = this.type.sex === "f";
@@ -464,6 +481,7 @@ export class Human {
     this.talkT -= dt;
     this.seenGhostT = Math.max(0, this.seenGhostT - dt);
     this.comboT = Math.max(0, (this.comboT || 0) - dt);
+    this.slipCool = Math.max(0, (this.slipCool || 0) - dt);
     this.fear = Math.max(this.fearFloor || 0, this.fear - dt * 0.85);  // ゆっくり落ち着く（が完全には戻らない）
 
     let speed = this.type.speed;

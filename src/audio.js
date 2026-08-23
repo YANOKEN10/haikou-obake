@@ -104,6 +104,12 @@ export class Audio {
       case "piano":   [523, 587, 659, 494, 440].forEach((f, i) => { this.tone(f, 0.7, "triangle", 0.1, null, i * 0.14); this.tone(f * 1.01, 0.7, "sine", 0.05, null, i * 0.14); }); break;
       case "suido":   this.noise(1.1, 0.14, 3800, 0.6, 0, "highpass"); break;
       case "jintai":  this.tone(90, 0.9, "sawtooth", 0.13, 60); this.noise(0.25, 0.12, 400, 1, 0.55); break;
+      case "tsuru":   this.tone(1500, 0.32, "sine", 0.09, 260); this.noise(0.22, 0.09, 2600, 3, 0.05, "highpass"); this.tone(120, 0.2, "triangle", 0.11, 60, 0.24); break;
+      case "kagami":  this.tone(1800, 0.5, "sine", 0.05, 2300); this.noise(0.3, 0.05, 6000, 6, 0.1, "highpass"); break;
+      case "housou":  [880, 660, 990, 740].forEach((f, i) => this.tone(f, 0.34, "sine", 0.09, null, i * 0.3)); this.noise(1.2, 0.03, 900, 2, 1.2); break;
+      case "fumikiri":for (let i = 0; i < 6; i++) this.noise(0.16, 0.1, 1400, 1.4, i * 0.26, "highpass"); break;
+      case "ofuda":   this.noise(0.34, 0.13, 2200, 2, 0, "highpass"); this.tone(70, 1.1, "sawtooth", 0.12, 44, 0.2); break;
+      case "kyuushoku": for (let i = 0; i < 10; i++) this.noise(0.07, 0.09, 300 + Math.random() * 200, 2.5, i * 0.13); this.tone(200, 0.5, "square", 0.05, 150, 0.4); break;
       default:        this.scare();
     }
   }

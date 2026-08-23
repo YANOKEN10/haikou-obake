@@ -69,7 +69,7 @@ export class UI {
     keys.forEach((k, i) => {
       const n = built[k] || 0;
       html += '<div class="slot' + (i === sel ? " sel" : "") + (n ? "" : " empty") + '" data-i="' + i + '">' +
-        '<span class="num">' + (i + 1) + "</span>" + TRAPS[k].icon +
+        '<span class="num">' + (i < 9 ? i + 1 : i === 9 ? 0 : "") + "</span>" + TRAPS[k].icon +
         '<span class="cnt">' + n + "</span></div>";
     });
     const bar = $("#hotbar");
@@ -99,73 +99,33 @@ export class UI {
         '<div class="n"><span>' + esc(h.name) + '</span><span class="st">' + st + "</span></div>" +
         '<div class="hbar"><i style="width:' + (p * 100) + "%;background:hsl(" + hue + ',85%,58%)"></i></div></div>';
     }).join("");
+    box.classList.remove("s1", "s2", "s3", "s4", "bare");
     box.innerHTML = html + '<div class="hmore" hidden></div>';
     this.trimHumanList(box);
   }
 
-  // 入りきらない行は、まるごと隠して「ほか◯人」とまとめる
-  //  （行が中とちゅうで切れて読めなくなるのを防ぐ）
+  // 全員の名まえが 必ず見えるようにする。
+  //  入りきらないときは、行そのものを小さくして 詰めていく。
+  //  （まえは「ほか◯人」とまとめていたが、だれが来ているか
+  //    分からなくなるので やめた）
   trimHumanList(box) {
     const more = box.lastElementChild;
+    more.hidden = true;
     const rows = Array.prototype.slice.call(box.children, 0, -1);
     for (const r of rows) r.hidden = false;
-    more.hidden = true;
     const limit = box.clientHeight;
     if (!limit || !rows.length) return;
-    const top = box.getBoundingClientRect().top;
-    const spare = Math.round(rows[0].getBoundingClientRect().height * 0.7);
-    let hidden = 0;
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i].getBoundingClientRect();
-      // 最後の1行以外は、「ほか◯人」の行のぶんも空けておく
-      const room = limit - (i < rows.length - 1 ? spare : 0);
-      if (r.bottom - top > room) {
-        for (let j = i; j < rows.length; j++) { rows[j].hidden = true; hidden++; }
-        break;
-      }
+
+    // まずは ふつうの大きさで。あふれたら、段階的に小さくする
+    const steps = ["", "s1", "s2", "s3", "s4"];
+    for (const cls of steps) {
+      box.classList.remove("s1", "s2", "s3", "s4");
+      if (cls) box.classList.add(cls);
+      if (box.scrollHeight <= limit + 1) return;
     }
-    if (hidden > 0) { more.hidden = false; more.textContent = "ほか " + hidden + " 人"; }
+    // いちばん小さくしても あふれるときだけ、バーを消してさらに詰める
+    box.classList.add("s4", "bare");
   }
-
-  // ともだちと あそぶ画面のようす
-  setRoom(net) {
-    const on = net && net.on;
-    const chip = $("#roomChip");
-    chip.hidden = !on;
-    if (on) {
-      const s = "👥 あいことば " + net.code + "　" + net.playerCount + "人" + (net.isHost ? "（おや）" : "");
-      if (s !== this._chip) { this._chip = s; chip.textContent = s; }
-    } else this._chip = "";
-    const box = document.getElementById("room");
-    if (!box || !box.classList.contains("on")) return;
-    $("#roomOut").hidden = !!on;
-    $("#roomIn").hidden = !on;
-    if (!on) return;
-    $("#rCodeBig").textContent = net.code;
-    $("#rRole").textContent = net.isHost
-      ? "あなたが「おや」です。人間たちは あなたの画面が動かしています。"
-      : "「おや」が人間たちを動かしています。";
-    const rows = ['<div class="rmem"><span>' + esc(net.name) + '（あなた）</span><span class="tag">' +
-      (net.isHost ? "おや" : "") + "</span></div>"];
-    for (const p of net.peers.values()) {
-      rows.push('<div class="rmem"><span>' + esc(p.name) + "</span><span class=\"tag\"></span></div>");
-    }
-    $("#rMembers").innerHTML = rows.join("");
-  }
-
-  roomMsg(text, ok) {
-    const e = $("#rMsg");
-    e.textContent = text || "";
-    e.classList.toggle("ok", !!ok);
-  }
-
-  openRoom(net) {
-    document.getElementById("room").classList.add("on");
-    this.roomMsg("");
-    this.setRoom(net);
-  }
-  closeRoom() { document.getElementById("room").classList.remove("on"); }
-  get roomOpen() { return document.getElementById("room").classList.contains("on"); }
 
   setGauges(phase, stamina) {
     $("#phaseBar").firstElementChild.style.width = phase + "%";

@@ -36,6 +36,8 @@ export class Pickup {
 const TRAP_COLOR = {
   locker: 0x89a0ad, chalk: 0xe8e2c8, uwabaki: 0xd9cfb4,
   piano: 0x2a2a3a, suido: 0x7fd0e8, jintai: 0xd7a58f,
+  tsuru: 0xffd97a, kagami: 0xb8d8e8, housou: 0xd8a85e,
+  fumikiri: 0x8a7a4a, ofuda: 0xe8e4d4, kyuushoku: 0xc9c4b4,
 };
 
 export class Trap {
@@ -55,6 +57,20 @@ export class Trap {
     body.position.y = 0.72;
     this.body = body;
     this.group.add(body);
+    if (this.def.slip) {
+      // ワックスの水たまり。低くて広い
+      body.scale.set(1.1, 0.07, 1.1);
+      body.position.y = 0.06;
+      const pool = new THREE.Mesh(
+        new THREE.CircleGeometry(this.def.radius, 22),
+        new THREE.MeshBasicMaterial({ color: 0xffd97a, transparent: true, opacity: 0.16,
+          side: THREE.DoubleSide, depthWrite: false })
+      );
+      pool.rotation.x = -Math.PI / 2;
+      pool.position.y = 0.035;
+      this.pool = pool;
+      this.group.add(pool);
+    }
 
     // 足元の魔法陣
     const ring = new THREE.Mesh(
@@ -85,6 +101,8 @@ export class Trap {
   }
 
   update(dt, t) {
+    if (this.pool) this.pool.material.opacity = 0.12 + Math.sin(t * 2.1 + this.x) * 0.05;
+
     this.cool = Math.max(0, this.cool - dt);
     this.fireT = Math.max(0, this.fireT - dt);
     const f = this.fireT > 0 ? this.fireT / 0.9 : 0;
@@ -214,6 +232,95 @@ function buildSummonMesh(g, id) {
     const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.3, 0.07), new THREE.MeshLambertMaterial({ color: 0x40342c }));
     leg.position.set(-0.14, -0.4, 0); g.add(leg);
     const leg2 = leg.clone(); leg2.position.x = 0.14; g.add(leg2);
+  } else if (id === "kubinashi") {
+    // くびなし体操服：白い体操服だけが 準備運動をしている
+    const m = new THREE.MeshLambertMaterial({ color: 0xf2efe6, emissive: 0x6a7a8a, emissiveIntensity: 0.4,
+      transparent: true, opacity: 0.94 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.6, 0.26), m);
+    body.position.y = 0.1; g.add(body);
+    const line = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.07, 0.02),
+      new THREE.MeshBasicMaterial({ color: 0xd44a3a }));
+    line.position.set(0, 0.2, 0.14); g.add(line);          // 赤い ゼッケンの線
+    for (const sx of [-0.32, 0.32]) {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.44, 0.14), m);
+      arm.position.set(sx, 0.16, 0); arm.rotation.z = sx > 0 ? -0.9 : 0.9; g.add(arm);
+    }
+    const pants = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.3, 0.28),
+      new THREE.MeshLambertMaterial({ color: 0x2f3f6a }));
+    pants.position.y = -0.32; g.add(pants);
+    for (const sx of [-0.13, 0.13]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, 0.14), m);
+      leg.position.set(sx, -0.6, 0); g.add(leg);
+    }
+    // 首から上は、なにもない
+    const hole = new THREE.Mesh(new THREE.CircleGeometry(0.15, 12),
+      new THREE.MeshBasicMaterial({ color: 0x090a10, side: THREE.DoubleSide }));
+    hole.rotation.x = -Math.PI / 2; hole.position.y = 0.41; g.add(hole);
+
+  } else if (id === "kagerou") {
+    // かげろう先生：細長い影。近づくほど 背がのびて見える
+    const m = new THREE.MeshLambertMaterial({ color: 0x14121c, emissive: 0x241f38,
+      emissiveIntensity: 0.6, transparent: true, opacity: 0.88 });
+    const body = new THREE.Mesh(new THREE.ConeGeometry(0.3, 2.3, 10, 1, true), m);
+    body.position.y = 0.2; g.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), m);
+    head.position.y = 1.34; head.scale.set(0.85, 1.25, 0.85); g.add(head);
+    for (const sx of [-0.2, 0.2]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6),
+        new THREE.MeshBasicMaterial({ color: 0xffe9a8 }));
+      eye.position.set(sx * 0.55, 1.36, 0.17); g.add(eye);
+    }
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.09, 1.1, 0.09), m);
+    arm.position.set(-0.28, 0.7, 0.05); arm.rotation.z = 0.16; g.add(arm);
+    const arm2 = arm.clone(); arm2.position.x = 0.28; arm2.rotation.z = -0.16; g.add(arm2);
+    const chalk = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.14, 6),
+      new THREE.MeshBasicMaterial({ color: 0xf2efe4 }));
+    chalk.position.set(0.3, 0.16, 0.08); g.add(chalk);
+
+  } else if (id === "ranchi") {
+    // からっぽ椅子の大合唱：椅子が かさなって 立ちあがっている
+    const wood = new THREE.MeshLambertMaterial({ color: 0x8a6a3a, emissive: 0x4a2f1a, emissiveIntensity: 0.4 });
+    const iron = new THREE.MeshLambertMaterial({ color: 0x4a4a52, emissive: 0x22222a, emissiveIntensity: 0.3 });
+    for (let k = 0; k < 3; k++) {
+      const y = -0.5 + k * 0.52, s = 1 - k * 0.13, rot = k * 1.1;
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42 * s, 0.06, 0.4 * s), wood);
+      seat.position.set(0, y, 0); seat.rotation.y = rot; g.add(seat);
+      const back = new THREE.Mesh(new THREE.BoxGeometry(0.42 * s, 0.3 * s, 0.05), wood);
+      back.position.set(Math.sin(rot) * 0.18, y + 0.2 * s, Math.cos(rot) * -0.18);
+      back.rotation.y = rot; g.add(back);
+      for (const sx of [-0.16, 0.16]) for (const sz of [-0.16, 0.16]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.24 * s, 0.03), iron);
+        const rx = sx * Math.cos(rot) - sz * Math.sin(rot), rz = sx * Math.sin(rot) + sz * Math.cos(rot);
+        leg.position.set(rx * s * 2, y - 0.15 * s, rz * s * 2); g.add(leg);
+      }
+    }
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10),
+      new THREE.MeshBasicMaterial({ color: 0xffd45e, transparent: true, opacity: 0.09, depthWrite: false }));
+    g.add(glow);
+
+  } else if (id === "ookami") {
+    // 巨大てるてる坊主
+    const cloth = new THREE.MeshLambertMaterial({ color: 0xefe9de, emissive: 0x8a7f6a,
+      emissiveIntensity: 0.4, transparent: true, opacity: 0.93 });
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.62, 16, 14), cloth);
+    head.position.y = 0.6; g.add(head);
+    const body = new THREE.Mesh(new THREE.ConeGeometry(0.95, 1.7, 16, 1, true), cloth);
+    body.position.y = -0.6; g.add(body);
+    const tie = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.07, 8, 18),
+      new THREE.MeshLambertMaterial({ color: 0x8a2a3a }));
+    tie.rotation.x = Math.PI / 2; tie.position.y = 0.08; g.add(tie);
+    for (const sx of [-0.24, 0.24]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8),
+        new THREE.MeshBasicMaterial({ color: 0x14100f }));
+      eye.position.set(sx, 0.68, 0.52); eye.scale.set(1, 1.4, 0.5); g.add(eye);
+    }
+    const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8),
+      new THREE.MeshBasicMaterial({ color: 0x14100f }));
+    mouth.position.set(0, 0.42, 0.56); mouth.scale.set(1.1, 0.45, 0.35); g.add(mouth);
+    const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.6, 6),
+      new THREE.MeshBasicMaterial({ color: 0x8a7a52 }));
+    rope.position.y = 2.0; g.add(rope);
+
   } else {
     // トイレのハナコさん
     const m = new THREE.MeshLambertMaterial({ color: 0xf0e8e2, emissive: 0x8a4f6a, emissiveIntensity: 0.35, transparent: true, opacity: 0.92 });
@@ -382,6 +489,9 @@ export class Cat {
     this.tx = 0; this.tz = 0;
     this.life = 0;
     this.found = false;
+    this.startled = 0;
+    this.hop = 0;
+    this.rest = 0;
   }
 
   update(dt, t, world, player) {
@@ -403,31 +513,64 @@ export class Cat {
     }
 
     this.life -= dt;
+    this.rest = (this.rest || 0) - dt;
+    this.startled = Math.max(0, (this.startled || 0) - dt);
+    this.hop = Math.max(0, (this.hop || 0) - dt * 2.2);
     const d = dist(this.g.position.x, this.g.position.z, player.x, player.z);
-    // 近づかれると、ちょっとだけ逃げる
-    let sp = 1.3;
-    if (d < 5) {
+    // ふだんは その場にすわって、たまにゆっくり歩く。
+    // 近づかれたときだけ、ぱっと逃げる。
+    let sp = 0.75;
+    if (this.startled > 0) {
+      sp = 6.2;                                  // おどかされたら 全力で走る
+    } else if (d < 5) {
       this.tx = this.g.position.x + (this.g.position.x - player.x) * 2;
       this.tz = this.g.position.z + (this.g.position.z - player.z) * 2;
-      sp = 3.4;
-    } else if (dist(this.g.position.x, this.g.position.z, this.tx, this.tz) < 1) {
+      this.rest = 0;
+      sp = 3.2;
+    } else if (this.rest > 0) {
+      sp = 0;                                   // すわって、じっとしている
+    } else if (dist(this.g.position.x, this.g.position.z, this.tx, this.tz) < 0.8) {
       this.pickTarget();
+      this.rest = 5 + Math.random() * 9;        // つぎに動くまで、しばらく休む
     }
     const dx = this.tx - this.g.position.x, dz = this.tz - this.g.position.z;
     const len = Math.hypot(dx, dz) || 1;
     this.g.position.x = clamp(this.g.position.x + (dx / len) * sp * dt, -44, 44);
     this.g.position.z = clamp(this.g.position.z + (dz / len) * sp * dt, 38, 70);
-    this.g.rotation.y = Math.atan2(dx, dz);
-    this.tail.rotation.z = Math.sin(t * 3) * 0.3;
-    this.g.position.y = 0.02 + Math.abs(Math.sin(t * 7)) * (sp > 2 ? 0.05 : 0.012);
+    if (sp > 0.2) this.g.rotation.y += ((Math.atan2(dx, dz) - this.g.rotation.y + Math.PI * 3) % (Math.PI * 2) - Math.PI) * Math.min(1, dt * 3);
+    this.tail.rotation.z = Math.sin(t * 1.1) * 0.16;
+    this.g.position.y = 0.02 + (sp > 0.2 ? Math.abs(Math.sin(t * 6)) * (sp > 2 ? 0.05 : 0.01) : 0);
 
+    if (this.startled > 0) {
+      const k = 1 + this.hop * 0.35;
+      this.g.scale.setScalar(1.5 * k);           // 毛がさかだつ
+      this.g.position.y += this.hop * 0.5;       // 飛びあがる
+      this.tail.rotation.x = -1.5;               // しっぽをぴんと立てる
+    } else {
+      this.g.scale.setScalar(1.5);
+      this.tail.rotation.x = -0.7;
+    }
     if (this.life <= 0) { this.active = false; this.g.visible = false; }
     return null;
   }
 
+  // おどかされた！毛をさかだてて 飛びあがり、いちもくさんに逃げる
+  scare(px, pz) {
+    if (!this.active || this.startled > 0) return false;
+    this.startled = 2.6;
+    this.hop = 1;
+    this.rest = 0;
+    const dx = this.g.position.x - px, dz = this.g.position.z - pz;
+    const len = Math.hypot(dx, dz) || 1;
+    this.tx = clamp(this.g.position.x + (dx / len) * 22, -44, 44);
+    this.tz = clamp(this.g.position.z + (dz / len) * 22, 38, 70);
+    this.life = Math.min(this.life, 5.5);        // びっくりして、どこかへ行ってしまう
+    return true;
+  }
+
   pickTarget() {
-    this.tx = clamp(this.g.position.x + rand(-12, 12), -42, 42);
-    this.tz = clamp(this.g.position.z + rand(-10, 10), 39, 69);
+    this.tx = clamp(this.g.position.x + rand(-4.5, 4.5), -42, 42);
+    this.tz = clamp(this.g.position.z + rand(-4, 4), 39, 69);
   }
 }
 

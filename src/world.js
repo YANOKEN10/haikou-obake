@@ -59,6 +59,8 @@ export function buildWorld(scene, opts = {}) {
   buildEntranceHall(ctx);
   buildRoof(ctx);
   buildSecret(ctx);
+  buildForest(ctx);
+  buildMountains(ctx);
 
   linkNav(ctx);
   col.build();
@@ -986,10 +988,14 @@ function buildYard(ctx, dustCount) {
 
   fence(mb, col, YARD.x1, 0.5, YARD.x1, YARD.z2);
   fence(mb, col, YARD.x2, 0.5, YARD.x2, YARD.z2);
-  fence(mb, col, YARD.x1, YARD.z2, -5.0, YARD.z2);
-  fence(mb, col, 5.0, YARD.z2, YARD.x2, YARD.z2);
+  // 中庭と運動場のあいだの柵はなくし、そのまま行き来できるようにする
+  //  （校門の柱だけ、目じるしとして残す）
   for (const gx of [-5.0, 5.0]) {
-    mb.box(gx, 1.6, YARD.z2, 0.6, 3.2, 0.6, C.stone, { jitter: 0.05 });
+    for (let r = 0; r < 6; r++) {
+      mb.box(gx, 0.26 + r * 0.52, YARD.z2, 0.72 - r * 0.02, 0.5, 0.72 - r * 0.02,
+        choice([0x54514a, 0x4a4740, 0x5d5950]), { jitter: 0.2 });
+    }
+    mb.box(gx, 3.24, YARD.z2, 0.86, 0.16, 0.86, 0x5f5a51, { jitter: 0.12 });
     col.add(gx - 0.3, YARD.z2 - 0.3, gx + 0.3, YARD.z2 + 0.3, 0, 3.2, "wall");
   }
 
@@ -1026,16 +1032,17 @@ function buildYard(ctx, dustCount) {
     mb.box(bx, bh, 11.5, 0.07, 0.07, 3.1, C.metal);
   }
 
-  mb.box(0, 0.35, 24, 4.4, 0.7, 2.6, C.concrete, { jitter: 0.05 });
-  col.add(-2.2, 22.7, 2.2, 25.3, 0, 0.7, "furn");
-  spawnSpots.push({ x: 0, z: 26.6, y: 0, floor: 0 });
+  spawnSpots.push({ x: 0, z: 25.0, y: 0, floor: 0 });
 
   mb.box(-30, 0.4, 20, 2.6, 0.8, 1.0, 0x8a8f88, { jitter: 0.05 });
   col.add(-31.3, 19.5, -28.7, 20.5, 0, 0.8, "furn");
   for (let i = 0; i < 3; i++) mb.box(-31 + i, 0.95, 20, 0.07, 0.3, 0.07, C.metal);
   spawnSpots.push({ x: -30, z: 22, y: 0, floor: 0 });
 
-  for (const t of [[-34, 27, 1.2], [-8, 29, 1.0], [12, 28, 1.15], [34, 24, 1.05], [-36, 14, 0.9]]) {
+  for (const t of [[-34, 27, 1.2], [-8, 29, 1.0], [12, 28, 1.15], [34, 24, 1.05], [-36, 14, 0.9],
+                   [-40, 31, 1.1], [-24, 31.5, 0.95], [-12, 32, 1.15], [4, 31.5, 1.0],
+                   [24, 32, 1.1], [38, 30, 0.9], [40, 18, 1.05], [-40, 22, 1.0],
+                   [-38, 5, 0.85], [38, 6, 0.9], [28, 27, 0.95]]) {
     tree(mb, col, t[0], t[1], t[2]);
     spawnSpots.push({ x: t[0] + 2.2, z: t[1] + 1.6, y: 0, floor: 0 });
   }
@@ -1053,16 +1060,275 @@ function buildYard(ctx, dustCount) {
   props.push(makeDust(dustCount));
 }
 
-function fence(mb, col, x1, z1, x2, z2) {
+// 運動場・体育館がわの柵。
+//  さびた金あみのフェンスに、ツタがからみ、
+//  ところどころ「立入禁止」の札が下がっている。
+function wireFence(mb, col, x1, z1, x2, z2) {
   const len = Math.hypot(x2 - x1, z2 - z1);
-  const n = Math.max(1, Math.ceil(len / 2.4));
+  if (len < 0.2) return;
+  const ux = (x2 - x1) / len, uz = (z2 - z1) / len;
+  const nx = -uz, nz = ux;
+  const ang = Math.atan2(ux, uz);
+  const H = 2.4;
+  const RUST = 0x4e4a42, WIRE = 0x6a6a62;
+
+  // 支柱と、上下の横パイプ
+  const n = Math.max(1, Math.ceil(len / 2.5));
   for (let i = 0; i <= n; i++) {
     const t = i / n;
-    mb.box(x1 + (x2 - x1) * t, 1.1, z1 + (z2 - z1) * t, 0.12, 2.2, 0.12, C.fence, { jitter: 0.1 });
+    const px = x1 + (x2 - x1) * t, pz = z1 + (z2 - z1) * t;
+    mb.box(px, H / 2, pz, 0.11, H, 0.11, RUST, { jitter: 0.16 });
+    mb.box(px, 0.12, pz, 0.3, 0.24, 0.3, 0x4a4740, { jitter: 0.2 });      // 根もとのコンクリ
   }
-  mb.wall(x1, z1, x2, z2, 0.0, 2.1, 0.06, 0x4a5057, { jitter: 0.06 });
-  const t = 0.35;
-  col.add(Math.min(x1, x2) - t, Math.min(z1, z2) - t, Math.max(x1, x2) + t, Math.max(z1, z2) + t, 0, 2.2, "wall");
+  mb.wall(x1, z1, x2, z2, H - 0.09, H - 0.01, 0.09, RUST, { jitter: 0.12 });
+  mb.wall(x1, z1, x2, z2, 0.16, 0.24, 0.08, RUST, { jitter: 0.12 });
+
+  // 金あみ（たて糸・よこ糸）
+  for (let d = 0; d < len; d += 0.34) {
+    mb.box(x1 + ux * d, H / 2, z1 + uz * d, 0.03, H - 0.2, 0.03, WIRE, { jitter: 0.35, rotY: ang });
+  }
+  for (let y = 0.35; y < H - 0.1; y += 0.34) {
+    mb.wall(x1, z1, x2, z2, y, y + 0.035, 0.035, WIRE, { jitter: 0.3 });
+  }
+
+  // からみついた ツタ
+  const ivyN = Math.round(len * 2.2);
+  for (let i = 0; i < ivyN; i++) {
+    const d = rand(0, len);
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const yy = Math.pow(Math.random(), 1.4) * H;
+    const s = rand(0.2, 0.6) * (1 - yy / H * 0.3);
+    mb.box(x1 + ux * d + nx * 0.09 * side, yy, z1 + uz * d + nz * 0.09 * side,
+      s, s * rand(0.7, 1.6), 0.06, C.ivy, { jitter: 0.5, rotY: ang + rand(-0.4, 0.4) });
+  }
+  // 立入禁止の札
+  for (let d = rand(3, 9); d < len - 2; d += rand(11, 20)) {
+    const px = x1 + ux * d, pz = z1 + uz * d;
+    mb.box(px, 1.35, pz, 0.86, 0.5, 0.05, 0xc9c2ae, { jitter: 0.08, rotY: ang + rand(-0.12, 0.12) });
+    mb.box(px, 1.5, pz - nz * 0.04, 0.66, 0.1, 0.04, 0x8e2a24, { jitter: 0.1, rotY: ang });
+    mb.box(px, 1.24, pz - nz * 0.04, 0.66, 0.1, 0.04, 0x8e2a24, { jitter: 0.1, rotY: ang });
+    mb.box(px - 0.2, 1.37, pz - nz * 0.05, 0.16, 0.2, 0.03, 0x2a2620, { jitter: 0.15, rotY: ang });
+    mb.box(px + 0.06, 1.37, pz - nz * 0.05, 0.16, 0.2, 0.03, 0x2a2620, { jitter: 0.15, rotY: ang });
+  }
+  // 足もとの草
+  for (let i = 0; i < len * 0.9; i++) {
+    const d = rand(0, len);
+    const side = Math.random() < 0.5 ? -1 : 1;
+    mb.tuft(x1 + ux * d + nx * rand(0.1, 0.7) * side, z1 + uz * d + nz * rand(0.1, 0.7) * side,
+      0.02, rand(0.25, 0.8), 0x2b3a1f, choice([0x475331, 0x5a5236]), 3, 0.24);
+  }
+
+  const t = 0.3;
+  col.add(Math.min(x1, x2) - t, Math.min(z1, z2) - t, Math.max(x1, x2) + t, Math.max(z1, z2) + t, 0, H, "wall");
+}
+
+// 敷地をかこむ石垣。
+//  大きさのちがう石を積み、上に笠石をのせ、ツタをはわせる。
+//  長い年月で ところどころ石が抜け、草が生えている。
+function fence(mb, col, x1, z1, x2, z2) {
+  const len = Math.hypot(x2 - x1, z2 - z1);
+  if (len < 0.2) return;
+  const ux = (x2 - x1) / len, uz = (z2 - z1) / len;        // 石垣の向き
+  const nx = -uz, nz = ux;                                 // 横向き（面のほう）
+  const ang = Math.atan2(ux, uz);
+  const H = 2.0, TH = 0.62;                                // 高さ・厚み
+
+  // 芯（すきまから向こうが見えないように）
+  mb.wall(x1, z1, x2, z2, 0.0, H - 0.12, TH * 0.72, 0x3f3a33, { jitter: 0.1 });
+
+  // 石を積む。段ごとに石の大きさを変えて、乱積みに見せる
+  const rows = 5;
+  for (let r = 0; r < rows; r++) {
+    const y0 = (H - 0.2) * (r / rows);
+    const hh = (H - 0.2) / rows;
+    const sw = 0.62 + r * 0.1;                             // 上の段ほど小さい石
+    const off = (r % 2) * sw * 0.5;                        // 目地をずらす
+    for (let d = off; d < len; d += sw) {
+      const wd = Math.min(sw * rand(0.72, 1.0), len - d);
+      if (wd < 0.12) continue;
+      const px = x1 + ux * (d + wd / 2), pz = z1 + uz * (d + wd / 2);
+      const grey = choice([0x54514a, 0x4a4740, 0x5d5950, 0x46433c, 0x615c52]);
+      // ときどき石が抜けている
+      if (Math.random() < 0.05) continue;
+      for (const side of [-1, 1]) {
+        mb.box(px + nx * (TH * 0.38) * side, y0 + hh / 2, pz + nz * (TH * 0.38) * side,
+          wd * 0.92, hh * rand(0.82, 0.97), TH * 0.3, grey, { jitter: 0.24, rotY: ang });
+      }
+    }
+  }
+  // 笠石（いちばん上にのせる ひらたい石）
+  for (let d = 0; d < len; d += 0.9) {
+    const wd = Math.min(0.9 * rand(0.85, 1.0), len - d);
+    if (wd < 0.15) continue;
+    mb.box(x1 + ux * (d + wd / 2), H - 0.09, z1 + uz * (d + wd / 2),
+      wd, 0.18, TH * 1.06, choice([0x5f5a51, 0x565148]), { jitter: 0.18, rotY: ang });
+  }
+
+  // ツタ。石垣の両面をはい上がり、上のふちから垂れさがる
+  const ivyN = Math.round(len * 2.6);
+  for (let i = 0; i < ivyN; i++) {
+    const d = rand(0, len);
+    const px = x1 + ux * d, pz = z1 + uz * d;
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const yy = Math.pow(Math.random(), 1.5) * H;
+    const s = rand(0.22, 0.62) * (1 - yy / H * 0.35);
+    mb.box(px + nx * (TH * 0.5) * side, yy, pz + nz * (TH * 0.5) * side,
+      s, s * rand(0.7, 1.5), 0.07, C.ivy, { jitter: 0.5, rotY: ang + rand(-0.4, 0.4) });
+  }
+  // ふちから垂れる ツタの房
+  for (let d = rand(0, 3); d < len; d += rand(1.6, 5.0)) {
+    const px = x1 + ux * d, pz = z1 + uz * d;
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const drop = rand(0.4, 1.3);
+    mb.box(px + nx * (TH * 0.52) * side, H - drop / 2, pz + nz * (TH * 0.52) * side,
+      rand(0.3, 0.7), drop, 0.08, 0x2f4024, { jitter: 0.4, rotY: ang });
+  }
+  // 足もとの草と、こけ
+  for (let i = 0; i < len * 1.1; i++) {
+    const d = rand(0, len);
+    const side = Math.random() < 0.5 ? -1 : 1;
+    mb.tuft(x1 + ux * d + nx * (TH * 0.55 + rand(0, 0.5)) * side, z1 + uz * d + nz * (TH * 0.55 + rand(0, 0.5)) * side,
+      0.02, rand(0.2, 0.6), 0x2b3a1f, choice([0x475331, 0x5a5236]), 3, 0.22);
+  }
+
+  const t = TH * 0.6;
+  col.add(Math.min(x1, x2) - t, Math.min(z1, z2) - t, Math.max(x1, x2) + t, Math.max(z1, z2) + t, 0, H, "wall");
+}
+
+// 遠くの木。行けない場所に立つだけなので、段を減らして軽くする
+function treeFar(mb, x, z, s) {
+  const H = 3.6 * s, W = 1.5 * s;
+  mb.box(x, H * 0.5, z, 0.16 * s, H, 0.16 * s, 0x33261a, { jitter: 0.16 });
+  const twist = rand(0, 1.57);
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6;
+    const y = 0.62 * s + t * (H - 0.95 * s);
+    const wd = W * (1 - t * 0.82);
+    mb.box(x, y, z, wd, (0.58 - t * 0.16) * s, wd * 0.72,
+      i % 2 ? 0x1e2a15 : 0x253119, { jitter: 0.26, rotY: twist + i * 0.45 });
+  }
+  mb.box(x, H - 0.1 * s, z, 0.18 * s, 0.55 * s, 0.18 * s, 0x1e2a15, { jitter: 0.24 });
+}
+
+// マップの外がわを、ぐるりと針葉樹の林でかこむ。
+//  行けない場所なので、当たり判定は付けない。
+//  空がのぞく高さにおさえ、奥ほど背を低くして遠くに見せる。
+// 針葉樹林の、さらに向こうにつらなる山。
+//  遠くにあるので、空気にかすんで青むらさきに見える。
+//  近づけないので当たり判定はなし。スマホの描画距離（190m）の内がわに置く。
+function buildMountains(ctx) {
+  const { mb } = ctx;
+  const CX = 0, CZ = 26;
+
+  // 山ひとつ。四角い箱を積むと ビルに見えてしまうので、
+  // 「稜線（りょうせん）」を1本ひいて、その線ぞいに
+  // 三角の板を立てていく。どこから見ても 山の形に見える。
+  const peak = (mx, mz, H, W, base, faceA) => {
+    const SEG = 18;                                    // 稜線を きざむ数
+    // 稜線の高さ：まんなかが てっぺんで、両はしが すそ
+    const prof = [];
+    for (let i = 0; i <= SEG; i++) {
+      const t = i / SEG;
+      const s = Math.sin(t * Math.PI);                 // 0→1→0 の山なり
+      // ぎざぎざを すこし足して、自然な形に
+      const rough = 1 + Math.sin(t * 11.3 + mx) * 0.07 + Math.sin(t * 23.7 + mz) * 0.04;
+      prof.push(Math.max(0.5, H * Math.pow(s, 0.78) * rough));
+    }
+    const ux = Math.cos(faceA), uz = Math.sin(faceA);  // 稜線の向き
+    for (let i = 0; i < SEG; i++) {
+      const t0 = i / SEG - 0.5, t1 = (i + 1) / SEG - 0.5;
+      const h0 = prof[i], h1 = prof[i + 1];
+      const hh = (h0 + h1) / 2;
+      const seg = (W / SEG) * 1.35;                    // 少し重ねて すきまを消す
+      const px = mx + ux * ((t0 + t1) / 2) * W;
+      const pz = mz + uz * ((t0 + t1) / 2) * W;
+      // 稜線ぞいの板（うすい壁）を、少しずつ高さを変えて立てる
+      mb.box(px, -6 + hh / 2, pz, seg, hh + 6, seg * 0.5, base, { jitter: 0.07, rotY: faceA });
+      // 手前へ張りだす すそ（横から見ても 厚みが出るように）
+      const foot = Math.max(0.1, hh * 0.5);
+      mb.box(px - uz * W * 0.11, -6 + foot / 2, pz + ux * W * 0.11,
+        seg, foot + 6, seg * 0.75, base, { jitter: 0.1, rotY: faceA });
+      mb.box(px + uz * W * 0.11, -6 + foot / 2, pz - ux * W * 0.11,
+        seg, foot + 6, seg * 0.75, base, { jitter: 0.1, rotY: faceA });
+    }
+  };
+
+  // 手前の低い尾根 → 奥の高い山、の2列で 奥ゆきを出す
+  const ridges = [
+    { dist: 108, count: 13, h: [15, 25], wide: [42, 64], col: [0x2c2b36, 0x32303d] },
+    { dist: 148, count: 11, h: [28, 48], wide: [56, 88], col: [0x342e44, 0x3b3550] },
+  ];
+  for (const R of ridges) {
+    for (let i = 0; i < R.count; i++) {
+      const a2 = (i / R.count) * Math.PI * 2 + rand(-0.12, 0.12);
+      const d = R.dist * rand(0.94, 1.06);
+      const mx = CX + Math.cos(a2) * d, mz = CZ + Math.sin(a2) * d;
+      // 稜線は、こちらを向く向き（見る側に 横顔を見せる）
+      peak(mx, mz, rand(R.h[0], R.h[1]), rand(R.wide[0], R.wide[1]),
+        choice(R.col), a2 + Math.PI / 2 + rand(-0.25, 0.25));
+    }
+  }
+  // いちばん奥に、うっすら もやの層
+  for (let i = 0; i < 26; i++) {
+    const a2 = (i / 26) * Math.PI * 2;
+    mb.box(CX + Math.cos(a2) * 132, 4, CZ + Math.sin(a2) * 132,
+      44, 14, 10, 0x2a2739, { jitter: 0.16, rotY: a2 + Math.PI / 2 });
+  }
+}
+
+function buildForest(ctx) {
+  const { mb, opts } = ctx;
+  const Q = opts && opts.grass !== undefined ? opts.grass : 1;
+
+  // 遊べる場所（この中には生やさない）
+  const inPlay = (x, z) =>
+    (x > -50 && x < 50 && z > 34 && z < 74) ||          // 運動場
+    (x > -44 && x < 44 && z > -2 && z < 36) ||          // 中庭
+    (x > -46 && x < 46 && z > -17 && z < 2) ||          // 校舎
+    (x > -9 && x < 9 && z > -2 && z < 11) ||            // 昇降口まわり
+    (x > 4 && x < 36 && z > -36 && z < -16);            // 秘密の教室の下
+
+  // 遊べる場所のふちから、どれだけ離れているか
+  const outDist = (x, z) => {
+    const dx = Math.max(Math.abs(x) - 50, 0);
+    const dz = z > 20 ? Math.max(z - 74, 0) : Math.max(-17 - z, 0);
+    return Math.max(0.0, Math.hypot(dx, dz));
+  };
+
+  // 林の地面。空がのぞかないよう、外がわ ぜんぶに敷く
+  for (let x = -150; x < 150; x += 15) {
+    for (let z = -110; z < 165; z += 15) {
+      mb.slab(x, z, x + 15, z + 15, -0.03, 0.5, 0x1f2718, { jitter: 0.3 });
+    }
+  }
+
+  // 木。フェンスのすぐ外は高く密に、遠くへいくほど小さく
+  const N = Math.round(1500 * Q);
+  let made = 0;
+  for (let i = 0; i < N * 5 && made < N; i++) {
+    const x = rand(-140, 140), z = rand(-100, 155);
+    if (inPlay(x, z)) continue;
+    const d = outDist(x, z);
+    if (d > 78) continue;
+    const near = 1 - Math.min(1, d / 78);              // 1=フェンスぎわ 0=いちばん奥
+    // ぎわは びっしり、奥は すこし まばらに
+    if (Math.random() > 0.34 + near * 0.62) continue;
+    // ぎわの木ほど大きく、奥は小さく見せる（遠近感）
+    const s = (0.55 + near * near * 1.5) * rand(0.8, 1.3);
+    treeFar(mb, x, z, s);
+    made++;
+  }
+  // フェンスにいちばん近い列は、とくに背を高くして 壁のように立てる
+  const edge = [];
+  for (let x = -56; x <= 56; x += 3.4) { edge.push([x, 78 + rand(-1.6, 2.6)]); edge.push([x, -22 - rand(0, 3)]); }
+  for (let z = -22; z <= 80; z += 3.4) { edge.push([-56 - rand(0, 3), z]); edge.push([56 + rand(0, 3), z]); }
+  for (const [ex, ez] of edge) {
+    if (inPlay(ex, ez)) continue;
+    if (Math.random() > 0.82) continue;
+    treeFar(mb, ex, ez, rand(1.7, 2.6));
+    made++;
+  }
+  return made;
 }
 
 // 針葉樹。細い幹に、上へいくほど小さくなる枝の段を重ねて
@@ -1315,13 +1581,14 @@ function buildField(ctx) {
   for (let i = 0; i < 5; i++) mb.box(cxT - 26 + i * 0.02, 0.18, czT + rz - 1 + i * 1.4, 0.16, 0.025, 1.2, 0x9a9688, { jitter: 0.3 });
 
   // 外周のフェンスと正門
-  fence(mb, col, F.x1, F.z1, F.x1, F.z2);
-  fence(mb, col, F.x2, F.z1, F.x2, F.z2);
-  fence(mb, col, F.x1, F.z2, -5, F.z2);
-  fence(mb, col, 5, F.z2, F.x2, F.z2);
-  // 中庭のフェンスの東西の外側（校門の左右）はそのまま活かす
-  fence(mb, col, F.x1, F.z1, -42, F.z1);
-  fence(mb, col, 42, F.z1, F.x2, F.z1);
+  // 運動場・体育館がわは、ツタのからんだ 立入禁止フェンス
+  wireFence(mb, col, F.x1, F.z1, F.x1, F.z2);
+  wireFence(mb, col, F.x2, F.z1, F.x2, F.z2);
+  wireFence(mb, col, F.x1, F.z2, -5, F.z2);
+  wireFence(mb, col, 5, F.z2, F.x2, F.z2);
+  // 中庭の石垣の東西の外側（校門の左右）をつなぐ
+  wireFence(mb, col, F.x1, F.z1, -42, F.z1);
+  wireFence(mb, col, 42, F.z1, F.x2, F.z1);
   for (const gx of [-5.2, 5.2]) {
     mb.box(gx, 1.8, F.z2, 0.7, 3.6, 0.7, C.stone, { jitter: 0.05 });
     col.add(gx - 0.35, F.z2 - 0.35, gx + 0.35, F.z2 + 0.35, 0, 3.6, "wall");
@@ -1330,20 +1597,12 @@ function buildField(ctx) {
   mb.box(-3.4, 2.5, F.z2 + 0.1, 1.2, 1.6, 0.12, 0x6b5334, { jitter: 0.05 });  // 校名の札
 
   // サッカーゴール
-  for (const [gz, dir] of [[F.z1 + 6, 1], [F.z2 - 6, -1]]) {
-    const gx = 15;
-    for (const sx of [-3.4, 3.4]) {
-      mb.box(gx + sx, 1.2, gz, 0.14, 2.4, 0.14, 0xd8d6cc, { jitter: 0.08 });
-      col.add(gx + sx - 0.1, gz - 0.1, gx + sx + 0.1, gz + 0.1, 0, 2.4, "wall");
-    }
-    mb.box(gx, 2.36, gz, 7.0, 0.14, 0.14, 0xd8d6cc, { jitter: 0.06 });
-    for (let i = 0; i <= 8; i++) mb.box(gx - 3.4 + i * 0.85, 1.2, gz + dir * 0.9, 0.04, 2.3, 0.04, 0xb0b6bc, { jitter: 0.2 });
-  }
+  //  運動場の東はし（校舎がわではなく横）に、向かいあわせで2つ。
+  //  行き来のじゃまにならないよう、トラックの外に置く。
+  soccerGoal(mb, col, props, 44, 43, 1);      // 開いている向き：南（+z）
+  soccerGoal(mb, col, props, 44, 65, -1);     // 開いている向き：北（-z）
 
-  // バックネット
-  for (let i = 0; i <= 10; i++) mb.box(-14 + i * 2.0, 2.4, F.z1 + 3, 0.09, 4.8, 0.09, C.fence, { jitter: 0.1 });
-  mb.wall(-14, F.z1 + 3, 6, F.z1 + 3, 0.2, 4.6, 0.05, 0x4a5057, { jitter: 0.08 });
-  col.add(-14.3, F.z1 + 2.7, 6.3, F.z1 + 3.3, 0, 4.8, "wall");
+  // バックネットは、視界をふさぐのでなくした
 
   // 砂場と百葉箱
   mb.slab(30, 40, 38, 46, 0.16, 0.2, 0xb0a184, { jitter: 0.2 });
@@ -1387,7 +1646,10 @@ function buildField(ctx) {
 
   // 外周の木立
   for (const t of [[-44, 68, 1.2], [-30, 69, 1.0], [8, 69.5, 1.15], [30, 69, 1.05], [45, 66, 1.1],
-                   [45, 44, 1.0], [45, 52, 0.9], [-46, 38, 1.0]]) {
+                   [45, 44, 1.0], [45, 52, 0.9], [-46, 38, 1.0],
+                   [-37, 70, 1.05], [-20, 70.5, 0.9], [-6, 70, 1.1], [18, 70.5, 0.95],
+                   [40, 70, 1.15], [46, 58, 0.95], [46, 50, 1.05], [-46, 46, 0.9],
+                   [-46, 56, 1.0], [-46, 64, 1.1], [46, 38, 0.9]]) {
     tree(mb, col, t[0], t[1], t[2]);
     spawnSpots.push({ x: t[0] + 2.2, z: t[1] - 2, y: 0, floor: 0 });
   }
@@ -1527,7 +1789,61 @@ function buildGym(ctx) {
 
   // 屋根：波トタンの天井と、緑色にぬられた鉄骨のトラス
   const TRUSS = 0x3d5544;                            // 体育館らしい くすんだ緑
-  tiled(mb, G.x1, G.z1, G.x2, G.z2, H, 0.36, 0x554c3e, 7);
+  tiled(mb, G.x1, G.z1, G.x2, G.z2, H, 0.36, 0x554c3e, 7);          // 中から見える天井
+
+  // 外から見える 切妻屋根（三角のかたち）。
+  //  むねは東西に走り、東と西のはしに三角の妻（つま）が見える。
+  {
+    const RISE = 5.2;                                   // むねの高さ
+    const halfD = (G.z2 - G.z1) / 2 + 0.9;              // 軒（のき）の出
+    const cz2 = (G.z1 + G.z2) / 2;
+    const STEPS = 16;
+    const ROOF = 0x2c2b2c, ROOF2 = 0x353334;            // 黒っぽい かわら
+    for (let k = 0; k < STEPS; k++) {
+      const t = k / STEPS, t2 = (k + 1) / STEPS;
+      const y = H - 0.2 + t * RISE;
+      const hh = (RISE / STEPS) * 1.5;
+      for (const s of [-1, 1]) {
+        const zA = cz2 + s * halfD * (1 - t);
+        const zB = cz2 + s * halfD * (1 - t2);
+        mb.box(G.x1 - 0.7 + (G.x2 - G.x1 + 1.4) / 2, y + hh / 2, (zA + zB) / 2,
+          G.x2 - G.x1 + 1.4, hh, Math.abs(zA - zB) + 0.34,
+          k % 2 ? ROOF : ROOF2, { jitter: 0.14 });
+      }
+    }
+    // むね（いちばん上の かわら）
+    mb.box((G.x1 + G.x2) / 2, H - 0.2 + RISE + 0.14, cz2, G.x2 - G.x1 + 1.6, 0.34, 0.7, 0x232223, { jitter: 0.1 });
+
+    // 東と西の 妻（つま）：三角の板壁でふさぐ
+    for (const [xx, side] of [[G.x1, -1], [G.x2, 1]]) {
+      for (let k = 0; k < STEPS; k++) {
+        const t = k / STEPS, t2 = (k + 1) / STEPS;
+        const y = H - 0.2 + t * RISE;
+        const hh = (RISE / STEPS) * 1.12;
+        const wd = (halfD - 0.9) * 2 * (1 - t2);
+        if (wd < 0.2) continue;
+        mb.box(xx + side * 0.12, y + hh / 2, cz2, 0.3, hh, wd, GW, { jitter: 0.2 });
+        mb.box(xx + side * 0.3, y + hh / 2, cz2, 0.06, hh * 0.5, wd * 0.98, C.siding, { jitter: 0.35 });
+      }
+      // 妻のてっぺんの、小さな明かりとり窓
+      mb.box(xx + side * 0.2, H + RISE * 0.52, cz2, 0.16, 0.9, 1.6, C.sash, { jitter: 0.1 });
+      mb.box(xx + side * 0.26, H + RISE * 0.52, cz2, 0.06, 0.7, 1.36, 0x1a1620, { jitter: 0.1 });
+      // 破風板（はふいた）：三角のふちに走る白い板
+      for (const s of [-1, 1]) {
+        for (let k = 0; k < STEPS; k += 2) {
+          const t = k / STEPS;
+          const zz = cz2 + s * halfD * (1 - t);
+          mb.box(xx + side * 0.34, H - 0.1 + t * RISE + 0.16, zz, 0.16, 0.5, 0.5, 0x6f6656, { jitter: 0.18 });
+        }
+      }
+    }
+    // 軒（のき）の下の 垂木（たるき）
+    for (let x = G.x1; x <= G.x2; x += 1.1) {
+      for (const s of [-1, 1]) {
+        mb.box(x, H - 0.32, cz2 + s * (halfD - 0.35), 0.12, 0.16, 1.0, C.post, { jitter: 0.16 });
+      }
+    }
+  }
   for (let z = G.z1 + 2.4; z < G.z2; z += 3.0) {
     // 山形の梁（まんなかが高い）
     for (const s of [-1, 1]) {
@@ -1641,11 +1957,76 @@ function buildGym(ctx) {
 }
 
 // 転がったボール
-function makeBall(x, y, z) {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10),
-    new THREE.MeshLambertMaterial({ color: choice([0xd8721f, 0xc9c4b4, 0x7a4a3a]) }));
-  m.position.set(x, y, z);
-  return { mesh: m, kind: "ball", x, z, update(dt, t) { m.rotation.y = t * 0.2; } };
+// サッカーゴール。柱・クロスバー・後ろへ傾いた支柱・ネットまで作る。
+//  dir は「ゴールが開いている向き」（+1なら南むき）
+function soccerGoal(mb, col, props, gx, gz, dir) {
+  const W = 3.66, H = 2.44, D = 1.9;          // 半幅・高さ・おくゆき
+  const POST = 0xe4e0d4, NET = 0xa8aeb4;
+  const back = gz - dir * D;                  // ネットの後ろがわ
+  // 両わきの柱
+  for (const sx of [-W, W]) {
+    mb.box(gx + sx, H / 2, gz, 0.15, H, 0.15, POST, { jitter: 0.06 });
+    col.add(gx + sx - 0.11, gz - 0.11, gx + sx + 0.11, gz + 0.11, 0, H, "wall");
+    // 後ろへ傾いた支柱
+    mb.box(gx + sx, H / 2 - 0.15, gz - dir * D / 2, 0.11, 0.11, D * 1.06, POST,
+      { jitter: 0.08, rotY: 0 });
+    mb.box(gx + sx, 0.35, back, 0.12, 0.7, 0.12, POST, { jitter: 0.08 });
+  }
+  // クロスバー
+  mb.box(gx, H - 0.07, gz, W * 2 + 0.15, 0.15, 0.15, POST, { jitter: 0.05 });
+  mb.box(gx, 0.62, back, W * 2 + 0.12, 0.12, 0.12, POST, { jitter: 0.07 });
+
+  // ネット：後ろの面（たてよこ）
+  for (let x = -W; x <= W + 0.01; x += 0.42) {
+    mb.box(gx + x, 0.35, back, 0.03, 0.7, 0.03, NET, { jitter: 0.3 });
+  }
+  for (let y = 0.15; y < 0.7; y += 0.2) {
+    mb.box(gx, y, back, W * 2, 0.03, 0.03, NET, { jitter: 0.3 });
+  }
+  // ネット：上の面（クロスバーから後ろへ、ゆるやかに下がる）
+  for (let x = -W; x <= W + 0.01; x += 0.42) {
+    for (let k = 0; k < 4; k++) {
+      const t = (k + 0.5) / 4;
+      mb.box(gx + x, H - 0.1 - t * (H - 0.8), gz - dir * (D * t), 0.03, 0.03, D / 4, NET, { jitter: 0.3 });
+    }
+  }
+  // ネット：両わきの三角
+  for (const sx of [-W, W]) {
+    for (let k = 0; k < 5; k++) {
+      const t = (k + 0.5) / 5;
+      const hh = (H - 0.1) * (1 - t) + 0.7 * t;
+      mb.box(gx + sx, hh / 2, gz - dir * (D * t), 0.03, hh, 0.03, NET, { jitter: 0.3 });
+    }
+  }
+  // ゴールの前の芝はげ（よく蹴られていた あと）
+  mb.box(gx, 0.05, gz + dir * 1.6, W * 2.2, 0.04, 3.4, 0x5a5140, { jitter: 0.3 });
+
+  // ボールを ころがしておく
+  props.push(makeBall(gx + rand(-1.6, 1.6), 0.24, gz - dir * rand(0.3, 1.2), 0.22, true));
+  props.push(makeBall(gx + rand(-4.5, 4.5), 0.24, gz + dir * rand(2.0, 5.0), 0.22, true));
+}
+
+function makeBall(x, y, z, r, soccer) {
+  const rr = r || 0.12;
+  const g = new THREE.Group();
+  const col0 = soccer ? 0xdedad0 : choice([0xd8721f, 0xc9c4b4, 0x7a4a3a]);
+  const m = new THREE.Mesh(new THREE.SphereGeometry(rr, soccer ? 14 : 12, soccer ? 12 : 10),
+    new THREE.MeshLambertMaterial({ color: col0 }));
+  g.add(m);
+  if (soccer) {
+    // 黒いパネルを ぺたぺた貼って、サッカーボールらしく
+    const dark = new THREE.MeshLambertMaterial({ color: 0x2a2a30 });
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2, b = i % 2 ? 0.55 : -0.55;
+      const p = new THREE.Mesh(new THREE.SphereGeometry(rr * 0.42, 6, 5), dark);
+      p.position.set(Math.cos(a) * rr * 0.85, Math.sin(b) * rr * 0.85, Math.sin(a) * rr * 0.85);
+      p.scale.set(1, 1, 0.45);
+      p.lookAt(0, 0, 0);
+      g.add(p);
+    }
+  }
+  g.position.set(x, y, z);
+  return { mesh: g, kind: "ball", x, z, update(dt, t) { g.rotation.y = t * 0.2; } };
 }
 
 // ============================================================
