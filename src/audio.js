@@ -76,7 +76,18 @@ export class Audio {
   }
 
   // --- ゲーム内イベント ------------------------------------
-  pickup()  { this.tone(880, 0.09, "triangle", 0.13); this.tone(1320, 0.13, "triangle", 0.1, null, 0.06); }
+  // レアな色ほど、音が はなやかになる
+  pickup(tier) {
+    const T = tier || 0;
+    this.tone(880, 0.09, "triangle", 0.13);
+    this.tone(1320, 0.13, "triangle", 0.1, null, 0.06);
+    if (T >= 1) this.tone(1760, 0.14, "sine", 0.09, null, 0.11);
+    if (T >= 3) [1976, 2349, 2637].forEach((f, i) => this.tone(f, 0.16, "sine", 0.08, null, 0.16 + i * 0.07));
+    if (T >= 5) {
+      [2637, 3136, 3520, 4186].forEach((f, i) => this.tone(f, 0.3, "triangle", 0.09, null, 0.34 + i * 0.09));
+      this.noise(0.5, 0.05, 6000, 5, 0.3, "highpass");
+    }
+  }
   deny()    { this.tone(180, 0.16, "square", 0.09, 110); }
   click()   { this.tone(660, 0.05, "square", 0.07); }
   place()   { this.tone(300, 0.12, "sine", 0.14, 620); this.noise(0.12, 0.08, 900); }

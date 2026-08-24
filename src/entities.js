@@ -1,33 +1,97 @@
 import * as THREE from "../lib/three.module.js";
 import { clamp, lerp, rand, choice, dist } from "./util.js";
-import { MATERIALS, TRAPS, GHOSTS } from "./data.js";
+import { MATERIALS, TRAPS, GHOSTS, RARITY } from "./data.js";
 
 // ============================================================
 //  落ちている材料
 // ============================================================
 export class Pickup {
-  constructor(scene, kind, x, z, y = 0.55) {
+  // tier は 0〜6（白・水色・青・赤・紫・銀・金）。
+  // 色を見るだけで、どれくらい値うちがあるか分かるようにしてある。
+  constructor(scene, kind, x, z, y = 0.55, tier = 0) {
     this.kind = kind; this.x = x; this.z = z; this.y = y;
     this.taken = false;
-    const def = MATERIALS[kind];
+    this.tier = Math.max(0, Math.min(RARITY.length - 1, tier | 0));
+    const R = RARITY[this.tier];
+    this.R = R;
+    const g = new THREE.Group();
+
     const mat = new THREE.MeshLambertMaterial({
-      color: def.color, emissive: def.color, emissiveIntensity: 0.75,
+      color: R.color, emissive: R.glow, emissiveIntensity: 0.75 + this.tier * 0.12,
       transparent: true, opacity: 0.95,
     });
-    this.mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), mat);
-    this.mesh.position.set(x, y, z);
+    const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.22 * R.size, this.tier >= 4 ? 1 : 0), mat);
+    g.add(core);
+    this.core = core;
     this.mat = mat;
+
+    // レアな色ほど、まわりに ひかりの輪と、まわる かけらが つく
+    if (R.aura > 0) {
+      const halo = new THREE.Mesh(
+        new THREE.SphereGeometry(0.34 * R.size, 12, 10),
+        new THREE.MeshBasicMaterial({ color: R.glow, transparent: true,
+          opacity: 0.1 + R.aura * 0.07, depthWrite: false })
+      );
+      g.add(halo);
+      this.halo = halo;
+    }
+    if (this.tier >= 3) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.34 * R.size, 0.42 * R.size, 20),
+        new THREE.MeshBasicMaterial({ color: R.glow, transparent: true, opacity: 0.5,
+          side: THREE.DoubleSide, depthWrite: false })
+      );
+      ring.rotation.x = -Math.PI / 2.4;
+      g.add(ring);
+      this.ring = ring;
+    }
+    if (this.tier >= 4) {
+      this.bits = [];
+      const bm = new THREE.MeshBasicMaterial({ color: R.glow, transparent: true, opacity: 0.85 });
+      for (let i = 0; i < 3 + this.tier; i++) {
+        const b = new THREE.Mesh(new THREE.OctahedronGeometry(0.05, 0), bm);
+        g.add(b);
+        this.bits.push(b);
+      }
+    }
+    // 金と銀は、遠くからでも見つけられるように 光を持たせる
+    if (this.tier >= 5) {
+      this.light = new THREE.PointLight(R.glow, 1.4, 9, 1.8);
+      g.add(this.light);
+    }
+
+    g.position.set(x, y, z);
+    this.mesh = g;
     this.phase = rand(0, 6.3);
-    scene.add(this.mesh);
+    scene.add(g);
     this.scene = scene;
   }
   update(dt, t) {
-    this.mesh.rotation.y += dt * 1.6;
-    this.mesh.rotation.x = Math.sin(t * 1.3 + this.phase) * 0.3;
-    this.mesh.position.y = this.y + Math.sin(t * 2.2 + this.phase) * 0.12;
-    this.mat.emissiveIntensity = 0.6 + Math.sin(t * 3 + this.phase) * 0.25;
+    const R = this.R, k = 1 + R.aura;
+    this.core.rotation.y += dt * (1.6 + this.tier * 0.25);
+    this.core.rotation.x = Math.sin(t * 1.3 + this.phase) * 0.3;
+    this.mesh.position.y = this.y + Math.sin(t * 2.2 + this.phase) * (0.12 + this.tier * 0.02);
+    this.mat.emissiveIntensity = (0.6 + this.tier * 0.12) + Math.sin(t * 3 + this.phase) * 0.25;
+    if (this.halo) this.halo.scale.setScalar(1 + Math.sin(t * 2.6 + this.phase) * 0.09);
+    if (this.ring) { this.ring.rotation.z += dt * 0.9; this.ring.material.opacity = 0.34 + Math.sin(t * 3.4 + this.phase) * 0.16; }
+    if (this.bits) {
+      for (let i = 0; i < this.bits.length; i++) {
+        const a = t * (1.1 + i * 0.13) + (i / this.bits.length) * 6.283 + this.phase;
+        const rr = 0.42 * R.size;
+        this.bits[i].position.set(Math.cos(a) * rr, Math.sin(a * 1.7) * 0.16, Math.sin(a) * rr);
+        this.bits[i].rotation.y = a * 2;
+      }
+    }
+    if (this.light) this.light.intensity = 1.1 + Math.sin(t * 4 + this.phase) * 0.5;
+    void k;
   }
-  dispose() { this.scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mat.dispose(); }
+  dispose() {
+    this.scene.remove(this.mesh);
+    this.mesh.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) o.material.dispose();
+    });
+  }
 }
 
 // ============================================================

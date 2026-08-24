@@ -1,4 +1,4 @@
-import { MATERIALS, TRAPS, GHOSTS, RANKS } from "./data.js";
+import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, CHARS, EXCHANGE } from "./data.js";
 import { clamp } from "./util.js";
 
 const $ = (s) => document.querySelector(s);
@@ -47,6 +47,27 @@ export class UI {
     const p = next ? clamp((kicked - r.at) / (next.at - r.at), 0, 1) : 1;
     $("#progBar").style.width = (p * 100) + "%";
     return r;
+  }
+
+  // 持っている「かけら」を、色の玉でならべる
+  setShards(shards) {
+    const sig = RARITY.map((R) => shards[R.id] || 0).join(",");
+    if (sig === this._shardSig) return;
+    this._shardSig = sig;
+    const box = $("#shards");
+    if (!box) return;
+    const rows = RARITY.filter((R) => R.id >= 1 && (shards[R.id] || 0) > 0).map((R) =>
+      '<span class="sh"><i style="background:#' + R.glow.toString(16).padStart(6, "0") + '"></i>' +
+      (shards[R.id] || 0) + "</span>");
+    box.innerHTML = rows.join("");
+    box.hidden = rows.length === 0;
+  }
+
+  // いま どのすがたか
+  setCharChip(c) {
+    const e = $("#charChip");
+    if (!e || !c) return;
+    e.textContent = c.icon + " " + c.name;
   }
 
   setPlace(name) { const e = $("#place"); if (e.textContent !== name) e.textContent = name; }
@@ -167,6 +188,7 @@ export class UI {
   renderCraft() {
     const g = this.game;
     const grid = $("#cgrid");
+    if (this.craftTab === "shop") { this.renderShop(grid); return; }
     const isTrap = this.craftTab === "trap";
     const src = isTrap ? TRAPS : GHOSTS;
     grid.innerHTML = Object.entries(src).map(([id, d]) => {
@@ -194,6 +216,67 @@ export class UI {
         if (c.classList.contains("locked")) { g.audio.deny(); return; }
         g.craft(c.dataset.kind, c.dataset.id);
         this.renderCraft();
+      });
+    });
+  }
+
+  // --- 交換所：かけらで、すがた・仕掛け・おばけ と ひきかえる ---
+  renderShop(grid) {
+    const g = this.game;
+    const chip = (cost) => Object.keys(cost).map((k) => {
+      const have = g.shards[k] || 0;
+      const R = RARITY[k];
+      return "<b class='" + (have >= cost[k] ? "" : "lack") + "'>" +
+        '<i class="dot" style="background:#' + R.glow.toString(16).padStart(6, "0") + '"></i>' +
+        R.name + " " + have + "/" + cost[k] + "</b>";
+    }).join("");
+
+    let html = "<div class='shead'>💠 集めた かけら</div><div class='shbag'>" +
+      RARITY.filter((R) => R.id >= 1).map((R) =>
+        '<span class="sh big"><i style="background:#' + R.glow.toString(16).padStart(6, "0") + '"></i>' +
+        R.name + " " + (g.shards[R.id] || 0) + "</span>").join("") +
+      "</div><div class='snote'>かけらは、マップのすみや 屋上、秘密の教室など" +
+      "「ふつうは行かない場所」で 光っているアイテムから 手に入ります。</div>";
+
+    // すがた
+    html += "<div class='shead'>🎭 すがたを かえる</div><div class='cgrid2'>";
+    html += Object.entries(CHARS).sort((a, b) => a[1].order - b[1].order).map(([id, c]) => {
+      const owned = !!g.chars[id];
+      const now = g.charId === id;
+      const can = owned || g.canPayShards(c.cost);
+      const cls = now ? "card now" : owned ? "card can" : can ? "card can" : "card no";
+      return "<div class='" + cls + "' data-kind='char' data-id='" + id + "'>" +
+        "<h4>" + c.icon + " " + c.name + (now ? "　<span class='now'>いま これ</span>" : "") + "</h4>" +
+        "<div class='d'>" + c.desc + "</div>" +
+        "<div class='stat'>はやさ ×" + c.speed.toFixed(2) + "／こわさ ×" + c.scare.toFixed(2) +
+        "／とどく ×" + c.reach.toFixed(2) + "／すりぬけ ×" + c.phase.toFixed(2) + "</div>" +
+        "<div class='stat' style='color:var(--gold)'>" + c.tip + "</div>" +
+        (owned ? "<div class='cost'><b>" + (now ? "えらんでいます" : "おしてえらぶ") + "</b></div>"
+               : "<div class='cost'>" + chip(c.cost) + "</div>") +
+        "</div>";
+    }).join("") + "</div>";
+
+    // 仕掛け・おばけ
+    const sec = (title, kind, table, src) => {
+      let s = "<div class='shead'>" + title + "</div><div class='cgrid2'>";
+      s += Object.entries(table).map(([id, cost]) => {
+        const d = src[id];
+        if (!d) return "";
+        const can = g.canPayShards(cost);
+        return "<div class='card " + (can ? "can" : "no") + "' data-kind='" + kind + "' data-id='" + id + "'>" +
+          "<h4>" + d.icon + " " + d.name + "</h4>" +
+          "<div class='d'>" + d.desc + "</div>" +
+          "<div class='cost'>" + chip(cost) + "</div></div>";
+      }).join("");
+      return s + "</div>";
+    };
+    html += sec("🪤 かけらで 仕掛けを もらう", "trap", EXCHANGE.traps, TRAPS);
+    html += sec("👻 かけらで おばけを 呼ぶ", "ghost", EXCHANGE.ghosts, GHOSTS);
+
+    grid.innerHTML = html;
+    grid.querySelectorAll(".card").forEach((c) => {
+      c.addEventListener("click", () => {
+        g.exchange(c.dataset.kind, c.dataset.id);
       });
     });
   }

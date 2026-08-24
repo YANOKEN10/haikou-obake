@@ -62,6 +62,7 @@ export function buildWorld(scene, opts = {}) {
   buildForest(ctx);
   buildMountains(ctx);
 
+  markRemote(ctx);
   linkNav(ctx);
   col.build();
   nav.autoLink(col, 12);
@@ -380,14 +381,14 @@ function buildRoof(ctx) {
     mb.box(b2[0], top + 0.42, b2[1], 2.0, 0.1, 0.5, C.wood, { jitter: 0.1 });
     for (const s2 of [-0.8, 0.8]) mb.box(b2[0] + s2, top + 0.2, b2[1], 0.1, 0.44, 0.4, C.metal);
     col.add(b2[0] - 1, b2[1] - 0.3, b2[0] + 1, b2[1] + 0.3, top, top + 0.5, "furn");
-    spawnSpots.push({ x: b2[0] + 1.6, z: b2[1] + 1, y: top, floor: FLOORS });
+    spawnSpots.push({ x: b2[0] + 1.6, z: b2[1] + 1, y: top, floor: FLOORS , roof: true });
   }
   // 水たまりと落ち葉
   for (let i = 0; i < 60; i++) {
     mb.box(rand(BX1 + 2, BX2 - 2), top + 0.02, rand(RZ1 + 1, HZ2 - 1), rand(0.3, 1.2), 0.02, rand(0.3, 1.2),
       choice([0x4a4438, 0x3a4a44, 0x5c4433]), { jitter: 0.4, rotY: rand(0, 3.14) });
   }
-  for (let i = 0; i < 10; i++) spawnSpots.push({ x: rand(BX1 + 3, BX2 - 3), z: rand(RZ1 + 2, HZ2 - 2), y: top, floor: FLOORS });
+  for (let i = 0; i < 10; i++) spawnSpots.push({ x: rand(BX1 + 3, BX2 - 3), z: rand(RZ1 + 2, HZ2 - 2), y: top, floor: FLOORS , roof: true });
   props.push(makeCobweb(BX1 + 1.5, top + 1.5, RZ1 + 1.5, 1.1));
 
   rooms.push({ id: "roof", name: "屋上", floor: FLOORS, cx: 0, cz: -7, y: top,
@@ -885,6 +886,39 @@ function tiled(mb, x1, z1, x2, z2, y, thick, color, step) {
 // ============================================================
 //  経路の点をならべる
 // ============================================================
+// それぞれの湧き場所が「どれくらい へんぴか」を決める
+function markRemote(ctx) {
+  const { spawnSpots } = ctx;
+  for (const s of spawnSpots) {
+    let far = 0;
+    const x = s.x, z = s.z, f = s.floor || 0;
+
+    if (s.rich) {
+      far = 1.0;                                   // 秘密の教室：すりぬけでしか行けない
+    } else if (z > FIELD.z1) {
+      // 運動場：まんなか（トラック）は ふつう、すみへ行くほど へんぴ
+      const ex = Math.min(x - FIELD.x1, FIELD.x2 - x) / ((FIELD.x2 - FIELD.x1) / 2);
+      const ez = Math.min(z - FIELD.z1, FIELD.z2 - z) / ((FIELD.z2 - FIELD.z1) / 2);
+      far = 1 - Math.min(1, Math.min(ex, ez) * 1.3);
+      // 四すみは とくに へんぴ
+      if (Math.min(ex, ez) < 0.16) far = Math.max(far, 0.92);
+      // 体育館の裏（校舎から見えない南がわ）
+      if (x > GYM.x1 - 3 && x < GYM.x2 + 3 && z > GYM.z2) far = Math.max(far, 0.9);
+    } else if (z > 1.6) {
+      // 中庭：校舎ぎわは ふつう、フェンスぎわほど へんぴ
+      const ex = Math.min(x - YARD.x1, YARD.x2 - x) / ((YARD.x2 - YARD.x1) / 2);
+      far = Math.max(0, Math.min(1, (z - 6) / 26) * 0.55 + (1 - Math.min(1, ex * 1.4)) * 0.6);
+    } else {
+      // 校舎のなか：上の階ほど、そして 東西のはしの部屋ほど へんぴ
+      far = f * 0.17 + (Math.abs(x) / 42) * 0.4;
+      if (f >= 3) far += 0.14;                     // 4階は だれも上がってこない
+    }
+    // 屋上は とくべつ
+    if (s.roof) far = Math.max(far, 0.88);
+    s.far = Math.max(0, Math.min(1, far));
+  }
+}
+
 function linkNav(ctx) {
   const { nav } = ctx;
   for (let f = 0; f < FLOORS; f++) {

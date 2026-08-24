@@ -11,7 +11,7 @@ import { Pickup, Trap, Summon, FloatText, RedLady, Cat, Confession, PeerGhost } 
 import { Net } from "./net.js";
 import { UI } from "./ui.js";
 import { Audio } from "./audio.js";
-import { MATERIALS, TRAPS, GHOSTS, RANKS } from "./data.js";
+import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, pickRarity, CHARS, EXCHANGE } from "./data.js";
 import { Roster } from "./people.js";
 import { clamp, rand, randi, choice, dist } from "./util.js";
 const FLOOR_HEIGHT_HALF = 3.2;
@@ -106,6 +106,8 @@ class Game {
     this.spawnTimer = 6;
     this.scareFx = 0;
     this.rankName = RANKS[0].name;
+    this.charId = "hitotsume";
+    if (this.player && this.player.setChar) this.player.setChar("hitotsume");
 
     this.roster = new Roster(100);
     this.humans = [];
@@ -205,17 +207,32 @@ class Game {
     const spots = this.world.spawnSpots;
     if (!spots.length || this.pickups.length > this.q.maxPickups) return;
     const s = choice(spots);
-    const table = ["hokori", "hokori", "hokori", "chalk", "chalk", "uwabaki", "pan", "denchi", "nurunuru"];
+    const table = ["hokori", "hokori", "hokori", "chalk", "chalk", "uwabaki", "pan", "denchi", "nurunuru", "wax", "kami"];
     const kind = choice(table);
     const y = s.y || 0;
     const r = this.world.colliders.resolve(s.x + rand(-0.8, 0.8), s.z + rand(-0.8, 0.8), 0.3, y + 0.6);
-    this.pickups.push(new Pickup(this.scene, kind, r.x, r.z, y + rand(0.45, 0.75)));
+    // へんぴな場所ほど、いい色が出る
+    const tier = pickRarity(s.far || 0);
+    this.pickups.push(new Pickup(this.scene, kind, r.x, r.z, y + rand(0.45, 0.75), tier));
   }
 
-  dropAt(kind, x, z, y) {
+  // 人間が落とすもの。おどかした場所が へんぴなら、いい色で落ちる
+  dropAt(kind, x, z, y, tier) {
     const yy = y || 0;
     const r = this.world.colliders.resolve(x + rand(-0.6, 0.6), z + rand(-0.6, 0.6), 0.3, yy + 0.6);
-    this.pickups.push(new Pickup(this.scene, kind, r.x, r.z, yy + 0.55));
+    const t = tier === undefined ? pickRarity(this.remoteAt(x, z, yy) * 0.7) : tier;
+    this.pickups.push(new Pickup(this.scene, kind, r.x, r.z, yy + 0.55, t));
+  }
+
+  // その場所の「へんぴさ」を、近くの湧き場所から しらべる
+  remoteAt(x, z, y) {
+    let best = 0.35, bd = 1e9;
+    for (const s of this.world.spawnSpots) {
+      if (Math.abs((s.y || 0) - (y || 0)) > 2.5) continue;
+      const d = dist(s.x, s.z, x, z);
+      if (d < bd) { bd = d; best = s.far === undefined ? 0.35 : s.far; }
+    }
+    return best;
   }
 
   // --- 人間の襲来 --------------------------------------------
@@ -244,6 +261,66 @@ class Game {
     if (came === 0) return;                       // 全員かぶったときは、なにも起きない
     this.ui.toast("第" + this.wave + "陣：" + group.label + "（" + came + "人）が来た…", "bad");
     this.audio.tone(180, 0.7, "sawtooth", 0.1, 90);
+  }
+
+  // ============================================================
+  //  交換所：かけらを、仕掛け・おばけ・すがた と ひきかえる
+  // ============================================================
+  canPayShards(cost) {
+    for (const k in cost) if ((this.shards[k] || 0) < cost[k]) return false;
+    return true;
+  }
+  payShards(cost) {
+    for (const k in cost) this.shards[k] -= cost[k];
+    this.ui.setShards(this.shards);
+  }
+  shardCostText(cost) {
+    return Object.keys(cost).map((k) => RARITY[k].name + "×" + cost[k]).join("　");
+  }
+
+  exchange(kind, id) {
+    const cost = kind === "char" ? (CHARS[id] || {}).cost : (EXCHANGE[kind === "trap" ? "traps" : "ghosts"] || {})[id];
+    if (!cost) { this.audio.deny(); return; }
+    if (kind === "char" && this.chars[id]) { this.setChar(id); return; }
+    if (!this.canPayShards(cost)) {
+      this.audio.deny();
+      this.ui.toast("かけらが 足りない（" + this.shardCostText(cost) + "）", "bad");
+      return;
+    }
+    this.payShards(cost);
+    if (kind === "trap") {
+      this.built[id] = (this.built[id] || 0) + 1;
+      this.selTrap = Object.keys(TRAPS).indexOf(id);
+      this.ui.setHotbar(this.built, this.selTrap);
+      this.ui.toast(TRAPS[id].icon + " " + TRAPS[id].name + " と ひきかえた！", "good");
+      this.audio.place();
+    } else if (kind === "ghost") {
+      const pl = this.player;
+      const r = this.world.colliders.resolve(pl.x + rand(-2, 2), pl.z + rand(-2, 2), 0.4, pl.y);
+      this.summons.push(new Summon(this.scene, this.world, id, r.x, r.z));
+      this.bump("ghostsSummoned"); this.bumpIn("byGhost", id);
+      this.ui.toast(GHOSTS[id].icon + " " + GHOSTS[id].name + " と ひきかえた！", "gold");
+      this.audio.summon();
+    } else {
+      this.chars[id] = 1;
+      this.bumpIn("byChar", id);
+      this.ui.toast("✨ " + CHARS[id].icon + " " + CHARS[id].name + " が つかえるようになった！", "gold");
+      this.audio.rankUp();
+      this.setChar(id);
+    }
+    this.ui.renderCraft();
+  }
+
+  // すがたを 着がえる
+  setChar(id) {
+    if (!this.chars[id]) { this.audio.deny(); return; }
+    if (this.player.setChar(id)) {
+      this.charId = id;
+      this.ui.toast(CHARS[id].icon + " " + CHARS[id].name + " に なった！", "good");
+      this.ui.setCharChip(CHARS[id]);
+      this.audio.summon();
+      this.ui.renderCraft();
+    }
   }
 
   // --- 作成 --------------------------------------------------
@@ -344,7 +421,7 @@ class Game {
   doScare() {
     const p = this.player;
     if (p.scareCooldown > 0) return;
-    let best = null, bd = 5.2;
+    let best = null, bd = 5.2 * p.C.reach;
     for (const h of this.humans) {
       if (h.out) continue;
       const d = dist(p.x, p.z, h.x, h.z);
@@ -365,7 +442,7 @@ class Game {
     // ネコも おどろく（人間より すこし近くでないと気づかない）
     if (this.cat && this.cat.active && this.cat.startled <= 0) {
       const cp = this.cat.g.position;
-      if (dist(cp.x, cp.z, p.x, p.z) < 4.2 &&
+      if (dist(cp.x, cp.z, p.x, p.z) < 4.2 * p.C.reach &&
           this.world.colliders.lineOfSight(p.x, p.z, cp.x, cp.z, 1.0, 0.6) &&
           this.cat.scare(p.x, p.z)) {
         this.audio.scare();
@@ -392,7 +469,9 @@ class Game {
     const ang = Math.atan2(p.x - best.x, p.z - best.z);
     let diff = Math.abs(((ang - best.yaw + Math.PI) % (Math.PI * 2)) - Math.PI);
     const behind = diff > 1.7;
-    let amount = 34 * (behind ? 1.75 : 1.0) * (bd < 2.5 ? 1.2 : 1.0);
+    // あまのじゃくは ふいうちが とくい
+    const behindK = p.charId === "amanojaku" ? 2.5 : 1.75;
+    let amount = 34 * p.C.scare * (behind ? behindK : 1.0) * (bd < 2.5 ? 1.2 : 1.0);
     if (best.seenGhostT > 0.2) amount *= 0.7;      // 見られていると効きが悪い
 
     const eff = best.addFear(amount, p.x, p.z, "direct", "おどかし");
@@ -486,10 +565,28 @@ class Game {
       const it = this.pickups[i];
       it.update(dt, t);
       if (dist(it.x, it.z, p.x, p.z) < 1.35 && Math.abs(it.y - p.y) < 1.8) {
-        this.inv[it.kind] = (this.inv[it.kind] || 0) + 1;
+        const R = RARITY[it.tier || 0];
+        this.inv[it.kind] = (this.inv[it.kind] || 0) + R.mult;
         this.bump("materials");
-        this.audio.pickup();
-        this.texts.push(new FloatText(this.scene, MATERIALS[it.kind].icon + "+1", it.x, it.y + 0.9, it.z, "#9fe8ff", 1.15));
+        this.bumpIn("byRarity", R.name);
+        this.best("bestRarity", it.tier || 0);
+        // 白いじょうは「かけら」も もらえる。交換所で つかう
+        if (it.tier >= 1) {
+          this.shards[it.tier] = (this.shards[it.tier] || 0) + 1;
+          this.ui.setShards(this.shards);
+        }
+        this.audio.pickup(it.tier || 0);
+        const col = "#" + R.glow.toString(16).padStart(6, "0");
+        this.texts.push(new FloatText(this.scene,
+          MATERIALS[it.kind].icon + "+" + R.mult + (it.tier ? "（" + R.name + "）" : ""),
+          it.x, it.y + 0.9, it.z, col, 1.15 + (it.tier || 0) * 0.12));
+        // 赤いじょうは、見つけたことを ちゃんと知らせる
+        if ((it.tier || 0) >= 3) {
+          this.ui.toast(["", "", "", "🔴 赤の", "🟣 紫の", "⚪ 銀の", "🟡 金の"][it.tier] +
+            MATERIALS[it.kind].name + " を見つけた！　＋" + R.mult,
+            it.tier >= 5 ? "gold" : "good");
+          this.ui.flash(0.1 + it.tier * 0.04);
+        }
         it.dispose();
         this.pickups.splice(i, 1);
         if (this.ui.craftOpen) this.ui.renderCraft();
@@ -779,6 +876,9 @@ class Game {
     p.inv = { ...this.inv };
     p.built = { ...this.built };
     p.selTrap = this.selTrap;
+    p.shards = { ...this.shards };
+    p.chars = { ...this.chars };
+    p.charId = this.charId;
     p.traps = this.traps.map((t) => ({ id: t.id, x: +t.x.toFixed(2), z: +t.z.toFixed(2), uses: t.uses }));
     p.pos = { x: +this.player.x.toFixed(2), z: +this.player.z.toFixed(2) };
     p.playSeconds = Math.round(p.playSeconds || 0);
@@ -802,6 +902,11 @@ class Game {
   // セーブデータを読みこんで反映する
   applySave(p) {
     this.kicked = p.kicked || 0;
+    this.shards = { ...(p.shards || {}) };
+    this.chars = { hitotsume: 1, ...(p.chars || {}) };
+    if (p.charId && this.chars[p.charId]) { this.charId = p.charId; this.player.setChar(p.charId); }
+    this.ui.setShards(this.shards);
+    this.ui.setCharChip(CHARS[this.charId]);
     this.wave = p.wave || 0;
     this.inv = { ...(p.inv || {}) };
     this.built = { ...(p.built || {}) };
@@ -827,6 +932,9 @@ class Game {
     for (const x of this.texts) this.scene.remove(x.sprite);
     this.humans = []; this.traps = []; this.summons = []; this.pickups = []; this.texts = [];
     this.inv = {}; this.built = {};
+    this.shards = {};                      // 色ごとの かけら
+    this.chars = { hitotsume: 1 };          // 使えるすがた
+    this.charId = "hitotsume";
     this.kicked = 0; this.wave = 0; this.selTrap = 0;
     this.waveTimer = 0; this.spawnTimer = 6; this.scareFx = 0;
     this.rankName = RANKS[0].name;
@@ -838,6 +946,8 @@ class Game {
     this.ui.setRank(0);
     this.ui.setBag(this.inv);
     this.ui.setHotbar(this.built, this.selTrap);
+    this.ui.setShards(this.shards);
+    this.ui.setCharChip(CHARS[this.charId] || CHARS.hitotsume);
     this.ui.setHumans(this.humans);
     this.ui.vignette(0);
   }

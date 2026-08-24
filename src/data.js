@@ -15,6 +15,114 @@ export const MATERIALS = {
   kami:    { name: "しめった半紙",   icon: "📜", color: 0xe8e4d4, desc: "書道の時間の残り。まだ字が読める。読まないほうがいい。" },
 };
 
+// --- アイテムの値うち（色で分かる7段階）----------------------
+//  白がふつう、金がいちばんレア。
+//  レアな色ほど、いちどに たくさん手に入る。
+//  マップのはしや、ふつうは行かない場所ほど、いい色が落ちている。
+export const RARITY = [
+  { id: 0, name: "白",   color: 0xf2efe6, glow: 0xffffff, mult: 1,  aura: 0.0,  size: 1.00 },
+  { id: 1, name: "水色", color: 0x8fe3ff, glow: 0x8fe3ff, mult: 2,  aura: 0.35, size: 1.10 },
+  { id: 2, name: "青",   color: 0x4a7dff, glow: 0x4a7dff, mult: 3,  aura: 0.5,  size: 1.20 },
+  { id: 3, name: "赤",   color: 0xff4a4a, glow: 0xff5a3a, mult: 5,  aura: 0.7,  size: 1.32 },
+  { id: 4, name: "紫",   color: 0xb44aff, glow: 0xc46aff, mult: 8,  aura: 0.9,  size: 1.45 },
+  { id: 5, name: "銀",   color: 0xdfe6ee, glow: 0xeaf2ff, mult: 14, aura: 1.15, size: 1.6 },
+  { id: 6, name: "金",   color: 0xffd23a, glow: 0xffc21a, mult: 25, aura: 1.5,  size: 1.8 },
+];
+
+// その場所の「へんぴさ」から、色を決める。
+//  far は 0（ふつうに歩く場所）〜1（すみっこ・屋上・秘密の教室）。
+//  それぞれの色の出やすさを、下の2つの表のあいだで まぜあわせる。
+//  しきい値ではなく「重み」で決めているので、
+//  かならず 白 ＞ 水色 ＞ … ＞ 金 の順に めずらしくなる。
+//                白    水色    青    赤    紫     銀     金
+const W_NEAR = [ 720,  200,   62,   16,   2.0,  0.35,  0.06];   // ふつうの場所
+const W_FAR  = [ 180,  230,   215,  190,  120,   48,    17 ];   // へんぴな場所
+
+export function pickRarity(far, luck) {
+  const f = Math.max(0, Math.min(1, far)) * (luck === undefined ? 1 : luck);
+  const g = Math.max(0, Math.min(1, f));
+  let total = 0;
+  const w = [];
+  for (let i = 0; i < 7; i++) {
+    // へんぴさが上がるほど、レアがわの表に近づく（後半ほど強く効かせる）
+    const k = Math.pow(g, 1 + i * 0.28);
+    const v = W_NEAR[i] * (1 - k) + W_FAR[i] * k;
+    w.push(v);
+    total += v;
+  }
+  let r = Math.random() * total;
+  for (let i = 0; i < 7; i++) { r -= w[i]; if (r <= 0) return i; }
+  return 0;
+}
+
+// --- あやつれる おばけ（キャラ）------------------------------
+//  レアな色の「かけら」で 交換所を開くと、新しい すがたが使える。
+//  すがたが変わると、動きや とくいわざも変わる。
+export const CHARS = {
+  hitotsume: {
+    name: "一つ目小僧", icon: "👁", order: 0,
+    cost: {},                                  // はじめから使える
+    speed: 1.00, dash: 1.00, phase: 1.00, scare: 1.00, reach: 1.00, size: 1.00,
+    body: 0xdfeaf5, glow: 0x5d7fa8,
+    desc: "みんなのおともだち。とくいも にがても ない、ふつうのおばけ。",
+    tip: "まずは この子で 廃校を おぼえよう。",
+  },
+  karakasa: {
+    name: "唐傘おばけ", icon: "🌂", order: 1,
+    cost: { 2: 6, 1: 10 },                     // 青6・水色10
+    speed: 1.05, dash: 1.15, phase: 1.45, scare: 0.95, reach: 1.0, size: 1.02,
+    body: 0xe8d0c0, glow: 0xc4564a,
+    desc: "ぴょんぴょん はねる 一本足の傘。すりぬけが とても長もちする。",
+    tip: "壁のなかを ずっと 進んでいられる。かくれんぼが とくい。",
+  },
+  amanojaku: {
+    name: "あまのじゃく", icon: "😈", order: 2,
+    cost: { 3: 5, 2: 12 },                     // 赤5・青12
+    speed: 1.10, dash: 1.05, phase: 0.9, scare: 1.15, reach: 1.05, size: 0.94,
+    body: 0xc8e0a8, glow: 0x4a7a2a,
+    desc: "人の いやがることを する 小さな鬼。ふいうちが とくべつ よく効く。",
+    tip: "うしろから おどかすと、ほかの子より ずっと こわがらせられる。",
+  },
+  kappa: {
+    name: "河童", icon: "🥒", order: 3,
+    cost: { 3: 12, 4: 3 },                     // 赤12・紫3
+    speed: 1.22, dash: 1.30, phase: 1.0, scare: 1.05, reach: 1.0, size: 1.06,
+    body: 0x7fd6a8, glow: 0x2a7a5a,
+    desc: "皿の水が かわくと 元気がなくなる。足の速さは 廃校いちばん。",
+    tip: "だっしゅが 長もちする。運動場を 走りまわるのに ぴったり。",
+  },
+  tengu: {
+    name: "天狗", icon: "🍃", order: 4,
+    cost: { 4: 10, 5: 3 },                     // 紫10・銀3
+    speed: 1.12, dash: 1.15, phase: 1.1, scare: 1.25, reach: 1.45, size: 1.12,
+    body: 0xe8a08a, glow: 0x8a2a1a,
+    desc: "高いところが 好きな 山のぬし。はなれた ところからでも おどかせる。",
+    tip: "とどく はんいが とても広い。上から まとめて おどかそう。",
+  },
+  kyubi: {
+    name: "九尾", icon: "🦊", order: 5,
+    cost: { 5: 10, 6: 3 },                     // 銀10・金3
+    speed: 1.28, dash: 1.28, phase: 1.35, scare: 1.4, reach: 1.25, size: 1.1,
+    body: 0xffe0a0, glow: 0xffa03a,
+    desc: "九つの尾を もつ 大妖怪。すべてが ずばぬけている。",
+    tip: "廃校の ぬしにふさわしい すがた。ここまで来たら 無敵。",
+  },
+};
+
+// 交換所で、かけらと ひきかえられるもの
+//  cost は { レア度の番号: 数 }
+export const EXCHANGE = {
+  traps: {
+    locker: { 1: 2 }, chalk: { 1: 3 }, uwabaki: { 1: 2 }, suido: { 1: 3 },
+    fumikiri: { 1: 4 }, kyuushoku: { 2: 2 }, tsuru: { 2: 3 }, kagami: { 2: 3 },
+    piano: { 2: 4 }, housou: { 3: 2 }, jintai: { 3: 3 }, ofuda: { 3: 4 },
+  },
+  ghosts: {
+    hitotsume: { 1: 4 }, randoseru: { 2: 4 }, kubinashi: { 3: 3 },
+    hanako: { 3: 5 }, kagerou: { 4: 4 }, ranchi: { 5: 3 }, ookami: { 6: 2 },
+  },
+};
+
 // 人間が落とす（ドロップ）テーブル
 export const HUMAN_DROPS = ["onnen", "onnen", "denchi", "pan", "hokori", "wax", "kami"];
 

@@ -1,6 +1,7 @@
 import * as THREE from "../lib/three.module.js";
 import { clamp, lerp, angleLerp } from "./util.js";
 import { FLOOR_H, FLOORS, stairSurface } from "./world.js";
+import { CHARS } from "./data.js";
 
 // ============================================================
 //  プレイヤー（おばけ）と3人称カメラ
@@ -9,8 +10,10 @@ import { FLOOR_H, FLOORS, stairSurface } from "./world.js";
 export const GHOST_SCALE = 0.5;
 
 export class Player {
-  constructor(scene, world) {
+  constructor(scene, world, charId) {
     this.world = world;
+    this.charId = CHARS[charId] ? charId : "hitotsume";
+    this.C = CHARS[this.charId];
     this.x = 0; this.y = 1.5; this.z = 20;
     this.vx = 0; this.vz = 0; this.vy = 0;
     this.yaw = Math.PI;
@@ -29,7 +32,7 @@ export class Player {
     this.stamina = 100;
 
     this.group = new THREE.Group();
-    this.group.scale.setScalar(GHOST_SCALE);
+    this.group.scale.setScalar(GHOST_SCALE * this.C.size);
     this.build();
     scene.add(this.group);
 
@@ -38,9 +41,30 @@ export class Player {
     this.group.add(this.light);
   }
 
+  // すがたを 着がえる（かけらで 開放したキャラに）
+  setChar(id) {
+    if (!CHARS[id] || id === this.charId) return false;
+    this.charId = id;
+    this.C = CHARS[id];
+    // いまの見た目を すべて消して、作りなおす
+    while (this.group.children.length) {
+      const o = this.group.children[0];
+      this.group.remove(o);
+      o.traverse && o.traverse((q) => {
+        if (q.geometry) q.geometry.dispose();
+        if (q.material && q.material !== this.bodyMat && q.material !== this.eyeMat) q.material.dispose();
+      });
+    }
+    this.build();
+    this.group.add(this.light);
+    this.group.scale.setScalar(GHOST_SCALE * this.C.size);
+    return true;
+  }
+
   build() {
+    const C = this.C || CHARS.hitotsume;
     const bodyMat = new THREE.MeshLambertMaterial({
-      color: 0xdfeaf5, emissive: 0x5d7fa8, emissiveIntensity: 0.55,
+      color: C.body, emissive: C.glow, emissiveIntensity: 0.55,
       transparent: true, opacity: 0.93,
     });
     this.bodyMat = bodyMat;
@@ -56,7 +80,7 @@ export class Player {
     this.skirtGeo = skirtGeo;
     this.skirtBase = skirtGeo.attributes.position.array.slice();
     const skirt = new THREE.Mesh(skirtGeo, new THREE.MeshLambertMaterial({
-      color: 0xd6e3f0, emissive: 0x4a6b92, emissiveIntensity: 0.45,
+      color: C.body, emissive: C.glow, emissiveIntensity: 0.45,
       transparent: true, opacity: 0.9, side: THREE.DoubleSide,
     }));
     this.skirtMat = skirt.material;
@@ -86,7 +110,7 @@ export class Player {
 
     // 壁にさえぎられたときに、輪郭だけ手前に描くためのコピー
     const xrayMat = new THREE.MeshBasicMaterial({
-      color: 0x9fd8ff, transparent: true, opacity: 0.42,
+      color: C.glow, transparent: true, opacity: 0.42,
       depthTest: false, depthWrite: false,
     });
     this.xrayMat = xrayMat;
@@ -107,6 +131,133 @@ export class Player {
     this.handL.position.set(-0.55, 1.0, 0.1);
     this.handR.position.set(0.55, 1.0, 0.1);
     this.group.add(this.handL, this.handR);
+
+    this.decorate(bodyMat, eyeMat);
+  }
+
+  // すがたごとの かざり。ここだけ 変えれば 見た目が変わる
+  decorate(bodyMat, eyeMat) {
+    const id = this.charId;
+    const C = this.C;
+    const accent = new THREE.MeshLambertMaterial({ color: C.glow, emissive: C.glow, emissiveIntensity: 0.5 });
+    this.extras = [];
+    const add = (m) => { this.group.add(m); this.extras.push(m); return m; };
+
+    if (id === "hitotsume") {
+      // 目をひとつにする（右目を消して、左目を まんなかに大きく）
+      this.eyeR.visible = false;
+      this.eyeL.position.set(0, 1.34, 0.44);
+      this.eyeL.scale.set(1.9, 2.0, 0.8);
+      const white = add(new THREE.Mesh(new THREE.SphereGeometry(0.29, 14, 12),
+        new THREE.MeshBasicMaterial({ color: 0xfdfdf5 })));
+      white.position.set(0, 1.34, 0.36);
+      white.scale.set(1, 1, 0.6);
+      this.group.remove(this.eyeL); this.group.add(this.eyeL);   // 白目より手前へ
+
+    } else if (id === "karakasa") {
+      // 開いた傘と、一本足と、長い舌
+      const canopy = add(new THREE.Mesh(new THREE.ConeGeometry(0.92, 0.62, 10, 1, true), accent));
+      canopy.position.y = 1.72;
+      for (let i = 0; i < 10; i++) {
+        const rib = add(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.9),
+          new THREE.MeshBasicMaterial({ color: 0x4a3524 })));
+        const a = (i / 10) * Math.PI * 2;
+        rib.position.set(Math.cos(a) * 0.44, 1.58, Math.sin(a) * 0.44);
+        rib.rotation.set(0.32, -a, 0);
+      }
+      const pole = add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.5, 8),
+        new THREE.MeshLambertMaterial({ color: 0x6a4a2a })));
+      pole.position.y = 1.1;
+      const foot = add(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.12, 0.6),
+        new THREE.MeshLambertMaterial({ color: 0x3a2a1a })));
+      foot.position.set(0, 0.16, 0.08);
+      this.foot = foot;
+      const tongue = add(new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.42, 0.06),
+        new THREE.MeshBasicMaterial({ color: 0xd8455a })));
+      tongue.position.set(0, 0.92, 0.44);
+      this.tongue = tongue;
+      this.eyeR.visible = false;
+      this.eyeL.position.set(0, 1.34, 0.44);
+      this.eyeL.scale.set(1.7, 1.8, 0.8);
+
+    } else if (id === "amanojaku") {
+      // 小さな2本の角と、とがった歯
+      for (const sx of [-0.2, 0.2]) {
+        const horn = add(new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.34, 6), accent));
+        horn.position.set(sx, 1.72, 0.06);
+        horn.rotation.z = sx > 0 ? -0.24 : 0.24;
+      }
+      for (let i = 0; i < 5; i++) {
+        const tooth = add(new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 4),
+          new THREE.MeshBasicMaterial({ color: 0xfdfdf5 })));
+        tooth.position.set(-0.18 + i * 0.09, 1.03, 0.46);
+        tooth.rotation.x = Math.PI;
+      }
+      this.eyeL.scale.set(1.2, 0.7, 0.6);
+      this.eyeR.scale.set(1.2, 0.7, 0.6);
+
+    } else if (id === "kappa") {
+      // 頭の皿、くちばし、背中の甲羅
+      const dish = add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.09, 14),
+        new THREE.MeshLambertMaterial({ color: 0xf2e9a0, emissive: 0x8a7a20, emissiveIntensity: 0.4 })));
+      dish.position.y = 1.66;
+      const water = add(new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.05, 14),
+        new THREE.MeshBasicMaterial({ color: 0x6ac8ff, transparent: true, opacity: 0.8 })));
+      water.position.y = 1.71;
+      const beak = add(new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.34, 8), accent));
+      beak.position.set(0, 1.16, 0.5);
+      beak.rotation.x = Math.PI / 2;
+      const shell = add(new THREE.Mesh(new THREE.SphereGeometry(0.46, 12, 10),
+        new THREE.MeshLambertMaterial({ color: 0x3f6a4a, emissive: 0x1a3a24, emissiveIntensity: 0.4 })));
+      shell.position.set(0, 0.92, -0.3);
+      shell.scale.set(1, 0.85, 0.5);
+
+    } else if (id === "tengu") {
+      // 長い鼻、黒い羽、頭の小さな箱
+      const nose = add(new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.72, 8), accent));
+      nose.position.set(0, 1.24, 0.68);
+      nose.rotation.x = Math.PI / 2;
+      for (const sx of [-1, 1]) {
+        const wing = add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.07),
+          new THREE.MeshLambertMaterial({ color: 0x1e1a22, emissive: 0x3a2a2a, emissiveIntensity: 0.3 })));
+        wing.position.set(sx * 0.72, 1.14, -0.24);
+        wing.rotation.set(0.1, sx * 0.5, sx * 0.35);
+        this.wings = this.wings || [];
+        this.wings.push(wing);
+      }
+      const cap = add(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.2, 0.2),
+        new THREE.MeshLambertMaterial({ color: 0x2a2a4a })));
+      cap.position.set(0, 1.76, 0.1);
+      this.eyeL.scale.set(1.1, 1.5, 0.6);
+      this.eyeR.scale.set(1.1, 1.5, 0.6);
+
+    } else if (id === "kyubi") {
+      // 九つの尾と、けものの耳
+      this.tails = [];
+      for (let i = 0; i < 9; i++) {
+        const t = i / 8;
+        const tail = add(new THREE.Mesh(new THREE.ConeGeometry(0.13, 1.15, 7), accent));
+        const a = (t - 0.5) * 2.3;
+        tail.position.set(Math.sin(a) * 0.5, 0.92 + Math.cos(a) * 0.28, -0.42 - Math.abs(Math.sin(a)) * 0.12);
+        tail.rotation.set(-1.0, 0, -a * 0.9);
+        this.tails.push({ m: tail, a, base: tail.rotation.z });
+        const tip = add(new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.34, 7),
+          new THREE.MeshBasicMaterial({ color: 0xfff4d8 })));
+        tip.position.copy(tail.position);
+        tip.position.y += Math.cos(a) * 0.5 + 0.42;
+        tip.position.x += Math.sin(a) * 0.42;
+        tip.position.z -= 0.3;
+        tip.rotation.copy(tail.rotation);
+        this.tails.push({ m: tip, a, base: tip.rotation.z });
+      }
+      for (const sx of [-0.26, 0.26]) {
+        const ear = add(new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.38, 5), accent));
+        ear.position.set(sx, 1.74, 0.02);
+        ear.rotation.z = sx > 0 ? -0.3 : 0.3;
+      }
+      this.eyeL.scale.set(1.3, 1.1, 0.6);
+      this.eyeR.scale.set(1.3, 1.1, 0.6);
+    }
   }
 
   get pos() { return { x: this.x, y: this.y, z: this.z }; }
@@ -140,18 +291,20 @@ export class Player {
     const dirZ = fwd * cos + rgt * sin;
 
     this.dashing = (input.k("ShiftLeft") || input.dash) && mag > 0 && this.stamina > 1;
-    if (this.dashing) this.stamina = Math.max(0, this.stamina - dt * 26);
-    else this.stamina = Math.min(100, this.stamina + dt * 17);
+    // すがたによって、だっしゅの もちが変わる
+    if (this.dashing) this.stamina = Math.max(0, this.stamina - dt * 26 / this.C.dash);
+    else this.stamina = Math.min(100, this.stamina + dt * 17 * this.C.dash);
 
-    const speed = this.dashing ? 9.6 : 5.4;
+    const speed = (this.dashing ? 9.6 : 5.4) * this.C.speed;
     const accel = mag > 0 ? 22 : 13;
     this.vx = lerp(this.vx, dirX * speed, clamp(accel * dt, 0, 1));
     this.vz = lerp(this.vz, dirZ * speed, clamp(accel * dt, 0, 1));
 
     // --- すりぬけ ------------------------------------------
     this.phasing = input.k("KeyQ") && this.phase > 0;
-    if (this.phasing) this.phase = Math.max(0, this.phase - dt * 34);
-    else this.phase = Math.min(100, this.phase + dt * 13);
+    // すがたによって、すりぬけの もちが変わる
+    if (this.phasing) this.phase = Math.max(0, this.phase - dt * 34 / this.C.phase);
+    else this.phase = Math.min(100, this.phase + dt * 13 * this.C.phase);
 
     // --- 上下 ----------------------------------------------
     const up = input.k("Space") ? 1 : input.k("KeyC") ? -1 : 0;
@@ -210,6 +363,25 @@ export class Player {
     if (moving > 0.4) this.yaw = angleLerp(this.yaw, Math.atan2(this.vx, this.vz), clamp(dt * 9, 0, 1));
     this.bob += dt * (2.0 + moving * 0.35);
 
+    // すがたごとの うごき
+    if (this.foot) {                                   // 唐傘：ぴょんぴょん はねる
+      const hop = Math.abs(Math.sin(this.bob * 1.6));
+      this.group.position.y += hop * 0.16;
+      this.foot.rotation.x = Math.sin(this.bob * 1.6) * 0.4;
+      if (this.tongue) this.tongue.rotation.x = 0.4 + Math.sin(t * 3.2) * 0.35;
+    }
+    if (this.wings) {                                  // 天狗：はばたく
+      for (let i = 0; i < this.wings.length; i++) {
+        const s = i ? 1 : -1;
+        this.wings[i].rotation.z = s * (0.35 + Math.sin(t * 5.5) * 0.4);
+      }
+    }
+    if (this.tails) {                                  // 九尾：尾が ゆらめく
+      for (let i = 0; i < this.tails.length; i++) {
+        const T2 = this.tails[i];
+        T2.m.rotation.z = T2.base + Math.sin(t * 2.2 + T2.a * 2.4) * 0.16;
+      }
+    }
     this.scareCooldown = Math.max(0, this.scareCooldown - dt);
     this.scarePose = Math.max(0, this.scarePose - dt);
 
