@@ -7,7 +7,7 @@ import { CHARS } from "./data.js";
 //  プレイヤー（おばけ）と3人称カメラ
 // ============================================================
 // おばけの大きさ（1.0 が以前の大きさ。人間より小さくして、こそこそ感を出す）
-export const GHOST_SCALE = 0.5;
+export const GHOST_SCALE = 0.4;
 
 export class Player {
   constructor(scene, world, charId) {

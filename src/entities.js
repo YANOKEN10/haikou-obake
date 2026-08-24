@@ -789,7 +789,7 @@ function drawTalk(b, text, color) {
 //  ともだちのおばけ
 //   ネットからとどいた位置に立たせる。色は人ごとに変えて見分けやすく
 // ============================================================
-const PEER_SCALE = 0.5;
+const PEER_SCALE = 0.4;
 const PEER_COLORS = [0xffd45e, 0x8fe6b0, 0xffa8d8, 0x9fd8ff, 0xd0b0ff, 0xffc39a];
 
 export class PeerGhost {
