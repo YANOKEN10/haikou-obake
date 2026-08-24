@@ -59,51 +59,59 @@ export function pickRarity(far, luck) {
 //  レアな色の「かけら」で 交換所を開くと、新しい すがたが使える。
 //  すがたが変わると、動きや とくいわざも変わる。
 export const CHARS = {
-  hitotsume: {
-    name: "一つ目小僧", icon: "👁", order: 0,
+  obake: {
+    name: "しろいおばけ", icon: "👻", order: 0,
     cost: {},                                  // はじめから使える
     speed: 1.00, dash: 1.00, phase: 1.00, scare: 1.00, reach: 1.00, size: 1.00,
     body: 0xdfeaf5, glow: 0x5d7fa8,
-    desc: "みんなのおともだち。とくいも にがても ない、ふつうのおばけ。",
-    tip: "まずは この子で 廃校を おぼえよう。",
+    desc: "まんまるの目がふたつ。この廃校で いちばん さいしょに 生まれた おばけ。",
+    tip: "とくいも にがても ない、あつかいやすい すがた。",
+  },
+  hitotsume: {
+    name: "一つ目小僧", icon: "👁", order: 1,
+    cost: { 1: 6 },                            // 水色6
+    speed: 1.02, dash: 1.00, phase: 1.05, scare: 1.08, reach: 1.10, size: 0.98,
+    body: 0xf7e3d8, glow: 0xd89a8a,
+    desc: "大きな目が ひとつだけ。じっと見つめられると、人はなぜか 目をそらせない。",
+    tip: "とどく はんいが すこし広く、こわがらせる ちからも すこし強い。",
   },
   karakasa: {
-    name: "唐傘おばけ", icon: "🌂", order: 1,
+    name: "唐傘おばけ", icon: "🌂", order: 2,
     cost: { 2: 6, 1: 10 },                     // 青6・水色10
     speed: 1.05, dash: 1.15, phase: 1.45, scare: 0.95, reach: 1.0, size: 1.02,
-    body: 0xe8d0c0, glow: 0xc4564a,
+    body: 0x9a2026, glow: 0x6a1218,
     desc: "ぴょんぴょん はねる 一本足の傘。すりぬけが とても長もちする。",
     tip: "壁のなかを ずっと 進んでいられる。かくれんぼが とくい。",
   },
   amanojaku: {
-    name: "あまのじゃく", icon: "😈", order: 2,
+    name: "あまのじゃく", icon: "😈", order: 3,
     cost: { 3: 5, 2: 12 },                     // 赤5・青12
     speed: 1.10, dash: 1.05, phase: 0.9, scare: 1.15, reach: 1.05, size: 0.94,
-    body: 0xc8e0a8, glow: 0x4a7a2a,
+    body: 0x54b0ec, glow: 0x2a6a9a,
     desc: "人の いやがることを する 小さな鬼。ふいうちが とくべつ よく効く。",
     tip: "うしろから おどかすと、ほかの子より ずっと こわがらせられる。",
   },
   kappa: {
-    name: "河童", icon: "🥒", order: 3,
+    name: "河童", icon: "🥒", order: 4,
     cost: { 3: 12, 4: 3 },                     // 赤12・紫3
     speed: 1.22, dash: 1.30, phase: 1.0, scare: 1.05, reach: 1.0, size: 1.06,
-    body: 0x7fd6a8, glow: 0x2a7a5a,
+    body: 0x92d24e, glow: 0x4a8a2a,
     desc: "皿の水が かわくと 元気がなくなる。足の速さは 廃校いちばん。",
     tip: "だっしゅが 長もちする。運動場を 走りまわるのに ぴったり。",
   },
   tengu: {
-    name: "天狗", icon: "🍃", order: 4,
+    name: "天狗", icon: "🍃", order: 5,
     cost: { 4: 10, 5: 3 },                     // 紫10・銀3
     speed: 1.12, dash: 1.15, phase: 1.1, scare: 1.25, reach: 1.45, size: 1.12,
-    body: 0xe8a08a, glow: 0x8a2a1a,
+    body: 0xe8543a, glow: 0xa02a1a,
     desc: "高いところが 好きな 山のぬし。はなれた ところからでも おどかせる。",
     tip: "とどく はんいが とても広い。上から まとめて おどかそう。",
   },
   kyubi: {
-    name: "九尾", icon: "🦊", order: 5,
+    name: "九尾", icon: "🦊", order: 6,
     cost: { 5: 10, 6: 3 },                     // 銀10・金3
     speed: 1.28, dash: 1.28, phase: 1.35, scare: 1.4, reach: 1.25, size: 1.1,
-    body: 0xffe0a0, glow: 0xffa03a,
+    body: 0xfaf6f2, glow: 0xe8908f,
     desc: "九つの尾を もつ 大妖怪。すべてが ずばぬけている。",
     tip: "廃校の ぬしにふさわしい すがた。ここまで来たら 無敵。",
   },

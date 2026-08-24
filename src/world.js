@@ -871,6 +871,20 @@ function ivy(mb, axis, fixed, from, to, y1, h, side, density = 26, holes = null)
   }
 }
 
+// まんなかを中心に、左右そろえて 同じ数の窓をならべる。
+//  端から数える windowRow とちがって、両はしの余白が そろうので
+//  4つの壁で 窓の位置が きれいにそろう。
+function windowGrid(from, to, count, w, y1, y2) {
+  const span = to - from;
+  const pitch = span / count;
+  const holes = [];
+  for (let i = 0; i < count; i++) {
+    const c = from + pitch * (i + 0.5);
+    holes.push({ a: c - w / 2, b: c + w / 2, y1, y2 });
+  }
+  return holes;
+}
+
 function windowRow(from, to, w, pitch, y1, y2) {
   const holes = [];
   for (let x = from; x + w < to; x += pitch) holes.push({ a: x, b: x + w, y1, y2 });
@@ -1680,10 +1694,12 @@ function buildField(ctx) {
 
   // 外周の木立
   for (const t of [[-44, 68, 1.2], [-30, 69, 1.0], [8, 69.5, 1.15], [30, 69, 1.05], [45, 66, 1.1],
-                   [45, 44, 1.0], [45, 52, 0.9], [-46, 38, 1.0],
+                   [45, 44, 1.0], [45, 52, 0.9],
                    [-37, 70, 1.05], [-20, 70.5, 0.9], [-6, 70, 1.1], [18, 70.5, 0.95],
-                   [40, 70, 1.15], [46, 58, 0.95], [46, 50, 1.05], [-46, 46, 0.9],
-                   [-46, 56, 1.0], [-46, 64, 1.1], [46, 38, 0.9]]) {
+                   [40, 70, 1.15], [46, 58, 0.95], [46, 50, 1.05],
+                   [-47, 69, 1.0], [-24, 67.5, 1.05], [46, 38, 0.9]]) {
+    // 体育館に めりこむ場所には 生やさない（木が壁を つきぬけてしまう）
+    if (t[0] > GYM.x1 - 3.2 && t[0] < GYM.x2 + 3.2 && t[1] > GYM.z1 - 3.2 && t[1] < GYM.z2 + 3.2) continue;
     tree(mb, col, t[0], t[1], t[2]);
     spawnSpots.push({ x: t[0] + 2.2, z: t[1] - 2, y: 0, floor: 0 });
   }
@@ -1774,18 +1790,25 @@ function buildGym(ctx) {
   // 壁（東面に入口、南北の高いところに窓の帯）
   //  外は下見板張り、中は腰まで剥げかけた壁、その上に格子窓がずらりと並ぶ
   const GW = 0x453626;                              // 板張りの外壁
-  // 高いところに長い窓の帯、その下にも腰高の窓。4つの壁ぜんぶに入れる
-  const winRow = windowRow(G.x1 + 3, G.x2 - 3, 3.2, 5.0, 5.4, 7.6);
-  const winLow = windowRow(G.x1 + 4, G.x2 - 4, 2.6, 5.0, 2.5, 4.4);
-  const winSide = windowRow(G.z1 + 3, G.z2 - 3, 3.0, 5.0, 5.4, 7.6);
-  const winSideLow = windowRow(G.z1 + 4, G.z2 - 8, 2.6, 5.0, 2.5, 4.4);
+  // 窓は、上下2段。上下で 位置をそろえ、4つの壁で 同じ形にする。
+  //  幅・高さ・すきまを そろえたので、ならびが きれいに見える。
+  const WW = 2.8;                       // 窓の幅
+  const HI1 = 5.5, HI2 = 7.5;           // 上の段の 高さ
+  const LO1 = 2.6, LO2 = 4.3;           // 下の段の 高さ
+  const NX = 7, NZ = 6;                 // 東西の壁に7つ、南北の壁に6つ
+  const winRow     = windowGrid(G.x1, G.x2, NX, WW, HI1, HI2);   // 北・南の 上
+  const winLow     = windowGrid(G.x1, G.x2, NX, WW, LO1, LO2);   // 北の 下
+  const winSide    = windowGrid(G.z1, G.z2, NZ, WW, HI1, HI2);   // 東・西の 上
+  const winSideLow = windowGrid(G.z1, G.z2, NZ, WW, LO1, LO2)
+    .filter((h) => h.b < GYM_DOOR.z - GYM_DOOR.w - 0.6 || h.a > GYM_DOOR.z + GYM_DOOR.w + 0.6);
   const nHoles = winRow.concat(winLow);
   wallWithHoles(mb, col, { axis: "x", fixed: G.z1, from: G.x1, to: G.x2, y1: 0, y2: H, thick: 0.3, color: GW, holes: nHoles });
   wallWithHoles(mb, col, { axis: "x", fixed: G.z2, from: G.x1, to: G.x2, y1: 0, y2: H, thick: 0.3, color: GW, holes: winRow });
-  wallWithHoles(mb, col, { axis: "z", fixed: G.x1, from: G.z1, to: G.z2, y1: 0, y2: H, thick: 0.3, color: GW, holes: winSide.concat(winSideLow) });
+  wallWithHoles(mb, col, { axis: "z", fixed: G.x1, from: G.z1, to: G.z2, y1: 0, y2: H, thick: 0.3, color: GW,
+    holes: winSide.concat(winSideLow) });
   wallWithHoles(mb, col, {
     axis: "z", fixed: G.x2, from: G.z1, to: G.z2, y1: 0, y2: H, thick: 0.3, color: GW,
-    holes: winSide.concat([{ a: GYM_DOOR.z - GYM_DOOR.w, b: GYM_DOOR.z + GYM_DOOR.w, y1: 0, y2: 3.0 }]),
+    holes: winSide.concat(winSideLow, [{ a: GYM_DOOR.z - GYM_DOOR.w, b: GYM_DOOR.z + GYM_DOOR.w, y1: 0, y2: 3.0 }]),
   });
   const gDoor = [{ a: GYM_DOOR.z - GYM_DOOR.w, b: GYM_DOOR.z + GYM_DOOR.w, y1: 0, y2: 3.0 }];
   siding(mb, "x", G.z1, G.x1, G.x2, 0, H, -1, 0.5, nHoles);
@@ -1797,27 +1820,44 @@ function buildGym(ctx) {
   ivy(mb, "x", G.z1, G.x1 + 1, G.x2 - 1, 0, 5.0, -1, 34, nHoles);
   ivy(mb, "z", G.x1, G.z1 + 1, G.z2 - 1, 0, 5.0, -1, 30, winSideLow);
   // 窓の格子（外がわ・内がわ）と、内壁の腰の汚れ
+  //  窓の格子。段ごとに 桟の数をそろえる（上は4本、下は3本）
+  const sideAll = winSide.concat(winSideLow);
   for (const h of nHoles) {
-    sash(mb, "x", G.z1 - 0.06, h.a, h.b, h.y1, h.y2, 4);
-    sash(mb, "x", G.z1 + 0.06, h.a, h.b, h.y1, h.y2, 4);
+    const n = h.y1 > 5 ? 4 : 3;
+    sash(mb, "x", G.z1 - 0.06, h.a, h.b, h.y1, h.y2, n);
+    sash(mb, "x", G.z1 + 0.06, h.a, h.b, h.y1, h.y2, n);
   }
   for (const h of winRow) {
     sash(mb, "x", G.z2 + 0.06, h.a, h.b, h.y1, h.y2, 4);
     sash(mb, "x", G.z2 - 0.06, h.a, h.b, h.y1, h.y2, 4);
   }
-  for (const h of winSide.concat(winSideLow)) sash(mb, "z", G.x1 + 0.06, h.a, h.b, h.y1, h.y2, 4);
-  for (const h of winSide) sash(mb, "z", G.x2 - 0.06, h.a, h.b, h.y1, h.y2, 4);
+  for (const h of sideAll) {
+    const n = h.y1 > 5 ? 4 : 3;
+    sash(mb, "z", G.x1 + 0.06, h.a, h.b, h.y1, h.y2, n);
+    sash(mb, "z", G.x1 - 0.06, h.a, h.b, h.y1, h.y2, n);
+    sash(mb, "z", G.x2 - 0.06, h.a, h.b, h.y1, h.y2, n);
+    sash(mb, "z", G.x2 + 0.06, h.a, h.b, h.y1, h.y2, n);
+  }
+  //  上下の段のあいだに、ぐるりと 水平の帯を走らせて ならびを ひきしめる
+  for (const [zz, side] of [[G.z1, 1], [G.z2, -1]]) {
+    mb.box(cx, LO2 + 0.28, zz + 0.17 * side, G.x2 - G.x1, 0.2, 0.12, 0x4a4534, { jitter: 0.12 });
+    mb.box(cx, HI2 + 0.3, zz + 0.17 * side, G.x2 - G.x1, 0.16, 0.1, 0x4a4534, { jitter: 0.12 });
+  }
+  for (const [xx, side] of [[G.x1, 1], [G.x2, -1]]) {
+    mb.box(xx + 0.17 * side, LO2 + 0.28, cz, 0.12, 0.2, G.z2 - G.z1, 0x4a4534, { jitter: 0.12 });
+    mb.box(xx + 0.17 * side, HI2 + 0.3, cz, 0.1, 0.16, G.z2 - G.z1, 0x4a4534, { jitter: 0.12 });
+  }
   //  腰壁は、窓の下（高さ2.4まで）だけにする。窓をふさがないように
   for (const [zz, side, hs] of [[G.z1, 1, nHoles], [G.z2, -1, winRow]]) {
     for (const [a, b] of freeSpans(G.x1, G.x2, 1.2, hs)) {
-      mb.box((a + b) / 2, 1.2, zz + 0.16 * side, b - a, 2.4, 0.05, 0x7d7452, { jitter: 0.3 });   // 剥げかけた腰壁
-      mb.box((a + b) / 2, 2.46, zz + 0.18 * side, b - a, 0.14, 0.1, 0x4a4534, { jitter: 0.12 });
+      mb.box((a + b) / 2, 1.25, zz + 0.16 * side, b - a, 2.5, 0.05, 0x7d7452, { jitter: 0.3 });   // 剥げかけた腰壁
+      mb.box((a + b) / 2, 2.54, zz + 0.18 * side, b - a, 0.14, 0.1, 0x4a4534, { jitter: 0.12 });
     }
   }
-  for (const [xx, side, hs] of [[G.x1, 1, winSideLow], [G.x2, -1, gDoor]]) {
+  for (const [xx, side, hs] of [[G.x1, 1, winSideLow], [G.x2, -1, winSideLow.concat(gDoor)]]) {
     for (const [a, b] of freeSpans(G.z1, G.z2, 1.2, hs)) {
-      mb.box(xx + 0.16 * side, 1.2, (a + b) / 2, 0.05, 2.4, b - a, 0x7d7452, { jitter: 0.3 });
-      mb.box(xx + 0.18 * side, 2.46, (a + b) / 2, 0.1, 0.14, b - a, 0x4a4534, { jitter: 0.12 });
+      mb.box(xx + 0.16 * side, 1.25, (a + b) / 2, 0.05, 2.5, b - a, 0x7d7452, { jitter: 0.3 });
+      mb.box(xx + 0.18 * side, 2.54, (a + b) / 2, 0.1, 0.14, b - a, 0x4a4534, { jitter: 0.12 });
     }
   }
 

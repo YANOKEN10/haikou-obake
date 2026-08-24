@@ -106,8 +106,8 @@ class Game {
     this.spawnTimer = 6;
     this.scareFx = 0;
     this.rankName = RANKS[0].name;
-    this.charId = "hitotsume";
-    if (this.player && this.player.setChar) this.player.setChar("hitotsume");
+    this.charId = "obake";
+    if (this.player && this.player.setChar) this.player.setChar("obake");
 
     this.roster = new Roster(100);
     this.humans = [];
@@ -903,7 +903,7 @@ class Game {
   applySave(p) {
     this.kicked = p.kicked || 0;
     this.shards = { ...(p.shards || {}) };
-    this.chars = { hitotsume: 1, ...(p.chars || {}) };
+    this.chars = { obake: 1, ...(p.chars || {}) };
     if (p.charId && this.chars[p.charId]) { this.charId = p.charId; this.player.setChar(p.charId); }
     this.ui.setShards(this.shards);
     this.ui.setCharChip(CHARS[this.charId]);
@@ -933,8 +933,8 @@ class Game {
     this.humans = []; this.traps = []; this.summons = []; this.pickups = []; this.texts = [];
     this.inv = {}; this.built = {};
     this.shards = {};                      // 色ごとの かけら
-    this.chars = { hitotsume: 1 };          // 使えるすがた
-    this.charId = "hitotsume";
+    this.chars = { obake: 1 };          // 使えるすがた
+    this.charId = "obake";
     this.kicked = 0; this.wave = 0; this.selTrap = 0;
     this.waveTimer = 0; this.spawnTimer = 6; this.scareFx = 0;
     this.rankName = RANKS[0].name;
@@ -947,7 +947,7 @@ class Game {
     this.ui.setBag(this.inv);
     this.ui.setHotbar(this.built, this.selTrap);
     this.ui.setShards(this.shards);
-    this.ui.setCharChip(CHARS[this.charId] || CHARS.hitotsume);
+    this.ui.setCharChip(CHARS[this.charId] || CHARS.obake);
     this.ui.setHumans(this.humans);
     this.ui.vignette(0);
   }
