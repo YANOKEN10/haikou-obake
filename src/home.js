@@ -2,6 +2,7 @@
 //  ホーム画面（ゲームを始める / ログイン / プロフィール）
 // ============================================================
 import * as S from "./save.js";
+import { mountSupport } from "./support.js";
 import { TRAPS, GHOSTS, MATERIALS, RANKS } from "./data.js";
 
 const $ = (s) => document.querySelector(s);
@@ -351,6 +352,7 @@ export class Home {
 
   // --- ゲームを始める ---------------------------------------
   renderPlay() {
+    mountSupport(this.game.ui);
     const p = this.profile();
     $("#whoPlay").innerHTML = p
       ? "いま遊ぶ人： <b>" + esc(p.name) + "</b>　<span style='font-size:11px'>（「ログイン」で変えられます）</span>"

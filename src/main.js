@@ -9,6 +9,7 @@ import { Player } from "./player.js";
 import { Human, HUMAN_SCALE } from "./human.js";
 import { Pickup, Trap, Summon, FloatText, RedLady, Cat, Confession, PeerGhost } from "./entities.js";
 import { Net } from "./net.js";
+import { checkReturn } from "./support.js";
 import { UI } from "./ui.js";
 import { Audio } from "./audio.js";
 import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, pickRarity, CHARS, EXCHANGE } from "./data.js";
@@ -1176,6 +1177,8 @@ setInterval(() => {
 document.getElementById("loading").textContent =
   "廃校の準備完了（" + game.world.triangles.toLocaleString() + " 面 / " + game.buildMs + "ms）";
 game.home.show("play");
+// 応援から もどってきたら、お礼を出す
+checkReturn(game.ui);
 
 // 閉じる・タブを切りかえる直前にも自動でセーブする
 addEventListener("beforeunload", () => { if (game.started) game.saveNow(false); });
@@ -1220,7 +1223,7 @@ if (isTouchDevice()) {
     keys.innerHTML = [
       ["WASD", "うごく"], ["マウス", "見まわす"], ["Shift", "ダッシュ"],
       ["Space/C", "浮く・沈む"], ["E", "おどかす"], ["Q", "すりぬけ（壁を通る）"],
-      ["Tab", "おばけ工房"], ["F", "選んだ仕掛けを置く"], ["1〜6", "仕掛けをえらぶ"],
+      ["Tab", "おばけ工房"], ["F", "選んだ仕掛けを置く"], ["R", "置いたものを回収"], ["1〜9・0", "仕掛けをえらぶ"],
       ["Esc", "ポーズ"],
     ].map((r) => "<div><b>" + r[0] + "</b>" + r[1] + "</div>").join("");
   }
