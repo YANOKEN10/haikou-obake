@@ -240,7 +240,10 @@ class Game {
     if (this.isGuest && !this._netSpawn) return;   // お客さんは、おやに合わせてだけ出す
     this.wave++;
     const group = this.roster.next();
-    const e = this.world.entry;
+    // 毎回、4つの門から どれかを えらんで そこから入ってくる
+    const gates = this.world.gates || [{ in: this.world.entry, out: this.world.exit, name: "正門" }];
+    const G = gates[Math.floor(Math.random() * gates.length)];
+    const e = { x: G.in.x, z: G.in.z };
     // いま校舎にいる人と同じ名まえの人は、こんかいは来ない
     //  （番号はずらさない。ともだちと遊ぶとき、おやとお客さんで番号がそろわなくなるため）
     const live = new Set();
@@ -252,14 +255,15 @@ class Game {
       if (live.has(t.name)) continue;
       live.add(t.name);
       came++;
-      const h = new Human(this.scene, this.world, t, e.x + rand(-3, 3), e.z + rand(-2, 2));
+      const h = new Human(this.scene, this.world, t, e.x + rand(-2.4, 2.4), e.z + rand(-2, 2));
       h.hid = hid;
+      h.gate = G.out;                              // 帰るときも この門から
       h.speak(choice(t.idle), 4 + i * 0.4);
       h.goTo(rand(-25, 25), rand(8, 28), 0);
       this.humans.push(h);
     }
     if (came === 0) return;                       // 全員かぶったときは、なにも起きない
-    this.ui.toast("第" + this.wave + "陣：" + group.label + "（" + came + "人）が来た…", "bad");
+    this.ui.toast("第" + this.wave + "陣：" + group.label + "（" + came + "人）が " + G.name + "から来た…", "bad");
     this.audio.tone(180, 0.7, "sawtooth", 0.1, 90);
   }
 
@@ -507,7 +511,7 @@ class Game {
     const r = this.ui.setRank(this.kicked);
     this.ui.toast("🎉 " + h.name + " を追い出した！（計 " + this.kicked + " 人）", "gold");
     this.audio.escape();
-    for (let i = 0; i < 3; i++) this.dropAt("onnen", this.world.exit.x + rand(-4, 4), 30 + rand(-3, 3));
+    for (let i = 0; i < 3; i++) this.dropAt("onnen", h.x + rand(-4, 4), h.z + rand(-4, 4), h.y);
     this.dropAt("onnen", h.x, h.z, h.y);
     if (r.name !== before) {
       this.rankName = r.name;

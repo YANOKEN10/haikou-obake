@@ -107,21 +107,89 @@ export class Human {
     this.group.add(this.body);
 
     // 白シャツ（上着が破けると出てくる）
-    const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.62, 0.25), shirtMat);
+    const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.60, 0.22), shirtMat);
     shirt.position.y = 1.15; this.body.add(shirt);
 
     // 制服の上着
     const torso = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.66, 0.29), blazer);
     torso.position.y = 1.15; this.body.add(torso);
     this.torso = torso;
+    // 服のかたち。名まえに合った かっこうをさせる
+    const ST = T.style || "uniform";
     // えり
     const collar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.31), trim);
     collar.position.y = 1.44; this.body.add(collar);
     this.collar = collar;
-    // ネクタイ／リボン
-    const tie = new THREE.Mesh(
-      T.sex === "f" ? new THREE.BoxGeometry(0.16, 0.09, 0.06) : new THREE.BoxGeometry(0.07, 0.26, 0.06), trim);
-    tie.position.set(0, T.sex === "f" ? 1.37 : 1.28, 0.16); this.body.add(tie);
+    // ネクタイ／リボン（制服とスーツのときだけ）
+    if (ST === "uniform" || ST === "suit") {
+      const tie = new THREE.Mesh(
+        T.sex === "f" ? new THREE.BoxGeometry(0.16, 0.09, 0.06) : new THREE.BoxGeometry(0.07, 0.26, 0.06), trim);
+      tie.position.set(0, T.sex === "f" ? 1.37 : 1.28, 0.16); this.body.add(tie);
+    }
+    if (ST === "jersey") {                          // ジャージ：そでと胴に 白い線
+      for (const sx of [-0.245, 0.245]) {
+        const st = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.58, 0.26), trim);
+        st.position.set(sx, 1.15, 0.01); this.body.add(st);
+      }
+      collar.scale.set(0.9, 0.8, 0.95);
+    }
+    if (ST === "apron") {                           // エプロン
+      const ap = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.72, 0.05), trim);
+      ap.position.set(0, 1.06, 0.17); this.body.add(ap);
+    }
+    if (ST === "coat") {                            // 長いコート
+      const co = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.5, 0.34), blazer);
+      co.position.y = 0.78; this.body.add(co);
+    }
+    if (ST === "robe") {                            // 作務衣・法衣
+      const sash = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.1, 0.33), trim);
+      sash.position.y = 0.95; this.body.add(sash);
+      const kesa = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.7, 0.05), trim);
+      kesa.position.set(-0.12, 1.2, 0.17); kesa.rotation.z = 0.32; this.body.add(kesa);
+    }
+    if (ST === "police") {                          // けいさつ：肩章と ベルト、バッジ
+      for (const sx of [-0.2, 0.2]) {
+        const ep = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.05, 0.28), trim);
+        ep.position.set(sx, 1.44, 0); this.body.add(ep);
+      }
+      const belt = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.09, 0.31),
+        new THREE.MeshLambertMaterial({ color: 0x1a1a1e }));
+      belt.position.y = 0.88; this.body.add(belt);
+      const badge = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.04),
+        new THREE.MeshBasicMaterial({ color: 0xffd23a }));
+      badge.position.set(-0.14, 1.3, 0.16); this.body.add(badge);
+    }
+    // 背番号（サッカーの人など）
+    if (T.number) {
+      const nm = new THREE.MeshBasicMaterial({ color: T.numColor || 0xffd23a });
+      const digits = String(T.number).split("");
+      const w2 = 0.15, gap = 0.045;
+      const total = digits.length * w2 + (digits.length - 1) * gap;
+      digits.forEach((dg, i) => {
+        // 背中は うしろから見るので、左右がさかさま。ならべる向きを 逆にする
+        const x0 = total / 2 - i * (w2 + gap) - w2 / 2;
+        // 7セグメントのように、棒をならべて 数字をつくる
+        const segs = {
+          "0": [1, 1, 1, 1, 1, 1, 0], "1": [0, 1, 1, 0, 0, 0, 0], "2": [1, 1, 0, 1, 1, 0, 1],
+          "3": [1, 1, 1, 1, 0, 0, 1], "4": [0, 1, 1, 0, 0, 1, 1], "5": [1, 0, 1, 1, 0, 1, 1],
+          "6": [1, 0, 1, 1, 1, 1, 1], "7": [1, 1, 1, 0, 0, 0, 0], "8": [1, 1, 1, 1, 1, 1, 1],
+          "9": [1, 1, 1, 1, 0, 1, 1],
+        }[dg] || [1, 1, 1, 1, 1, 1, 1];
+        const put = (sx, sy, hor) => {
+          const b = new THREE.Mesh(hor ? new THREE.BoxGeometry(w2 * 0.82, 0.036, 0.035)
+                                       : new THREE.BoxGeometry(0.036, 0.145, 0.035), nm);
+          b.position.set(x0 + sx, 1.22 + sy, -0.168);
+          this.body.add(b);
+        };
+        if (segs[0]) put(0, 0.155, true);              // 上
+        if (segs[1]) put(-w2 * 0.42, 0.078, false);     // 右上
+        if (segs[2]) put(-w2 * 0.42, -0.078, false);    // 右下
+        if (segs[3]) put(0, -0.155, true);             // 下
+        if (segs[4]) put(w2 * 0.42, -0.078, false);   // 左下
+        if (segs[5]) put(w2 * 0.42, 0.078, false);    // 左上
+        if (segs[6]) put(0, 0, true);                // まん中
+      });
+    }
 
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.19, 12, 10), skin);
     head.position.y = 1.62; this.body.add(head);
@@ -130,10 +198,21 @@ export class Human {
     const hairMat = new THREE.MeshLambertMaterial({ color: T.hair || 0x30262a });
     const hair = new THREE.Mesh(new THREE.SphereGeometry(0.205, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), hairMat);
     hair.position.y = 1.64; this.body.add(hair);
-    if (T.sex === "f") {
+    if (T.sex === "f" || T.longHair) {
       const back = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.34, 0.14), hairMat);
       back.position.set(0, 1.47, -0.13); this.body.add(back);
     }
+    if (T.center) {                                 // センター分け
+      hair.scale.set(1, 0.9, 1);
+      for (const sx of [-1, 1]) {
+        const bang = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.09), hairMat);
+        bang.position.set(sx * 0.09, 1.68, 0.16); bang.rotation.z = sx * 0.3; this.body.add(bang);
+      }
+      const part = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.06, 0.14),
+        new THREE.MeshLambertMaterial({ color: 0xe8c39e }));
+      part.position.set(0, 1.75, 0.13); this.body.add(part);
+    }
+    if (T.bald) { hair.visible = false; }
 
     this.armL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, 0.12), blazer);
     this.armR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, 0.12), blazer);
@@ -149,24 +228,36 @@ export class Human {
     this.body.add(this.bareL, this.bareR);
 
     // 下半身：女子はスカート、男子はズボン
-    if (T.sex === "f") {
+    const wearsSkirt = T.skirt !== null && (T.sex === "f" ? T.style !== "jersey" && T.style !== "police" && T.style !== "suit" : T.style === "robe");
+    if (wearsSkirt) {
       const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.36, 0.34, 12), new THREE.MeshLambertMaterial({ color: T.skirt || 0x574a70 }));
       skirt.position.y = 0.72; this.body.add(skirt);
       this.skirt = skirt;
     }
-    this.legL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.72, 0.14), T.sex === "f" ? skin : dark);
-    this.legR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.72, 0.14), T.sex === "f" ? skin : dark);
+    const pantsMat = T.pants ? new THREE.MeshLambertMaterial({ color: T.pants })
+                             : (T.sex === "f" ? skin : dark);
+    this.legL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.72, 0.14), pantsMat);
+    this.legR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.72, 0.14), pantsMat);
     this.legL.position.set(-0.12, 0.82, 0); this.legR.position.set(0.12, 0.82, 0);
     this.legL.geometry.translate(0, -0.3, 0); this.legR.geometry.translate(0, -0.3, 0);
     this.body.add(this.legL, this.legR);
     // 上履き
     for (const s2 of [-0.12, 0.12]) {
-      const sh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.09, 0.24), new THREE.MeshLambertMaterial({ color: 0xe8e2d0 }));
+      const sh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.09, 0.24), new THREE.MeshLambertMaterial({ color: T.shoes || 0xe8e2d0 }));
       sh.position.set(s2, 0.06, 0.03); this.body.add(sh);
       if (s2 < 0) this.shoeL = sh; else this.shoeR = sh;
     }
 
     // --- 持ち物・かぶり物（人ごとの見わけ） -------------------
+    if (T.hat === "police") {                       // けいさつ帽
+      const capM = new THREE.MeshLambertMaterial({ color: T.blazer || 0x22304a });
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.21, 0.12, 12), capM);
+      cap.position.y = 1.78; this.body.add(cap);
+      const brim = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.03, 0.2), new THREE.MeshLambertMaterial({ color: 0x14141a }));
+      brim.position.set(0, 1.72, 0.16); this.body.add(brim);
+      const em = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.07, 0.03), new THREE.MeshBasicMaterial({ color: 0xffd23a }));
+      em.position.set(0, 1.79, 0.2); this.body.add(em);
+    }
     const acc = T.acc || "none";
     const hairM2 = new THREE.MeshLambertMaterial({ color: T.hair || 0x30262a });
     if (acc === "glasses") {
@@ -443,7 +534,8 @@ export class Human {
     if (this.fear >= this.maxFear) {
       this.state = "flee"; this.stateT = 0;
       this.speak(choice(this.type.flee), 4.5);
-      this.goTo(this.world.exit.x, this.world.exit.z);
+      const gx = this.gate || this.world.exit;
+      this.goTo(gx.x, gx.z);
     } else {
       this.state = "panic"; this.stateT = clamp(eff / 22, 1.0, 3.2);
       this.speak(choice(this.type.scared), 3.0);
@@ -522,8 +614,10 @@ export class Human {
       }
       case "flee": {
         speed *= 1.9;
-        if (!this.path) this.goTo(w.exit.x, w.exit.z, 0);
-        if (dist(this.x, this.z, w.exit.x, w.exit.z) < 2.5) {
+        // 自分が入ってきた門へ もどっていく
+        const gt = this.gate || w.exit;
+        if (!this.path) this.goTo(gt.x, gt.z, 0);
+        if (dist(this.x, this.z, gt.x, gt.z) < 2.5) {
           this.out = true;
           this.group.visible = false;
           if (ctx && ctx.onEscape) ctx.onEscape(this);

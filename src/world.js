@@ -1,6 +1,6 @@
 import * as THREE from "../lib/three.module.js";
 import { MeshBuilder, wallWithHoles } from "./meshbuild.js";
-import { Colliders, NavGraph, rand, choice, clamp } from "./util.js";
+import { Colliders, NavGraph, rand, choice, clamp, dist2 } from "./util.js";
 import { FLOOR_ROOMS, FLOOR_LABEL, ST_W, ST_E } from "./rooms.js";
 
 export const FLOOR_H = 3.6;
@@ -32,8 +32,19 @@ const ANNEX = { x1: 20, x2: 33, z1: 26, z2: 33 };  // 渡り廊下の先の別�
 const FIELD = { x1: -48, x2: 48, z1: 36, z2: 72 };            // 運動場
 const GYM = { x1: -46, x2: -18, z1: 40, z2: 64, h: 9.2 };     // 体育館
 const GYM_DOOR = { z: 50, w: 2.6 };                            // 体育館の入口（東面）
-export const EXIT_POINT = { x: 0, z: 79 };                     // 正門の外
-export const HUMAN_ENTRY = { x: 0, z: 76 };
+// 廃校の まわりの 4つの出入り口。
+//  人間たちは 毎回 このどれかから 入ってきて、
+//  こわくなったら 自分が入ってきた門から 帰っていく。
+//  in  … 門のうちがわ（ここへ向かって歩く）
+//  out … 門のそとがわ（ここまで行くと 帰った ことになる）
+export const GATES = [
+  { id: "s", name: "正門",     in: { x: 0, z: 70 },   out: { x: 0, z: 79 },   axis: "x", at: 72, w: 5.0 },
+  { id: "e", name: "東の通用門", in: { x: 45, z: 52 }, out: { x: 55, z: 52 },  axis: "z", at: 48, w: 3.4 },
+  { id: "w", name: "西の裏門",  in: { x: -45, z: 68 }, out: { x: -56, z: 68 }, axis: "z", at: -48, w: 3.4 },
+  { id: "n", name: "北の勝手口", in: { x: 39, z: 16 }, out: { x: 52, z: 16 },  axis: "z", at: 42, w: 3.0 },
+];
+export const EXIT_POINT = GATES[0].out;                        // 正門の外（もとからの名前）
+export const HUMAN_ENTRY = { x: GATES[0].in.x, z: GATES[0].in.z + 6 };
 export const floorY = (f) => f * FLOOR_H;
 
 // 階段の段の位置（上下階で同じ形）
@@ -76,7 +87,7 @@ export function buildWorld(scene, opts = {}) {
 
   return {
     colliders: col, nav, rooms, spawnSpots, props, lightSpots,
-    exit: EXIT_POINT, entry: HUMAN_ENTRY, staticMesh, triangles: mb.triangles,
+    exit: EXIT_POINT, entry: HUMAN_ENTRY, gates: GATES, staticMesh, triangles: mb.triangles,
     bounds: { x1: -52, x2: 52, z1: -36, z2: 82 },
     northOutsideZ: RZ1 - 1.6,
     floors: FLOORS,
@@ -980,7 +991,18 @@ function linkNav(ctx) {
   for (const s of [ST_W, ST_E]) nav.addNode((s.x1 + s.x2) / 2, RZ2 - 2.6, FLOORS, "屋上", floorY(FLOORS));
 
   // 正門とその外
-  for (const z of [FIELD.z2 - 3, FIELD.z2 + 1.5, EXIT_POINT.z]) nav.addNode(EXIT_POINT.x, z, 0, "正門", 0);
+  // 4つの門：うちがわ → 門のところ → そとがわ を つなぐ
+  for (const g of GATES) {
+    const dx = g.out.x - g.in.x, dz = g.out.z - g.in.z;
+    const len = Math.hypot(dx, dz) || 1;
+    let prev = -1;
+    for (let k = -1; k <= 4; k++) {
+      const t = k / 4;
+      const n = nav.addNode(g.in.x + (dx / len) * (len * t), g.in.z + (dz / len) * (len * t), 0, g.name, 0);
+      if (prev >= 0) nav.link(prev, n);
+      prev = n;
+    }
+  }
 }
 
 // 階段の上下をつなぐ（autoLink は同じ階しか結ばないので、あとから手で結ぶ）
@@ -1035,7 +1057,11 @@ function buildYard(ctx, dustCount) {
   }
 
   fence(mb, col, YARD.x1, 0.5, YARD.x1, YARD.z2);
-  fence(mb, col, YARD.x2, 0.5, YARD.x2, YARD.z2);
+  // 東の石垣に、北の勝手口をあける
+  const gN = GATES[3];
+  fence(mb, col, YARD.x2, 0.5, YARD.x2, gN.in.z - gN.w);
+  fence(mb, col, YARD.x2, gN.in.z + gN.w, YARD.x2, YARD.z2);
+  gatePosts(mb, col, YARD.x2, gN.in.z, "z", gN.w, true);
   // 中庭と運動場のあいだの柵はなくし、そのまま行き来できるようにする
   //  （校門の柱だけ、目じるしとして残す）
   for (const gx of [-5.0, 5.0]) {
@@ -1091,6 +1117,7 @@ function buildYard(ctx, dustCount) {
                    [-40, 31, 1.1], [-24, 31.5, 0.95], [-12, 32, 1.15], [4, 31.5, 1.0],
                    [24, 32, 1.1], [38, 30, 0.9], [40, 18, 1.05], [-40, 22, 1.0],
                    [-38, 5, 0.85], [38, 6, 0.9], [28, 27, 0.95]]) {
+    if (GATES.some((G) => dist2(t[0], t[1], G.in.x, G.in.z) < 36 || dist2(t[0], t[1], G.out.x, G.out.z) < 36)) continue;
     tree(mb, col, t[0], t[1], t[2]);
     spawnSpots.push({ x: t[0] + 2.2, z: t[1] + 1.6, y: 0, floor: 0 });
   }
@@ -1173,6 +1200,27 @@ function wireFence(mb, col, x1, z1, x2, z2) {
 // 敷地をかこむ石垣。
 //  大きさのちがう石を積み、上に笠石をのせ、ツタをはわせる。
 //  長い年月で ところどころ石が抜け、草が生えている。
+// 門のりょうがわに立てる 石の柱と、上をわたす かんぬき
+function gatePosts(mb, col, fixed, at, axis, half, stone) {
+  const H = stone ? 2.6 : 2.9;
+  for (const s of [-1, 1]) {
+    const px = axis === "z" ? fixed : at + s * half;
+    const pz = axis === "z" ? at + s * half : fixed;
+    for (let r = 0; r < 5; r++) {
+      mb.box(px, 0.26 + r * 0.52, pz, 0.7 - r * 0.02, 0.5, 0.7 - r * 0.02,
+        choice([0x54514a, 0x4a4740, 0x5d5950]), { jitter: 0.2 });
+    }
+    mb.box(px, H, pz, 0.84, 0.16, 0.84, 0x5f5a51, { jitter: 0.12 });
+    col.add(px - 0.36, pz - 0.36, px + 0.36, pz + 0.36, 0, H, "wall");
+  }
+  // 上をわたす さびた かんぬき
+  if (axis === "z") mb.box(fixed, H + 0.24, at, 0.28, 0.22, half * 2 + 0.6, 0x4e4a42, { jitter: 0.14 });
+  else mb.box(at, H + 0.24, fixed, half * 2 + 0.6, 0.22, 0.28, 0x4e4a42, { jitter: 0.14 });
+  // 足もとの わだち
+  mb.box(axis === "z" ? fixed : at, 0.05, axis === "z" ? at : fixed,
+    axis === "z" ? 3.2 : half * 2, 0.04, axis === "z" ? half * 2 : 3.2, 0x565044, { jitter: 0.25 });
+}
+
 function fence(mb, col, x1, z1, x2, z2) {
   const len = Math.hypot(x2 - x1, z2 - z1);
   if (len < 0.2) return;
@@ -1629,11 +1677,17 @@ function buildField(ctx) {
   for (let i = 0; i < 5; i++) mb.box(cxT - 26 + i * 0.02, 0.18, czT + rz - 1 + i * 1.4, 0.16, 0.025, 1.2, 0x9a9688, { jitter: 0.3 });
 
   // 外周のフェンスと正門
-  // 運動場・体育館がわは、ツタのからんだ 立入禁止フェンス
-  wireFence(mb, col, F.x1, F.z1, F.x1, F.z2);
-  wireFence(mb, col, F.x2, F.z1, F.x2, F.z2);
+  // 運動場・体育館がわは、ツタのからんだ 立入禁止フェンス。
+  //  東（x=48）と 西（x=-48）に、通用門の あなをあける。
+  const gE = GATES[1], gW = GATES[2];
+  wireFence(mb, col, F.x1, F.z1, F.x1, gW.in.z - gW.w);
+  wireFence(mb, col, F.x1, gW.in.z + gW.w, F.x1, F.z2);
+  wireFence(mb, col, F.x2, F.z1, F.x2, gE.in.z - gE.w);
+  wireFence(mb, col, F.x2, gE.in.z + gE.w, F.x2, F.z2);
   wireFence(mb, col, F.x1, F.z2, -5, F.z2);
   wireFence(mb, col, 5, F.z2, F.x2, F.z2);
+  gatePosts(mb, col, F.x1, gW.in.z, "z", gW.w);
+  gatePosts(mb, col, F.x2, gE.in.z, "z", gE.w);
   // 中庭の石垣の東西の外側（校門の左右）をつなぐ
   wireFence(mb, col, F.x1, F.z1, -42, F.z1);
   wireFence(mb, col, 42, F.z1, F.x2, F.z1);
@@ -1700,6 +1754,8 @@ function buildField(ctx) {
                    [-47, 69, 1.0], [-24, 67.5, 1.05], [46, 38, 0.9]]) {
     // 体育館に めりこむ場所には 生やさない（木が壁を つきぬけてしまう）
     if (t[0] > GYM.x1 - 3.2 && t[0] < GYM.x2 + 3.2 && t[1] > GYM.z1 - 3.2 && t[1] < GYM.z2 + 3.2) continue;
+    // 門の 通り道も ふさがない
+    if (GATES.some((G) => dist2(t[0], t[1], G.in.x, G.in.z) < 36 || dist2(t[0], t[1], G.out.x, G.out.z) < 36)) continue;
     tree(mb, col, t[0], t[1], t[2]);
     spawnSpots.push({ x: t[0] + 2.2, z: t[1] - 2, y: 0, floor: 0 });
   }
