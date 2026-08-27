@@ -250,6 +250,7 @@ class Game {
     const live = new Set();
     for (const h0 of this.humans) if (!h0.out) live.add(h0.name);
     let came = 0;
+    const made = [];
     for (let i = 0; i < group.members.length; i++) {
       const t = group.members[i];
       const hid = this.hidNext++;
@@ -259,11 +260,13 @@ class Game {
       const h = new Human(this.scene, this.world, t, e.x + rand(-2.4, 2.4), e.z + rand(-2, 2));
       h.hid = hid;
       h.gate = G.out;                              // 帰るときも この門から
+      made.push(h);
       h.speak(choice(t.idle), 4 + i * 0.4);
       h.goTo(rand(-25, 25), rand(8, 28), 0);
       this.humans.push(h);
     }
     if (came === 0) return;                       // 全員かぶったときは、なにも起きない
+    this.planGroup(made, G);                      // 入りかたと 道すじを 決める
     this.ui.toast("第" + this.wave + "陣：" + group.label + "（" + came + "人）が " + G.name + "から来た…", "bad");
     this.audio.tone(180, 0.7, "sawtooth", 0.1, 90);
   }
@@ -326,6 +329,85 @@ class Game {
       this.audio.summon();
       this.ui.renderCraft();
     }
+  }
+
+  // ============================================================
+  //  グループごとの 入りかたと 道すじ
+  //   ・毎回おなじ「正面から まっすぐ」に ならないよう、
+  //     入りくちと 寄り道を くじで 決める
+  //   ・一列でゆっくり、はぐれる子、トイレに寄る子、
+  //     体育館に 寄り道する子 などを 混ぜる
+  // ============================================================
+  planGroup(members, gate) {
+    if (!members.length) return;
+    const w = this.world;
+    const ways = w.ways || [];
+    if (!ways.length) return;
+
+    // 門から いちばん近い入りくちを えらびやすくしつつ、たまに 遠回りもする
+    const scored = ways.map((y) => ({ y, d: dist(y.out.x, y.out.z, gate.in.x, gate.in.z) }));
+    scored.sort((a, b) => a.d - b.d);
+    const way = Math.random() < 0.55 ? scored[0].y : choice(ways);
+
+    // グループのくせ（雰囲気）を ひとつ えらぶ
+    const mood = choice(["normal", "normal", "line", "scatter", "gym"]);
+    const rooms = w.rooms.filter((r) => r.kind === "class" || r.kind === "science" ||
+      r.kind === "music" || r.kind === "library" || r.kind === "home" || r.kind === "art");
+    const toilets = w.rooms.filter((r) => r.kind === "toilet");
+    const gym = w.rooms.find((r) => r.kind === "gym");
+
+    // ぜんいん 共通の 道すじ：門 → 入りくちの外 → 中 → どこかの部屋
+    const common = [
+      { x: way.out.x, z: way.out.z, floor: 0,
+        say: choice(["ここから 入れそうじゃない？", "うわ、窓 割れてる…", "こっちから 行こう",
+          "ほんとに 入るの？", "だれか 先に 行ってよ"]) },
+      { x: way.in.x, z: way.in.z, floor: 0 },
+    ];
+
+    members.forEach((h, i) => {
+      const steps = common.map((s) => ({ ...s, say: i === 0 ? s.say : undefined }));
+
+      if (mood === "line") {
+        // 1列で こわがりながら ゆっくり
+        if (i === 0) {
+          h.role = "leader";
+          steps.push({ x: rand(-30, 30), z: rand(-12, -5), floor: 0, hold: rand(1.2, 2.4),
+            say: choice(["しずかに…足音たてないで", "一列で 行こう。はぐれないように", "ぼくが 先頭でいい？よくない？"]) });
+        } else {
+          h.role = "follower";
+          h.leader = members[i - 1];
+        }
+        h.type = { ...h.type, speed: h.type.speed * 0.6 };
+      } else if (mood === "scatter" && i >= members.length - 1) {
+        // はぐれる子：ひとりだけ ぜんぜん ちがう所へ行く
+        h.role = "straggler";
+        const r = choice(rooms.concat(toilets));
+        steps.push({ x: r.cx, z: r.cz, floor: r.floor || 0, hold: rand(2, 5),
+          say: choice(["あれ、みんな どこ行った？", "ちょっと こっち 見てくる", "はぐれた…かも"]) });
+      } else if (mood === "gym" && i % 2 === 0 && gym) {
+        // 体育館に 寄り道
+        steps.length = 0;
+        steps.push({ x: gym.cx + rand(-6, 6), z: gym.cz + rand(-6, 6), floor: 0, hold: rand(2, 4),
+          say: choice(["体育館 先に見ようよ", "ステージ 上がってみたい", "ここ、声が ひびくね"] ) });
+        steps.push({ x: way.out.x, z: way.out.z, floor: 0 });
+        steps.push({ x: way.in.x, z: way.in.z, floor: 0 });
+      }
+
+      // だれか ひとりは トイレに 寄る
+      if (toilets.length && Math.random() < 0.22) {
+        const t2 = choice(toilets);
+        steps.push({ x: t2.cx, z: t2.cz, floor: t2.floor || 0, hold: rand(3, 6),
+          say: choice(["ごめん、トイレ", "先 行ってて。すぐ 追いつく", "うわ…ここ 使えるの？"]) });
+      }
+      // さいごに どこかの部屋へ
+      const r2 = choice(rooms);
+      if (r2) steps.push({ x: r2.cx + rand(-2, 2), z: r2.cz + rand(-1.5, 1.5), floor: r2.floor || 0,
+        hold: rand(1, 3) });
+
+      h.setPlan(steps, h.role);
+      // 歩く速さも 一人ひとり すこし ちがう
+      h.type = { ...h.type, speed: h.type.speed * rand(0.86, 1.14) };
+    });
   }
 
   // --- 作成 --------------------------------------------------

@@ -80,6 +80,13 @@ export class Human {
     this.dropped = 0;
     this.slipCool = 0;
     this.out = false;
+    // --- 歩きかたの ちがい -----------------------------------
+    this.plan = null;        // やること の ならび（下の setPlan で入れる）
+    this.planI = 0;
+    this.role = "normal";    // normal / leader / follower / straggler
+    this.leader = null;      // 一列のとき、前の人
+    this.holdT = 0;          // その場で 立ちどまる時間
+    this.waitT = 0;          // なにかを 待っている時間
     this.scaredCount = 0;
     this.lookYaw = 0;
 
@@ -485,6 +492,26 @@ export class Human {
     this.target = { x, z, floor: to };
   }
 
+  // グループごとの「やること」を もらう。
+  //  例：[窓から入る] → [トイレに寄る] → [4階まで上がる]
+  setPlan(list, role) {
+    this.plan = list && list.length ? list.slice() : null;
+    this.planI = 0;
+    this.role = role || "normal";
+    this.nextPlan();
+  }
+
+  // つぎの やることへ 進む
+  nextPlan() {
+    if (!this.plan || this.planI >= this.plan.length) { this.plan = null; return false; }
+    const step = this.plan[this.planI++];
+    this.planStep = step;
+    if (step.say) this.speak(step.say, 3.4);
+    if (step.hold) { this.holdT = step.hold; }
+    this.goTo(step.x, step.z, step.floor || 0);
+    return true;
+  }
+
   wanderSomewhere() {
     const all = this.world.rooms.filter((r) => r.kind !== "yard" || Math.random() < 0.3);
     const r = choice(all);
@@ -584,6 +611,33 @@ export class Human {
       case "wander": {
         this.idleTalkT -= dt;
         if (this.idleTalkT <= 0) { this.speak(choice(this.type.idle), 3.4); this.idleTalkT = rand(7, 16); }
+        // その場で 立ちどまっている（トイレ・写真・ためらい）
+        if (this.holdT > 0) {
+          this.holdT -= dt;
+          wantX = null; wantZ = null;
+          this.path = null;
+          if (this.holdT <= 0 && !this.nextPlan()) { this.wanderSomewhere(); this.stateT = rand(14, 26); }
+          break;
+        }
+        // 一列のとき：前の人に ついていく（すこし間をあける）
+        if (this.role === "follower" && this.leader && !this.leader.out) {
+          const L = this.leader;
+          const d2 = dist(this.x, this.z, L.x, L.z);
+          if (d2 > 1.5) {
+            const k = (d2 - 1.5) / d2;
+            wantX = (L.x - this.x) / d2; wantZ = (L.z - this.z) / d2;
+            speed = Math.min(speed, L.type.speed * (d2 > 4 ? 1.25 : 0.85));
+            void k;
+          } else { wantX = null; wantZ = null; }
+          break;
+        }
+        // やることが あるなら それを こなす
+        if (this.plan) {
+          if (!this.path) {
+            if (this.holdT <= 0 && !this.nextPlan()) { this.wanderSomewhere(); this.stateT = rand(14, 26); }
+          }
+          break;
+        }
         if (!this.path || this.stateT <= 0) { this.wanderSomewhere(); this.stateT = rand(14, 26); }
         break;
       }
@@ -614,10 +668,12 @@ export class Human {
       }
       case "flee": {
         speed *= 1.9;
+        this.slideDir = this.slideDir || (Math.random() < 0.5 ? 1 : -1);
+        if (this.fleeStuck === undefined) this.regated = false;
         // 自分が入ってきた門へ もどっていく
         const gt = this.gate || w.exit;
         if (!this.path) this.goTo(gt.x, gt.z, 0);
-        if (dist(this.x, this.z, gt.x, gt.z) < 2.5) {
+        if (dist(this.x, this.z, gt.x, gt.z) < 3.4) {
           this.out = true;
           this.group.visible = false;
           if (ctx && ctx.onEscape) ctx.onEscape(this);
@@ -651,13 +707,81 @@ export class Human {
       this.vz = lerp(this.vz, 0, clamp(dt * 9, 0, 1));
     }
 
-    const r = w.colliders.resolve(this.x + this.vx * dt, this.z + this.vz * dt, this.radius, this.y + 1.0 * HUMAN_SCALE, ["stair"]);
-    if (r.hit) {
-      // 引っかかったら経路を引き直す
-      this.stuck = (this.stuck || 0) + dt;
-      if (this.stuck > 1.2 && this.target) { this.goTo(this.target.x, this.target.z, this.target.floor); this.stuck = 0; }
-    } else this.stuck = 0;
+    // 家具（花壇・机・ベンチ）は またげるので、体もすりぬける。
+    //  道をさがす計算が もともと家具を無視しているので、
+    //  ここを合わせないと 花壇の前で 足ぶみになってしまう。
+    const IGNORE = ["stair", "furn", "soft"];
+    const px = this.x, pz = this.z;
+    const r = w.colliders.resolve(this.x + this.vx * dt, this.z + this.vz * dt,
+      this.radius, this.y + 1.0 * HUMAN_SCALE, IGNORE);
     this.x = r.x; this.z = r.z;
+
+    // どれだけ進めたか。ぶつかっていなくても、
+    // 壁ぞいで まったく進んでいなければ「つまっている」とみなす
+    const moved = Math.hypot(this.x - px, this.z - pz);
+    const wanted = Math.hypot(this.vx, this.vz) * dt;
+    if (wanted > 0.004 && moved < wanted * 0.35) {
+      this.stuck = (this.stuck || 0) + dt;
+      // ② 横にすべって よける（壁づたいに まわりこむ）
+      if (this.stuck > 0.25) {
+        const side = this.slideDir || (this.slideDir = Math.random() < 0.5 ? 1 : -1);
+        const nx = -this.vz, nz = this.vx;
+        const nl = Math.hypot(nx, nz) || 1;
+        const s2 = w.colliders.resolve(
+          this.x + (nx / nl) * side * speed * dt * 1.2,
+          this.z + (nz / nl) * side * speed * dt * 1.2,
+          this.radius, this.y + 1.0 * HUMAN_SCALE, IGNORE);
+        this.x = s2.x; this.z = s2.z;
+      }
+      // ③ それでもだめなら 道を引きなおす。
+      //    逃げているときは 行き先が門なので、必ず引きなおせる
+      if (this.stuck > 1.0) {
+        const t2 = this.state === "flee" ? (this.gate || w.exit) : this.target;
+        if (t2) this.goTo(t2.x, t2.z, t2.floor === undefined ? 0 : t2.floor);
+        this.slideDir = -(this.slideDir || 1);      // 次は 反対がわへ よけてみる
+        this.stuck = 0;
+      }
+      // ④ 逃げているのに 長いこと出られないときの 最後の手段
+      if (this.state === "flee") {
+        this.fleeStuck = (this.fleeStuck || 0) + dt;
+        if (this.fleeStuck > 6) {
+          // 引っぱる先は「道の つぎの地点」。門へ まっすぐ引くと
+          // かべを つきぬけて 建物の中に 入ってしまう
+          const nx2 = (this.path && this.pathI < this.path.length)
+            ? this.path[this.pathI] : (this.gate || w.exit);
+          const dx2 = nx2.x - this.x, dz2 = nx2.z - this.z;
+          const dl = Math.hypot(dx2, dz2) || 1;
+          const p2 = w.colliders.resolve(
+            this.x + (dx2 / dl) * speed * dt * 1.4,
+            this.z + (dz2 / dl) * speed * dt * 1.4,
+            this.radius, this.y + 1.0 * HUMAN_SCALE, IGNORE);
+          this.x = p2.x; this.z = p2.z;
+        }
+        // ③ それでもだめなら、いちばん近い門に かえる
+        if (this.fleeStuck > 10 && !this.regated) {
+          this.regated = true;
+          let best = w.exit, bd = 1e9;
+          for (const G2 of (w.gates || [])) {
+            const d2 = dist(this.x, this.z, G2.out.x, G2.out.z);
+            if (d2 < bd) { bd = d2; best = G2.out; }
+          }
+          this.gate = best;
+          this.goTo(best.x, best.z, 0);
+        }
+        // ④ 16秒：道の つぎの地点まで ひとっとび。
+        //    道でつながっている所なので、へんな場所には 行かない
+        if (this.fleeStuck > 16 && this.path && this.pathI < this.path.length) {
+          const n2 = this.path[this.pathI++];
+          this.x = n2.x; this.z = n2.z;
+          if (n2.y !== undefined) this.y = n2.y;
+          if (this.pathI >= this.path.length) this.path = null;
+          this.fleeStuck = 11;
+        }
+      }
+    } else {
+      this.stuck = 0;
+      if (this.state !== "flee") this.fleeStuck = 0;
+    }
 
     const mv = Math.hypot(this.vx, this.vz);
     if (mv > 0.25 && this.state !== "spooked")

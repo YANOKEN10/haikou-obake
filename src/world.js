@@ -37,6 +37,15 @@ const GYM_DOOR = { z: 50, w: 2.6 };                            // 体育館の�
 //  こわくなったら 自分が入ってきた門から 帰っていく。
 //  in  … 門のうちがわ（ここへ向かって歩く）
 //  out … 門のそとがわ（ここまで行くと 帰った ことになる）
+// 校舎に 入る道。人間は このどれかを えらんで 入ってくる。
+//  out … 校舎の外がわ、in … 校舎の中がわ
+export const WAYS = [
+  { id: "front",  name: "昇降口",       out: { x: 0,   z: 12 },  in: { x: 0,   z: 3 } },
+  { id: "back",   name: "裏口",         out: { x: -30, z: -17 }, in: { x: -30, z: -11 } },
+  { id: "win_e",  name: "割れた窓（東）", out: { x: 21,  z: 2.4 }, in: { x: 21,  z: -2 } },
+  { id: "win_w",  name: "割れた窓（西）", out: { x: -21, z: 2.4 }, in: { x: -21, z: -2 } },
+];
+
 export const GATES = [
   { id: "s", name: "正門",     in: { x: 0, z: 70 },   out: { x: 0, z: 79 },   axis: "x", at: 72, w: 5.0 },
   { id: "e", name: "東の通用門", in: { x: 45, z: 52 }, out: { x: 55, z: 52 },  axis: "z", at: 48, w: 3.4 },
@@ -87,7 +96,7 @@ export function buildWorld(scene, opts = {}) {
 
   return {
     colliders: col, nav, rooms, spawnSpots, props, lightSpots,
-    exit: EXIT_POINT, entry: HUMAN_ENTRY, gates: GATES, staticMesh, triangles: mb.triangles,
+    exit: EXIT_POINT, entry: HUMAN_ENTRY, gates: GATES, ways: WAYS, staticMesh, triangles: mb.triangles,
     bounds: { x1: -52, x2: 52, z1: -36, z2: 82 },
     northOutsideZ: RZ1 - 1.6,
     floors: FLOORS,
@@ -168,24 +177,64 @@ function buildFloor(ctx, f) {
 
   // --- 外壁（南北）------------------------------------------
   //  木造校舎らしく、下見板張り＋柱＋格子窓＋ひさし で仕上げる
-  const north = windowRow(BX1 + 2, BX2 - 2, 3.0, 4.6, y0 + 0.95, y0 + 2.55);
+  const north = windowRow(BX1 + 2, BX2 - 2, 3.0, 4.6, y0 + 0.95, y0 + 2.55)
+    .filter((hh) => f > 0 || hh.b < -32.4 || hh.a > -27.6);        // 1階の裏口ぶんは あけておく
+  if (f === 0) north.push({ a: -32.4, b: -27.6, y1: y0, y2: y0 + 2.5 });   // 裏口
   wallWithHoles(mb, col, { axis: "x", fixed: RZ1, from: BX1, to: BX2, y1: y0, y2: y1, thick: WALL_T, color: C.wall, holes: north });
   siding(mb, "x", RZ1, BX1, BX2, y0, y1, -1, 0.42, north);
   posts(mb, "x", RZ1, BX1, BX2, y0, y1, -1, 4.6, north);
-  for (const h of north) sash(mb, "x", RZ1 - 0.06, h.a, h.b, h.y1, h.y2, 2);
+  for (const h of north) {
+    if (f === 0 && h.a === -32.4) continue;             // 裏口は 戸が あいたまま
+    sash(mb, "x", RZ1 - 0.06, h.a, h.b, h.y1, h.y2, 2);
+  }
   eave(mb, "x", RZ1, BX1, BX2, y0 + 2.78, 0.72, -1);
 
+  const BROKEN = [[19.4, 22.6], [-22.6, -19.4]];   // 割れた窓（1階・床まで あいている）
   const south = windowRow(BX1 + 2, BX2 - 2, 3.2, 4.6, y0 + 0.95, y0 + 2.6)
-    .filter((h) => f > 0 || h.b < -7.5 || h.a > 7.5);
-  if (f === 0) south.push({ a: -3, b: 3, y1: y0, y2: y0 + 2.5 });
+    .filter((h) => f > 0 || h.b < -7.5 || h.a > 7.5)
+    // 割れた窓に かぶる ふつうの窓は 消す。
+    //  残したままだと 窓の下の「腰壁」が 開口を ふさいで しまう
+    .filter((h) => f > 0 || !BROKEN.some((p) => h.b > p[0] - 0.05 && h.a < p[1] + 0.05));
+  if (f === 0) {
+    south.push({ a: -3, b: 3, y1: y0, y2: y0 + 2.5 });              // 昇降口へ
+    // 割れた窓。枠ごと外れていて、床まで あいている
+    south.push({ a: 19.4, b: 22.6, y1: y0, y2: y0 + 2.55 });
+    south.push({ a: -22.6, b: -19.4, y1: y0, y2: y0 + 2.55 });
+  }
   wallWithHoles(mb, col, { axis: "x", fixed: HZ2, from: BX1, to: BX2, y1: y0, y2: y1, thick: WALL_T, color: C.wall, holes: south });
   siding(mb, "x", HZ2, BX1, BX2, y0, y1, 1, 0.42, south);
   posts(mb, "x", HZ2, BX1, BX2, y0, y1, 1, 4.6, south);
   for (const h of south) {
     if (f === 0 && h.a === -3) continue;                 // 昇降口は枠なし
+    if (f === 0 && (h.a === 19.4 || h.a === -22.6)) continue;   // 割れた窓は 枠ごと外れている
     sash(mb, "x", HZ2 + 0.06, h.a, h.b, h.y1, h.y2, 2);
   }
   eave(mb, "x", HZ2, BX1, BX2, y0 + 2.84, 0.78, 1);
+
+  // 1階：割れた窓と 裏口の しるし
+  if (f === 0) {
+    for (const wx of [21, -21]) {
+      // 外れた枠が ころがっている
+      mb.box(wx + rand(-0.8, 0.8), 0.08, HZ2 + rand(0.7, 1.6), 1.5, 0.09, 0.14, C.sash,
+        { jitter: 0.2, rotY: rand(0, 3.14) });
+      mb.box(wx + rand(-0.8, 0.8), 0.07, HZ2 + rand(0.7, 1.6), 0.12, 0.08, 1.2, C.sash,
+        { jitter: 0.2, rotY: rand(0, 3.14) });
+      // 割れたガラスの かけら
+      for (let i = 0; i < 9; i++) {
+        mb.box(wx + rand(-1.4, 1.4), 0.05, HZ2 + rand(0.3, 2.0), rand(0.1, 0.26), 0.02, rand(0.1, 0.26),
+          0xa8c8d8, { jitter: 0.4, rotY: rand(0, 3.14) });
+      }
+      // 窓ぎわに 残った ぎざぎざのガラス
+      for (let i = 0; i < 5; i++) {
+        mb.box(wx - 1.4 + i * 0.7, 2.5, HZ2 + 0.05, 0.4, 0.22, 0.05, 0xb8d8e8, { jitter: 0.4 });
+      }
+      // ふみ台がわりの コンクリブロック
+      mb.box(wx, 0.14, HZ2 + 0.7, 0.7, 0.28, 0.5, C.concrete, { jitter: 0.12, rotY: rand(-0.3, 0.3) });
+    }
+    // 裏口の 開きっぱなしの ドア
+    mb.box(-27.4, 1.25, RZ1 - 0.1, 0.08, 2.4, 1.9, C.wood, { jitter: 0.14, rotY: 0.5 });
+    mb.box(-30, 0.06, RZ1 - 1.1, 2.6, 0.1, 1.8, C.concrete, { jitter: 0.16 });
+  }
 
   // 渡り廊下へ出る口（2階のみ）
   wallWithHoles(mb, col, { axis: "z", fixed: BX1, from: RZ1, to: HZ2, y1: y0, y2: y1, thick: WALL_T, color: C.wall });
@@ -991,6 +1040,15 @@ function linkNav(ctx) {
   for (const s of [ST_W, ST_E]) nav.addNode((s.x1 + s.x2) / 2, RZ2 - 2.6, FLOORS, "屋上", floorY(FLOORS));
 
   // 正門とその外
+  // 校舎の 入りくち4つ：外 → 入口 → 中 を まっすぐ つなぐ。
+  //  こうしておくと、道さがしが かならず ここを通れる
+  for (const way of WAYS) {
+    const a2 = nav.addNode(way.out.x, way.out.z, 0, way.name + "（外）", 0);
+    const b2 = nav.addNode((way.out.x + way.in.x) / 2, (way.out.z + way.in.z) / 2, 0, way.name, 0);
+    const c2 = nav.addNode(way.in.x, way.in.z, 0, way.name + "（中）", 0);
+    nav.link(a2, b2); nav.link(b2, c2);
+  }
+
   // 4つの門：うちがわ → 門のところ → そとがわ を つなぐ
   for (const g of GATES) {
     const dx = g.out.x - g.in.x, dz = g.out.z - g.in.z;
