@@ -17,18 +17,19 @@
 //       https://haikou-obake-daisakusen.vercel.app/?support=thanks
 export const SUPPORT_URL = "";
 
-// 問い合わせ先。ここだけ 変えれば 表示も変わる。
-//  ※ 住所と電話番号は わざと 書いていません。
-//    このゲームは 子どもが URL を教えあって あそぶので、
-//    自宅の情報を のせないほうが 安全だからです。
-//    売る商品がなく「任意の応援」なので、
-//    特定商取引法の通信販売の表記は 必要になりにくい、という考えです。
-//    事業者の情報が要る場合は、Stripe の支払いページ側に
-//    設定してください。払う人だけが その画面で見ます。
-export const CONTACT_MAIL = "voraz.yanokenta-arcoiris0928@docomo.ne.jp";
+// 連絡さき。
+//  ふだんは 空のままで かまいません。
+//  Stripe の「公開ビジネス情報 → サポートメール」を 設定しておけば、
+//  支払い画面と 領収メールに 連絡先が のります。
+//  払った おとなだけが それを見るので、
+//  子どもが 見るページに 個人の連絡先を 出さずに すみます。
+//
+//  もし ゲームの画面にも のせたい場合は、
+//  <b>このゲーム専用に 作った メールアドレス</b>を 入れてください。
+//  ふだん使いの携帯メールは、迷惑メールが 増えたり
+//  変えにくかったり するので おすすめしません。
+export const CONTACT_MAIL = "";
 
-// 特定商取引法に基づく表記のページ（もしあれば）。
-//  空なら リンクは出ません。
 export const TOKUSHOHO_URL = "";
 
 const KEY = "haikou-obake:supporter";
@@ -78,7 +79,11 @@ export function supportText() {
     { h: "返金について", p:
       "任意の応援のため、送っていただいたあとの お客様都合による返金には 対応していません。<br>" +
       "二重に 決済されてしまった場合や、手ちがいがあった場合は、" +
-      "確認のうえ 返金します。決済の日時を そえて ご連絡ください。" },
+      "確認のうえ 返金します。<br>" +
+      (CONTACT_MAIL
+        ? "決済の日時を そえて、下の連絡さきまで お知らせください。"
+        : "<b>お支払いのときに Stripe から とどく 領収メール</b>に 連絡さきが 書いてあります。" +
+          "決済の日時を そえて、そちらへ ご連絡ください。") },
     { h: "おとなの方へ・おねがい", p:
       "お子さんが かってに 決済することが ないよう、" +
       "スマホやタブレットの <b>お支払い制限</b>を かけておくことを おすすめします。<br>" +
@@ -117,7 +122,9 @@ export function openSupportInfo() {
   box.innerHTML =
     '<div class="sibox"><h3>☕ 応援について</h3>' +
     supportText().map((x) => "<h4>" + x.h + "</h4><p>" + x.p + "</p>").join("") +
-    '<h4>連絡さき</h4><p><a href="mailto:' + CONTACT_MAIL + '">' + CONTACT_MAIL + "</a></p>" +
+    (CONTACT_MAIL
+      ? '<h4>連絡さき</h4><p><a href="mailto:' + CONTACT_MAIL + '">' + CONTACT_MAIL + "</a></p>"
+      : "") +
     (TOKUSHOHO_URL
       ? '<p><a href="' + TOKUSHOHO_URL + '" target="_blank" rel="noopener noreferrer">特定商取引法に基づく表記</a></p>'
       : "") +
