@@ -206,8 +206,11 @@ export class Human {
     const hair = new THREE.Mesh(new THREE.SphereGeometry(0.205, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), hairMat);
     hair.position.y = 1.64; this.body.add(hair);
     if (T.sex === "f" || T.longHair) {
-      const back = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.34, 0.14), hairMat);
-      back.position.set(0, 1.47, -0.13); this.body.add(back);
+      // 背番号がある人は、髪を 結びあげているので みじかい
+      const back = T.number
+        ? new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.14, 0.12), hairMat)
+        : new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.34, 0.14), hairMat);
+      back.position.set(0, T.number ? 1.57 : 1.47, -0.13); this.body.add(back);
     }
     if (T.center) {                                 // センター分け
       hair.scale.set(1, 0.9, 1);
@@ -329,7 +332,15 @@ export class Human {
       }
     } else if (acc === "ponytail") {
       const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.04, 0.5, 8), hairM2);
-      tail.position.set(0, 1.42, -0.22); tail.rotation.x = -0.35; this.body.add(tail);
+      if (T.number) {
+        // 背番号が 見えるように、高いところで みじかく 結ぶ
+        tail.scale.set(0.85, 0.5, 0.85);
+        tail.position.set(0, 1.63, -0.2);
+        tail.rotation.set(-0.9, 0, 0);
+      } else {
+        tail.position.set(0, 1.42, -0.22); tail.rotation.x = -0.35;
+      }
+      this.body.add(tail);
     } else if (acc === "ahoge") {
       const ah = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.02, 0.24, 6), hairM2);
       ah.position.set(0.03, 1.88, -0.02); ah.rotation.z = 0.5; this.body.add(ah);
