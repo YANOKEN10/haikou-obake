@@ -133,6 +133,26 @@ export class Human {
         T.sex === "f" ? new THREE.BoxGeometry(0.16, 0.09, 0.06) : new THREE.BoxGeometry(0.07, 0.26, 0.06), trim);
       tie.position.set(0, T.sex === "f" ? 1.37 : 1.28, 0.16); this.body.add(tie);
     }
+    this.shirtBits = [];
+    if (ST === "soccer") {                          // サッカーの ユニフォーム
+      const hoop = new THREE.MeshLambertMaterial({ color: T.hoop || 0x3a70cc });
+      // 胴の よこじま（3本）
+      for (const hy of [1.365, 1.15, 0.935]) {
+        const band = new THREE.Mesh(new THREE.BoxGeometry(0.484, 0.104, 0.294), hoop);
+        band.position.y = hy; this.body.add(band); this.shirtBits.push(band);
+      }
+      // 肩の 黄色い3本ライン
+      for (const sx of [-1, 1]) {
+        for (let i = 0; i < 3; i++) {
+          const st = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.12, 0.3), trim);
+          st.position.set(sx * (0.145 + i * 0.05), 1.405, 0);
+          this.body.add(st); this.shirtBits.push(st);
+        }
+      }
+      // えりは Vネック。うすく 小さく
+      collar.scale.set(0.9, 0.62, 0.99);
+      collar.position.y = 1.45;
+    }
     if (ST === "jersey") {                          // ジャージ：そでと胴に 白い線
       for (const sx of [-0.245, 0.245]) {
         const st = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.58, 0.26), trim);
@@ -229,6 +249,17 @@ export class Human {
     this.armL.position.set(-0.32, 1.16, 0); this.armR.position.set(0.32, 1.16, 0);
     this.armL.geometry.translate(0, -0.22, 0); this.armR.geometry.translate(0, -0.22, 0);
     this.body.add(this.armL, this.armR);
+    if (ST === "soccer") {
+      // そでの 3本ライン（腕といっしょに 動くように 腕の子にする）
+      for (const [arm, sx] of [[this.armL, 1], [this.armR, -1]]) {
+        for (let i = 0; i < 3; i++) {
+          const st = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.2, 0.125), trim);
+          st.position.set(sx * (0.062 - i * 0.001), -0.12 + i * 0, 0);
+          st.position.y = -0.1; st.position.z = -0.042 + i * 0.042;
+          arm.add(st); this.shirtBits.push(st);
+        }
+      }
+    }
     // 破けたときに出てくる素肌の腕
     this.bareL = new THREE.Mesh(new THREE.BoxGeometry(0.115, 0.5, 0.115), skin);
     this.bareR = new THREE.Mesh(new THREE.BoxGeometry(0.115, 0.5, 0.115), skin);
@@ -238,7 +269,7 @@ export class Human {
     this.body.add(this.bareL, this.bareR);
 
     // 下半身：女子はスカート、男子はズボン
-    const wearsSkirt = T.skirt !== null && (T.sex === "f" ? T.style !== "jersey" && T.style !== "police" && T.style !== "suit" : T.style === "robe");
+    const wearsSkirt = T.skirt !== null && (T.sex === "f" ? T.style !== "jersey" && T.style !== "soccer" && T.style !== "police" && T.style !== "suit" : T.style === "robe");
     if (wearsSkirt) {
       const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.36, 0.34, 12), new THREE.MeshLambertMaterial({ color: T.skirt || 0x574a70 }));
       skirt.position.y = 0.72; this.body.add(skirt);
@@ -251,6 +282,18 @@ export class Human {
     this.legL.position.set(-0.12, 0.82, 0); this.legR.position.set(0.12, 0.82, 0);
     this.legL.geometry.translate(0, -0.3, 0); this.legR.geometry.translate(0, -0.3, 0);
     this.body.add(this.legL, this.legR);
+    if (ST === "soccer") {
+      for (const [leg, sx] of [[this.legL, -1], [this.legR, 1]]) {
+        // わきの 黄色い線（パンツ）
+        const sd = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.2, 0.09), trim);
+        sd.position.set(sx * 0.071, -0.09, 0); leg.add(sd);
+        // ソックスの 黄色いバンド
+        for (const by of [-0.44, -0.5]) {
+          const bd = new THREE.Mesh(new THREE.BoxGeometry(0.145, 0.028, 0.145), trim);
+          bd.position.set(0, by, 0); leg.add(bd);
+        }
+      }
+    }
     // 上履き
     for (const s2 of [-0.12, 0.12]) {
       const sh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.09, 0.24), new THREE.MeshLambertMaterial({ color: T.shoes || 0xe8e2d0 }));
@@ -407,6 +450,7 @@ export class Human {
     this.torso.visible = false;
     this.collar.visible = false;
     this.armL.visible = this.armR.visible = false;
+    if (this.shirtBits) for (const q of this.shirtBits) q.visible = false;
     this.bareL.visible = this.bareR.visible = true;
     this.burstPieces = [];
     for (let i = 0; i < 6; i++) {
