@@ -377,7 +377,7 @@ class Game {
     } else if (kind === "ghost") {
       const pl = this.player;
       const r = this.world.colliders.resolve(pl.x + rand(-2, 2), pl.z + rand(-2, 2), 0.4, pl.y);
-      this.summons.push(new Summon(this.scene, this.world, id, r.x, r.z));
+      this.summons.push(new Summon(this.scene, this.world, id, r.x, r.z, this.summonFloorY()));
       this.bump("ghostsSummoned"); this.bumpIn("byGhost", id);
       this.ui.toast(GHOSTS[id].icon + " " + GHOSTS[id].name + " と ひきかえた！", "gold");
       this.audio.summon();
@@ -510,7 +510,7 @@ class Game {
     } else {
       const p = this.player;
       const r = this.world.colliders.resolve(p.x + rand(-2, 2), p.z + rand(-2, 2), 0.4, 1.2);
-      this.summons.push(new Summon(this.scene, this.world, id, r.x, r.z));
+      this.summons.push(new Summon(this.scene, this.world, id, r.x, r.z, this.summonFloorY()));
       this.bump("ghostsSummoned"); this.bumpIn("byGhost", id);
       this.ui.toast(d.icon + " " + d.name + " を生み出した！", "gold");
       this.audio.summon();
@@ -1352,6 +1352,13 @@ class Game {
     this.ui.setCharChip(CHARS[this.charId]);
     this.saveNow(false);
     return true;
+  }
+
+  // 召喚おばけを 置く 階の、床の 高さ。
+  //  これを わたさないと、4階で 出しても 1階に あらわれてしまう
+  summonFloorY() {
+    const f = clamp(Math.round((this.player.y - 1.02) / 3.6), 0, 4);   // 1階が0、屋上が4
+    return f * 3.6;
   }
 
   // ============================================================

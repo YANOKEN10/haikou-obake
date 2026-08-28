@@ -77,11 +77,15 @@ export class Colliders {
   }
 
   // 円(x,z,r) を y の高さで箱から押し出す。戻り値 {x,z,hit}
-  resolve(x, z, r, y = 1.0, ignore = null) {
+  //  minTop … これより 上まで つづいている箱だけを 見る。
+  //    屋上に立ったとき、下の階の かべ（上が 屋根と同じ高さで
+  //    おわっている）に ぶつからないように するため。
+  resolve(x, z, r, y = 1.0, ignore = null, minTop = null) {
     let hit = false;
     for (let pass = 0; pass < 2; pass++) {
       for (const b of this.near(x, z, r + 0.5)) {
         if (y + 0.6 < b.y1 || y - 0.6 > b.y2) continue;
+        if (minTop !== null && b.y2 < minTop) continue;
         if (ignore && ignore.indexOf(b.tag) >= 0) continue;
         const cx = clamp(x, b.x1, b.x2);
         const cz = clamp(z, b.z1, b.z2);

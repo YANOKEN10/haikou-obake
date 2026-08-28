@@ -203,10 +203,14 @@ function makeIconSprite(ch) {
 //  召喚したおばけ（お供）
 // ============================================================
 export class Summon {
-  constructor(scene, world, id, x, z) {
+  constructor(scene, world, id, x, z, y) {
     this.id = id; this.def = GHOSTS[id];
     this.world = world;
-    this.x = x; this.z = z; this.y = 1.2;
+    this.x = x; this.z = z;
+    this.baseY = y || 0;              // 置かれた 階の 床の 高さ
+    this.y = this.baseY + 1.2;
+    this.stuck = 0;                   // かべに つまっている 時間
+    this.slide = Math.random() < 0.5 ? 1 : -1;
     this.yaw = 0;
     this.life = this.def.life;
     this.cool = 0;
@@ -231,6 +235,7 @@ export class Summon {
     let best = null, bd = 1e9;
     for (const h of humans) {
       if (h.out) continue;
+      if (Math.abs(h.y - this.baseY) > 2.4) continue;    // ちがう階の人は 追わない
       const d = dist(this.x, this.z, h.x, h.z);
       if (d < bd) { bd = d; best = h; }
     }
@@ -243,21 +248,47 @@ export class Summon {
         this.wanderT -= dt;
         if (this.wanderT <= 0) {
           this.wanderT = rand(3, 7);
-          this.tx = this.x + rand(-12, 12); this.tz = this.z + rand(-12, 12);
+          const a4 = rand(0, Math.PI * 2), r4 = rand(4, 11);
+          this.tx = this.x + Math.cos(a4) * r4;
+          this.tz = this.z + Math.sin(a4) * r4;
         }
         tx = this.tx; tz = this.tz;
       }
       const d = dist(this.x, this.z, tx, tz);
       if (d > 0.8) {
-        const nx = this.x + ((tx - this.x) / d) * spd * dt;
-        const nz = this.z + ((tz - this.z) / d) * spd * dt;
-        const r = this.world.colliders.resolve(nx, nz, 0.35, this.y);
+        const IGNORE = ["stair", "furn", "soft"];       // 机や 花壇は すりぬける
+        const px = this.x, pz = this.z;
+        const dx = (tx - this.x) / d, dz = (tz - this.z) / d;
+        const r = this.world.colliders.resolve(this.x + dx * spd * dt, this.z + dz * spd * dt,
+          0.35, this.y, IGNORE);
         this.x = r.x; this.z = r.z;
-        this.yaw = Math.atan2(tx - this.x, tz - this.z);
+
+        // どれだけ 進めたか。かべに 押しつけられていないか しらべる
+        const moved = dist(px, pz, this.x, this.z);
+        const want = spd * dt;
+        if (want > 0.004 && moved < want * 0.4) {
+          this.stuck += dt;
+          // ① かべに そって 横に すべって よける
+          const nx2 = -dz * this.slide, nz2 = dx * this.slide;
+          const s2 = this.world.colliders.resolve(this.x + nx2 * spd * dt * 1.2,
+            this.z + nz2 * spd * dt * 1.2, 0.35, this.y, IGNORE);
+          this.x = s2.x; this.z = s2.z;
+          // ② それでも だめなら 行き先を 変えて、よける向きも 逆にする
+          if (this.stuck > 1.2) {
+            this.stuck = 0;
+            this.slide = -this.slide;
+            this.wanderT = rand(3, 7);
+            const a3 = rand(0, Math.PI * 2), rr = rand(5, 12);
+            this.tx = this.x + Math.cos(a3) * rr;
+            this.tz = this.z + Math.sin(a3) * rr;
+          }
+        } else this.stuck = 0;
+        const mv = Math.hypot(this.x - px, this.z - pz);
+        if (mv > 0.002) this.yaw = Math.atan2(this.x - px, this.z - pz);
       }
     }
 
-    this.y = 1.15 + Math.sin(t * 2.4 + this.phase) * 0.18;
+    this.y = this.baseY + 1.15 + Math.sin(t * 2.4 + this.phase) * 0.18;
     this.group.position.set(this.x, this.y, this.z);
     this.group.rotation.y = this.yaw;
     this.group.rotation.z = Math.sin(t * 3 + this.phase) * 0.06;
