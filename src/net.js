@@ -20,6 +20,7 @@ export class Net {
     this.isHost = false;
     this.peers = new Map();      // pid -> {name, tx,ty,tz,tyaw, x,y,z,yaw, placed, seen}
     this.remoteWorld = null;     // ホストからとどいた人間たち
+    this.remoteBattle = null;    // おやからとどいた「おどかし勝負」のようす
     this.outActs = [];           // ホストへ送る「おどかした」合図（番号つき・何回か送りなおす）
     this.actNo = 1;
     this.inActs = [];            // ホストが受けとった合図
@@ -197,7 +198,9 @@ export class Net {
     if (this.isHost && !wasHost && this.onEvent) this.onEvent("host", "あなたが おやになりました");
 
     const seen = new Set();
+    let sawHost = false;
     for (const o of room.others || []) {
+      if (o.g && o.g.h) sawHost = true;
       seen.add(o.pid);
       let p = this.peers.get(o.pid);
       if (!p) {
@@ -205,6 +208,7 @@ export class Net {
         p = { name: o.name, x: g.x || 0, y: g.y || 1.2, z: g.z || 0, yaw: g.yaw || 0,
               tx: g.x || 0, ty: g.y || 1.2, tz: g.z || 0, tyaw: g.yaw || 0,
               vx: 0, vy: 0, vz: 0, age: 0, last: 0, charId: g.c || "obake",
+              score: 0, isHost: false,
               placed: [], phasing: false, scaring: 0 };
         this.peers.set(o.pid, p);
         if (this.onEvent) this.onEvent("join", o.name);
@@ -228,12 +232,16 @@ export class Net {
         p.tx = o.g.x; p.ty = o.g.y; p.tz = o.g.z; p.tyaw = o.g.yaw;
         p.phasing = !!o.g.p; p.scaring = o.g.s || 0;
         p.charId = o.g.c || "obake";           // ともだちの すがた
+        p.score = o.g.sc || 0;                 // おどかし勝負の 人数
+        p.isHost = !!o.g.h;                    // この人が おや か
+        if (o.g.h) this.remoteBattle = o.g.bt || null;   // 勝負の ようす
         // はなれすぎていたら（ワープしたときなど）、いきなり合わせる
         if (Math.abs(p.tx - p.x) > 14 || Math.abs(p.tz - p.z) > 14) {
           p.x = p.tx; p.y = p.ty; p.z = p.tz; p.vx = p.vy = p.vz = 0;
         }
       }
     }
+    if (!sawHost && !this.isHost) this.remoteBattle = null;   // おやが いない＝勝負は なし
     for (const [pid, p] of this.peers) {
       if (!seen.has(pid)) { this.peers.delete(pid); if (this.onEvent) this.onEvent("part", p.name); }
     }

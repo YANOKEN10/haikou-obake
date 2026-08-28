@@ -91,6 +91,24 @@ export class Home {
       g.audio.click();
     });
 
+    // --- おどかし勝負 ---------------------------------------
+    this.battleMin = 3;
+    document.querySelectorAll(".bmin").forEach((el) => {
+      el.addEventListener("click", () => {
+        this.battleMin = Number(el.dataset.min);
+        document.querySelectorAll(".bmin").forEach((o) => o.classList.toggle("on", o === el));
+        g.audio.click();
+      });
+    });
+    $("#rBattle").addEventListener("click", () => {
+      if (!g.net.on || !g.net.isHost) { g.ui.roomMsg("部屋を作った人だけ はじめられます"); return; }
+      if (!g.net.peers.size) { g.ui.roomMsg("ともだちが 入ってから はじめてください"); return; }
+      if (!g.started) { g.ui.roomMsg("さきに ゲームを 始めてください"); return; }
+      g.battle.start(this.battleMin);
+    });
+    $("#rsClose").addEventListener("click", () => { g.ui.hideResult(); g.audio.click(); });
+    $("#result").addEventListener("click", (e) => { if (e.target.id === "result") g.ui.hideResult(); });
+
     $("#rLeave").addEventListener("click", async () => {
       busy(true);
       await g.roomLeave();

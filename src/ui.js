@@ -298,6 +298,60 @@ export class UI {
     });
   }
 
+  // --- おどかし勝負 ------------------------------------------
+  //  b … {left, score, rows:[{name,score}]}。null で 消す
+  setBattle(b) {
+    const bar = $("#battleBar");
+    if (!b) { bar.hidden = true; return; }
+    bar.hidden = false;
+    const sec = Math.max(0, Math.ceil(b.left));
+    const txt = Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+    if (txt !== this._bClock) { this._bClock = txt; $("#bClock").textContent = txt; }
+    bar.classList.toggle("hurry", sec <= 10);
+    if (b.score !== this._bScore) { this._bScore = b.score; $("#bCount").textContent = b.score; }
+    const key = (b.rows || []).map((r) => r.name + ":" + r.score).join("|");
+    if (key !== this._bRows) {
+      this._bRows = key;
+      $("#bList").innerHTML = (b.rows || [])
+        .map((r) => "<span>" + esc(r.name) + " <b>" + r.score + "</b></span>").join("");
+    }
+  }
+
+  // 3・2・1 の 大きな数字
+  showCount(text, isGo) {
+    const e = $("#count3");
+    $("#count3n").textContent = text;
+    $("#count3s").textContent = isGo ? "スタート！" : "おどかし勝負！";
+    e.classList.remove("on");
+    void e.offsetWidth;                        // もう一度 動かすための おまじない
+    e.classList.add("on");
+    clearTimeout(this._c3);
+    this._c3 = setTimeout(() => e.classList.remove("on"), isGo ? 1100 : 900);
+  }
+
+  hideCount() { clearTimeout(this._c3); $("#count3").classList.remove("on"); }
+
+  // けっか はっぴょう
+  showResult(rows, gift, mine) {
+    const medal = ["🥇", "🥈", "🥉"];
+    $("#rsTitle").textContent = rows.length > 1
+      ? (mine.place === 1 ? "🎉 " + mine.score + "人で ゆうしょう！" : mine.place + "位　" + mine.score + "人 おどかした")
+      : mine.score + "人 おどかした！";
+    $("#rsRank").innerHTML = rows.map((r) =>
+      "<div class='rsrow" + (r.me ? " me" : "") + "'>" +
+      "<span class='pl'>" + (medal[r.place - 1] || r.place + "位") + "</span>" +
+      "<span class='nm'>" + esc(r.name) + "</span>" +
+      "<span class='sc'>" + r.score + "人</span></div>").join("");
+    const g2 = gift || { num: 0, items: "", tiers: "" };
+    $("#rsGift").innerHTML =
+      "<span class='gt'>🎁 ごほうび " + g2.num + "こ" + (g2.won ? "（ゆうしょう ボーナスつき）" : "") + "</span>" +
+      (g2.items || "なし") +
+      (g2.tiers ? "<br><span style='color:var(--gold)'>かけら： " + g2.tiers + "</span>" : "");
+    $("#result").classList.add("on");
+  }
+
+  hideResult() { $("#result").classList.remove("on"); }
+
   // --- ともだちと あそぶ -------------------------------------
   openRoom(net) {
     $("#room").classList.add("on");
@@ -346,6 +400,18 @@ export class UI {
     $("#rMembers").innerHTML = mem.map((m) =>
       "<div class='rmem'><span>" + (m.me ? "🫵 " : "👻 ") + esc(m.name) + "</span>" +
       "<span class='tag'>" + (m.me ? (m.host ? "じぶん・おや" : "じぶん") : "ともだち") + "</span></div>").join("");
+
+    // 勝負を はじめられるのは おや だけ。ひとりでは できない
+    const canFight = net.isHost && net.peers.size > 0;
+    $("#rBattle").disabled = !canFight;
+    $("#rBattle").style.opacity = canFight ? "1" : ".45";
+    $("#bNote").innerHTML = net.isHost
+      ? (net.peers.size ? "だれが いちばん たくさん おどかせるか。<br>おわると、おどかした人数ぶん 材料が もらえます。"
+                        : "ともだちが 入ってくると、勝負を はじめられます。")
+      : "おやが はじめるのを 待っています。";
+    $("#bPick").style.display = net.isHost ? "flex" : "none";
+    $("#rBattle").style.display = net.isHost ? "block" : "none";
+    $("#bHead").style.display = net.isHost ? "block" : "none";
 
     $("#rRole").innerHTML = (net.isHost
       ? "あなたが <b>おや</b> です。人間たちは あなたの画面で動いています。"

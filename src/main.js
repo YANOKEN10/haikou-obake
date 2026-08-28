@@ -9,6 +9,7 @@ import { Player } from "./player.js";
 import { Human, HUMAN_SCALE } from "./human.js";
 import { Pickup, Trap, Summon, FloatText, RedLady, Cat, Confession, PeerGhost } from "./entities.js";
 import { Net } from "./net.js";
+import { Battle } from "./battle.js";
 import { checkReturn } from "./support.js";
 import { UI } from "./ui.js";
 import { Audio } from "./audio.js";
@@ -112,6 +113,7 @@ class Game {
     this.waveTimer = 0;
     this.spawnTimer = 6;
     this.waveRoom = new Map();      // 波の番号 → その波で 入れた人数
+    this.battle = new Battle(this);  // ともだちとの おどかし勝負
     this.myScareT = new Map();      // 自分がおどかした時こく（hid → 時こく）
     this.trackHid = 0;              // さがしている人の番号（0はさがしていない）
     this.beacon = null;             // その人のところに 立てる 光の柱
@@ -638,6 +640,7 @@ class Game {
     this.texts.push(new FloatText(this.scene, "わっ！", p.x, p.y + 2.1, p.z, "#ffe27a", 2.3));
 
     if (eff > 0) {
+      this.battle.countScare();                  // 勝負ちゅうなら 1人 かぞえる
       this.bump("scares"); this.best("biggest", eff);
       if (behind) this.bump("behind");
       if (best.lastCombo) this.bump("combos");
@@ -966,6 +969,7 @@ class Game {
         this.texts.push(new FloatText(this.scene, tr.def.line, tr.x, 2.4, tr.z, eff > 0 ? "#ffb3e0" : "#8fa8c8", 1.9));
         if (eff > 0) {
           this.audio.scream(h.type.courage < 90 ? 1.3 : 1);
+          this.battle.countScare();              // 仕掛けの ぶんも かぞえる
           const drop = h.takeDrop();
           if (drop) this.dropAt(drop, h.x, h.z, h.y);
           // 理科室・音楽室の備品も呼応する
@@ -988,6 +992,7 @@ class Game {
         this.texts.push(new FloatText(this.scene, res.line, s.x, 2.3, s.z, eff > 0 ? "#b6ffd0" : "#8fa8c8", 1.8));
         if (eff > 0) {
           this.audio.scream(res.human.type.courage < 90 ? 1.3 : 1);
+          this.battle.countScare();              // 召喚おばけの ぶんも かぞえる
           const drop = res.human.takeDrop();
           if (drop) this.dropAt(drop, res.human.x, res.human.z, res.human.y);
         }
@@ -1105,6 +1110,18 @@ class Game {
     const p = this.player, w = this.world;
     this.ui.setPlace(w.roomAt(p.x, p.z, p.y));
     this.updateFind(dt, t);
+
+    // --- おどかし勝負 ---------------------------------------
+    this.battle.update(dt);
+    if (this.battle.on) {
+      const rows = [];
+      for (const [pid, pr] of this.net.peers) rows.push({ name: pr.name, score: pr.score || 0 });
+      rows.sort((a, b) => b.score - a.score);
+      this.ui.setBattle({ left: this.battle.left, score: this.battle.score, rows });
+    } else if (this._battleWas) {
+      this.ui.setBattle(null);
+    }
+    this._battleWas = this.battle.on;
     this.ui.setBag(this.inv);
     this.ui.setHotbar(this.built, this.selTrap);
     this.ui.setHumans(this.humans, this.netPeerList());
@@ -1317,6 +1334,7 @@ class Game {
   }
 
   async roomLeave() {
+    if (this.battle.on) this.battle.finish(true);
     await this.net.leave();
     for (const [, g] of this.peerGhosts) g.dispose();
     this.peerGhosts.clear();
@@ -1367,6 +1385,9 @@ class Game {
       x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), yaw: +p.yaw.toFixed(2),
       p: p.phasing ? 1 : 0, s: p.scarePose > 0 ? 1 : 0,
       c: this.charId || "obake",                   // どの すがたで 遊んでいるか
+      sc: this.battle.score,                       // おどかし勝負で おどかした人数
+      h: this.net.isHost ? 1 : 0,                  // この人が おや か
+      bt: this.net.isHost ? this.battle.netState() : undefined,
     };
     const placed = [];
     for (const tr of this.traps) placed.push({ k: "t", id: tr.id, x: +tr.x.toFixed(1), z: +tr.z.toFixed(1) });
@@ -1390,6 +1411,11 @@ class Game {
       this._worldSeen = this.net.worldSeq;
       this.applyRemoteWorld(this.net.remoteWorld);
     }
+
+    // 勝負の ようすを 合わせる
+    if (!this.net.isHost) this.battle.applyRemote(this.net.remoteBattle);
+    this.battle.peerScores = {};
+    for (const [pid, pr] of this.net.peers) this.battle.peerScores[pid] = pr.score || 0;
 
     // ともだちのおばけを出す
     const seen = new Set();
