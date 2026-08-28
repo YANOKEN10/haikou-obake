@@ -8,8 +8,9 @@
 //   ・おどかした合図だけをホストに送り、ホストが結果を返す
 // ============================================================
 const API = "/api/room";
-const TICK = 1000;          // ふだんの送信かんかく
+const TICK = 700;           // ふだんの送信かんかく
 const TICK_SLOW = 2500;     // 画面を見ていないとき
+const PREDICT_MAX = 1.4;    // 「このまま進む」と よそうしていい 秒数
 
 export class Net {
   constructor() {
@@ -106,15 +107,22 @@ export class Net {
     if (!this.on) return;
     this.pending = { me, placed, world };
 
-    // とどいた位置へ、なめらかに寄せる
-    const k = Math.min(1, dt * 6);
+    // とどいた位置から「そのまま進んだら いまここ」を よそうして、
+    // そこへ なめらかに 寄せる。こうすると 止まって見えない。
+    const k = Math.min(1, dt * 9);
     for (const p of this.peers.values()) {
-      p.x += (p.tx - p.x) * k;
-      p.y += (p.ty - p.y) * k;
-      p.z += (p.tz - p.z) * k;
+      p.age = (p.age || 0) + dt;
+      // よそうしすぎないように、上限をつける（とどかなかったとき用）
+      const ah = Math.min(p.age, PREDICT_MAX);
+      const px = p.tx + (p.vx || 0) * ah;
+      const pz = p.tz + (p.vz || 0) * ah;
+      const py = p.ty + (p.vy || 0) * ah;
+      p.x += (px - p.x) * k;
+      p.y += (py - p.y) * k;
+      p.z += (pz - p.z) * k;
       let d = ((p.tyaw - p.yaw + Math.PI) % (Math.PI * 2)) - Math.PI;
       if (d < -Math.PI) d += Math.PI * 2;
-      p.yaw += d * k;
+      p.yaw += d * Math.min(1, dt * 10);
     }
 
     this.send();
@@ -195,24 +203,45 @@ export class Net {
       if (!p) {
         const g = o.g || {};
         p = { name: o.name, x: g.x || 0, y: g.y || 1.2, z: g.z || 0, yaw: g.yaw || 0,
-              tx: g.x || 0, ty: g.y || 1.2, tz: g.z || 0, tyaw: g.yaw || 0, placed: [], phasing: false, scaring: 0 };
+              tx: g.x || 0, ty: g.y || 1.2, tz: g.z || 0, tyaw: g.yaw || 0,
+              vx: 0, vy: 0, vz: 0, age: 0, last: 0, charId: g.c || "obake",
+              placed: [], phasing: false, scaring: 0 };
         this.peers.set(o.pid, p);
         if (this.onEvent) this.onEvent("join", o.name);
       }
       p.name = o.name;
       p.placed = o.placed || [];
       if (o.g) {
+        // まえにとどいた所からの ずれで、動く速さを 出す
+        const now = (typeof performance !== "undefined" ? performance.now() : Date.now()) / 1000;
+        const gap = p.last ? Math.min(2.5, Math.max(0.15, now - p.last)) : 0;
+        if (gap > 0) {
+          p.vx = (o.g.x - p.tx) / gap;
+          p.vy = (o.g.y - p.ty) / gap;
+          p.vz = (o.g.z - p.tz) / gap;
+          // 速すぎる値は 通信のゆらぎ。おさえておく
+          const sp = Math.hypot(p.vx, p.vz);
+          if (sp > 14) { p.vx = p.vx / sp * 14; p.vz = p.vz / sp * 14; }
+        } else { p.vx = p.vy = p.vz = 0; }
+        p.last = now;
+        p.age = 0;
         p.tx = o.g.x; p.ty = o.g.y; p.tz = o.g.z; p.tyaw = o.g.yaw;
         p.phasing = !!o.g.p; p.scaring = o.g.s || 0;
+        p.charId = o.g.c || "obake";           // ともだちの すがた
         // はなれすぎていたら（ワープしたときなど）、いきなり合わせる
-        if (Math.abs(p.tx - p.x) > 14 || Math.abs(p.tz - p.z) > 14) { p.x = p.tx; p.y = p.ty; p.z = p.tz; }
+        if (Math.abs(p.tx - p.x) > 14 || Math.abs(p.tz - p.z) > 14) {
+          p.x = p.tx; p.y = p.ty; p.z = p.tz; p.vx = p.vy = p.vz = 0;
+        }
       }
     }
     for (const [pid, p] of this.peers) {
       if (!seen.has(pid)) { this.peers.delete(pid); if (this.onEvent) this.onEvent("part", p.name); }
     }
 
-    if (!this.isHost) this.remoteWorld = room.world || null;
+    if (!this.isHost) {
+      this.remoteWorld = room.world || null;
+      if (this.remoteWorld) this.worldSeq = (this.worldSeq || 0) + 1;   // 新しくとどいた しるし
+    }
     if (this.isHost && room.acts && room.acts.length) {
       for (const a of room.acts) {
         const key = a.q || "?";

@@ -53,7 +53,10 @@ function roundRect(g, x, y, w, h, r) {
 // 人間の大きさ（1.0 が以前。おばけと同じく小さめにして、廊下を広く見せる）
 export const HUMAN_SCALE = 0.72;
 // 目の高さ（腰高の窓ごしでも相手が見えるよう、下がりすぎないようにする）
-export const EYE_Y = Math.max(1.05, 1.35 * HUMAN_SCALE);
+export // 「このまま歩く」と よそうしていい 秒数
+const NET_PREDICT_MAX = 1.4;
+
+const EYE_Y = Math.max(1.05, 1.35 * HUMAN_SCALE);
 
 export class Human {
   constructor(scene, world, type, x, z) {
@@ -851,6 +854,18 @@ export class Human {
   //  おや（部屋を作った人）から来た位置に、そっと合わせていく。
   //  1秒に1回しか来ないので、そのあいだは自分でなめらかにつなぐ
   setNet(x, y, z, yaw, fear, state, out) {
+    // まえにとどいた所からの ずれで、歩く速さを 出す
+    const now = (typeof performance !== "undefined" ? performance.now() : Date.now()) / 1000;
+    const o = this.netT;
+    if (o) {
+      const gap = Math.min(2.5, Math.max(0.15, now - (this.netLast || now)));
+      let vx = (x - o.x) / gap, vy = (y - o.y) / gap, vz = (z - o.z) / gap;
+      const sp = Math.hypot(vx, vz);
+      if (sp > 12) { vx = vx / sp * 12; vz = vz / sp * 12; }   // 通信のゆらぎは おさえる
+      this.netV = { x: vx, y: vy, z: vz };
+    } else this.netV = { x: 0, y: 0, z: 0 };
+    this.netLast = now;
+    this.netAge = 0;
     this.netT = { x, y, z, yaw };
     this.fear = fear;
     if (!this.out) this.state = state;
@@ -862,17 +877,26 @@ export class Human {
     const n = this.netT;
     if (!n) return;
     const px = this.x, pz = this.z;
+    this.netAge = (this.netAge || 0) + dt;
     if (Math.abs(n.x - this.x) > 12 || Math.abs(n.z - this.z) > 12) {
       this.x = n.x; this.y = n.y; this.z = n.z;      // ワープしたときは、いきなり合わせる
+      this.netV = { x: 0, y: 0, z: 0 };
     } else {
-      const k = Math.min(1, dt * 5);
-      this.x += (n.x - this.x) * k;
-      this.y += (n.y - this.y) * k;
-      this.z += (n.z - this.z) * k;
+      // 「そのまま歩いたら いまここ」を よそうして、そこへ 寄せる
+      const v = this.netV || { x: 0, y: 0, z: 0 };
+      const ah = Math.min(this.netAge, NET_PREDICT_MAX);
+      const tx = n.x + v.x * ah, ty = n.y + v.y * ah, tz = n.z + v.z * ah;
+      const k = Math.min(1, dt * 9);
+      this.x += (tx - this.x) * k;
+      this.y += (ty - this.y) * k;
+      this.z += (tz - this.z) * k;
     }
-    let d = ((n.yaw - this.yaw + Math.PI) % (Math.PI * 2)) - Math.PI;
+    // 向きは 歩いているほうへ。止まっているときは とどいた向きのまま
+    const mvx = this.x - px, mvz = this.z - pz;
+    const want = Math.hypot(mvx, mvz) > 0.006 ? Math.atan2(mvx, mvz) : n.yaw;
+    let d = ((want - this.yaw + Math.PI) % (Math.PI * 2)) - Math.PI;
     if (d < -Math.PI) d += Math.PI * 2;
-    this.yaw += d * Math.min(1, dt * 6);
+    this.yaw += d * Math.min(1, dt * 8);
     this.floor = Math.max(0, Math.round(this.y / 3.6));
 
     const mv = Math.hypot(this.x - px, this.z - pz) / Math.max(dt, 1e-4);

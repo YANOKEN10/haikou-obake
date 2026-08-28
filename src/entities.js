@@ -1,6 +1,7 @@
 import * as THREE from "../lib/three.module.js";
 import { clamp, lerp, rand, choice, dist } from "./util.js";
-import { MATERIALS, TRAPS, GHOSTS, RARITY } from "./data.js";
+import { MATERIALS, TRAPS, GHOSTS, RARITY, CHARS } from "./data.js";
+import { buildGhostLook } from "./player.js";
 
 // ============================================================
 //  落ちている材料
@@ -793,51 +794,50 @@ const PEER_SCALE = 0.4;
 const PEER_COLORS = [0xffd45e, 0x8fe6b0, 0xffa8d8, 0x9fd8ff, 0xd0b0ff, 0xffc39a];
 
 export class PeerGhost {
-  constructor(scene, index, name) {
+  constructor(scene, index, name, charId) {
     this.scene = scene;
     const tint = PEER_COLORS[index % PEER_COLORS.length];
     this.tint = tint;
-    const g = new THREE.Group();
-    g.scale.setScalar(PEER_SCALE);
-
-    const bodyMat = new THREE.MeshLambertMaterial({
-      color: 0xeaf2fa, emissive: tint, emissiveIntensity: 0.5,
-      transparent: true, opacity: 0.86,
-    });
-    this.bodyMat = bodyMat;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 12), bodyMat);
-    head.position.y = 1.25; head.scale.set(1, 1.05, 0.96); g.add(head);
-    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.66, 0.95, 16, 1, true),
-      new THREE.MeshLambertMaterial({ color: 0xdfe9f4, emissive: tint, emissiveIntensity: 0.4,
-        transparent: true, opacity: 0.82, side: THREE.DoubleSide }));
-    skirt.position.y = 0.78; g.add(skirt);
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111820 });
-    const eyeGeo = new THREE.SphereGeometry(0.105, 10, 8);
-    for (const sx of [-0.17, 0.17]) {
-      const e = new THREE.Mesh(eyeGeo, eyeMat);
-      e.position.set(sx, 1.32, 0.44); e.scale.set(1, 1.25, 0.6); g.add(e);
-    }
-    for (const sx of [-0.55, 0.55]) {
-      const h = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), bodyMat);
-      h.position.set(sx, 1.0, 0.1); g.add(h);
-    }
-    // 壁ごしでも、どこにいるか分かるように輪郭を手前に出す
-    const xm = new THREE.MeshBasicMaterial({ color: tint, transparent: true, opacity: 0.3,
-      depthTest: false, depthWrite: false });
-    const xh = new THREE.Mesh(head.geometry, xm);
-    xh.position.copy(head.position); xh.scale.copy(head.scale);
-    xh.renderOrder = 890;
-    g.add(xh);
-
-    this.g = g;
-    scene.add(g);
+    this.charId = null;
+    this.g = new THREE.Group();
+    this.g.scale.setScalar(PEER_SCALE);
+    scene.add(this.g);
+    this.setChar(charId || "obake");
 
     // なまえの札
     this.plate = makePlate(name, tint);
     this.plate.position.y = 2.35;
-    g.add(this.plate);
+    this.g.add(this.plate);
     this.name = name;
     this.bob = Math.random() * 6.3;
+  }
+
+  // ともだちが すがたを かえたら、こちらも 着せかえる
+  setChar(charId) {
+    const id = CHARS[charId] ? charId : "obake";
+    if (id === this.charId) return;
+    this.charId = id;
+    if (this.look) {
+      this.g.remove(this.look);
+      this.look.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose();
+      });
+    }
+    const shell = buildGhostLook(id);
+    this.look = shell.group;
+    // ともだちごとに 色みを つけて、だれか 見分けられるようにする
+    this.bodyMat = shell.bodyMat;
+    this.skirtMat = shell.skirtMat;
+    for (const m of [shell.bodyMat, shell.skirtMat]) {
+      if (m) { m.emissive = new THREE.Color(this.tint); m.emissiveIntensity = 0.5; }
+    }
+    if (shell.xrayMat) { shell.xrayMat.color = new THREE.Color(this.tint); shell.xrayMat.opacity = 0.3; }
+    if (shell.xray) shell.xray.visible = true;      // かべごしでも どこにいるか 分かる
+    // すがたごとの 大きさに 合わせる
+    this.charSize = (CHARS[id] && CHARS[id].size) || 1;
+    this.g.add(this.look);
+    if (this.plate) { this.g.remove(this.plate); this.g.add(this.plate); }
   }
 
   setName(name) {
@@ -853,9 +853,10 @@ export class PeerGhost {
     this.bob += dt * 2.2;
     this.g.position.set(p.x, p.y - 1.1 * PEER_SCALE + Math.sin(this.bob) * 0.04, p.z);
     this.g.rotation.y = p.yaw;
-    this.bodyMat.opacity = p.phasing ? 0.4 : 0.86;
+    if (this.bodyMat) this.bodyMat.opacity = p.phasing ? 0.4 : 0.9;
     const s = p.scaring ? 1 + p.scaring * 0.25 : 1;
-    this.g.scale.setScalar(PEER_SCALE * s);
+    this.g.scale.setScalar(PEER_SCALE * s * (this.charSize || 1));
+    if (this.skirtMat) this.skirtMat.opacity = p.phasing ? 0.36 : 0.9;
   }
 
   dispose() {

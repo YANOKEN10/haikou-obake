@@ -1,5 +1,5 @@
 import * as THREE from "../lib/three.module.js";
-import { buildWorld } from "./world.js";
+import { buildWorld, clampPlay, inPlay } from "./world.js";
 import { buildSky } from "./sky.js";
 import { TouchControls, isTouchDevice, goFullscreen } from "./touch.js";
 import { Home } from "./home.js";
@@ -231,9 +231,13 @@ class Game {
   // 人間が落とすもの。おどかした場所が へんぴなら、いい色で落ちる
   dropAt(kind, x, z, y, tier) {
     const yy = y || 0;
-    const r = this.world.colliders.resolve(x + rand(-0.6, 0.6), z + rand(-0.6, 0.6), 0.3, yy + 0.6);
-    const t = tier === undefined ? pickRarity(this.remoteAt(x, z, yy) * 0.7) : tier;
-    this.pickups.push(new Pickup(this.scene, kind, r.x, r.z, yy + 0.55, t));
+    // 門のそとなど、おばけが 行けない所には 落とさない。
+    //  ずらしたあと・かべから 押しだされたあとも、もう一度 見る
+    let c = clampPlay(x, z);
+    const r = this.world.colliders.resolve(c.x + rand(-0.6, 0.6), c.z + rand(-0.6, 0.6), 0.3, yy + 0.6);
+    c = clampPlay(r.x, r.z);
+    const t = tier === undefined ? pickRarity(this.remoteAt(c.x, c.z, yy) * 0.7) : tier;
+    this.pickups.push(new Pickup(this.scene, kind, c.x, c.z, yy + 0.55, t));
     this.trimPickups();
   }
 
@@ -324,6 +328,7 @@ class Game {
       const h = new Human(this.scene, this.world, t, e.x + rand(-2.4, 2.4), e.z + rand(-2, 2));
       h.hid = hid;
       h.gate = G.out;                              // 帰るときも この門から
+      h.gateIn = G.in;                             // 落としものは 門のうちがわに
       made.push(h);
       h.speak(choice(t.idle), 4 + i * 0.4);
       h.goTo(rand(-25, 25), rand(8, 28), 0);
@@ -710,8 +715,11 @@ class Game {
     const r = this.ui.setRank(this.kicked);
     this.ui.toast("🎉 " + h.name + " を追い出した！（計 " + this.kicked + " 人）", "gold");
     this.audio.escape();
-    for (let i = 0; i < 3; i++) this.dropAt("onnen", h.x + rand(-4, 4), h.z + rand(-4, 4), h.y);
-    this.dropAt("onnen", h.x, h.z, h.y);
+    // 逃げきった人の 落としものは、門の うちがわに まとめて 置く。
+    //  門のそとに 置くと、おばけが 取りに行けない
+    const gi = (!inPlay(h.x, h.z) && h.gateIn) ? h.gateIn : { x: h.x, z: h.z };
+    for (let i = 0; i < 3; i++) this.dropAt("onnen", gi.x + rand(-3, 3), gi.z + rand(-3, 3), 0);
+    this.dropAt("onnen", gi.x, gi.z, 0);
     if (r.name !== before) {
       this.rankName = r.name;
       this.audio.rankUp();
@@ -1358,6 +1366,7 @@ class Game {
     const me = {
       x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), yaw: +p.yaw.toFixed(2),
       p: p.phasing ? 1 : 0, s: p.scarePose > 0 ? 1 : 0,
+      c: this.charId || "obake",                   // どの すがたで 遊んでいるか
     };
     const placed = [];
     for (const tr of this.traps) placed.push({ k: "t", id: tr.id, x: +tr.x.toFixed(1), z: +tr.z.toFixed(1) });
@@ -1377,7 +1386,8 @@ class Game {
           break;
         }
       }
-    } else if (this.net.remoteWorld) {
+    } else if (this.net.remoteWorld && this.net.worldSeq !== this._worldSeen) {
+      this._worldSeen = this.net.worldSeq;
       this.applyRemoteWorld(this.net.remoteWorld);
     }
 
@@ -1386,8 +1396,9 @@ class Game {
     for (const [pid, pr] of this.net.peers) {
       seen.add(pid);
       let g = this.peerGhosts.get(pid);
-      if (!g) { g = new PeerGhost(this.scene, this.peerGhosts.size, pr.name); this.peerGhosts.set(pid, g); }
+      if (!g) { g = new PeerGhost(this.scene, this.peerGhosts.size, pr.name, pr.charId); this.peerGhosts.set(pid, g); }
       g.setName(pr.name);
+      g.setChar(pr.charId || "obake");
       g.update(dt, t, pr);
     }
     for (const [pid, g] of this.peerGhosts) {

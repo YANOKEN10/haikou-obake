@@ -573,3 +573,16 @@ export class Player {
     return false;
   }
 }
+
+
+// すがた（キャラ）の 見た目だけを 作る。
+//  Player の build をそのまま借りるので、
+//  すがたを ふやしても ここは 直さなくていい。
+export function buildGhostLook(charId) {
+  const shell = Object.create(Player.prototype);      // Player のやり方を そのまま使う
+  shell.charId = CHARS[charId] ? charId : "obake";
+  shell.C = CHARS[shell.charId];
+  shell.group = new THREE.Group();
+  shell.build();
+  return shell;
+}
