@@ -548,6 +548,8 @@ export class Human {
     this.path = p ? p.map((i) => nav.nodes[i]) : null;
     this.pathI = 0;
     this.target = { x, z, floor: to };
+    this.noPath = !this.path;          // 道が なかった しるし
+    return !!this.path;
   }
 
   // グループごとの「やること」を もらう。
@@ -674,7 +676,10 @@ export class Human {
           this.holdT -= dt;
           wantX = null; wantZ = null;
           this.path = null;
-          if (this.holdT <= 0 && !this.nextPlan()) { this.wanderSomewhere(); this.stateT = rand(14, 26); }
+          if (this.holdT <= 0 && !this.nextPlan()) {
+            this.wanderSomewhere();
+            this.stateT = this.path ? rand(14, 26) : rand(0.6, 1.6);
+          }
           break;
         }
         // 一列のとき：前の人に ついていく（すこし間をあける）
@@ -692,11 +697,19 @@ export class Human {
         // やることが あるなら それを こなす
         if (this.plan) {
           if (!this.path) {
-            if (this.holdT <= 0 && !this.nextPlan()) { this.wanderSomewhere(); this.stateT = rand(14, 26); }
+            // やることの 場所へ 道が なければ、その やることは あきらめる
+            if (this.holdT <= 0 && !this.nextPlan()) {
+              this.wanderSomewhere();
+              this.stateT = this.path ? rand(14, 26) : rand(0.6, 1.6);
+            }
           }
           break;
         }
-        if (!this.path || this.stateT <= 0) { this.wanderSomewhere(); this.stateT = rand(14, 26); }
+        if (!this.path || this.stateT <= 0) {
+          this.wanderSomewhere();
+          // 道が 見つからなかったら、長く 待たずに すぐ 考えなおす
+          this.stateT = this.path ? rand(14, 26) : rand(0.6, 1.6);
+        }
         break;
       }
       case "investigate": {
@@ -778,8 +791,23 @@ export class Human {
     // 壁ぞいで まったく進んでいなければ「つまっている」とみなす
     const moved = Math.hypot(this.x - px, this.z - pz);
     const wanted = Math.hypot(this.vx, this.vz) * dt;
-    if (wanted > 0.004 && moved < wanted * 0.35) {
-      this.stuck = (this.stuck || 0) + dt;
+
+    // つぎの地点に 近づけているか。
+    //  動いているのに 近づかない＝かべを すべっているだけ
+    let sliding = false;
+    if (this.path && this.pathI < this.path.length) {
+      const n2 = this.path[this.pathI];
+      const d2 = dist(this.x, this.z, n2.x, n2.z);
+      if (this.nearI !== this.pathI) { this.nearI = this.pathI; this.nearD = d2; this.slipT = 0; }
+      else if (d2 < this.nearD - 0.2) { this.nearD = d2; this.slipT = 0; }
+      else {
+        this.slipT = (this.slipT || 0) + dt;
+        if (this.slipT > 2.5) { sliding = true; this.slipT = 0; }
+      }
+    } else { this.nearI = -1; this.slipT = 0; }
+
+    if (sliding || (wanted > 0.004 && moved < wanted * 0.35)) {
+      this.stuck = (this.stuck || 0) + (sliding ? 1.1 : dt);   // すべりは すぐ 手を打つ
       // ② 横にすべって よける（壁づたいに まわりこむ）
       if (this.stuck > 0.25) {
         const side = this.slideDir || (this.slideDir = Math.random() < 0.5 ? 1 : -1);
@@ -794,8 +822,19 @@ export class Human {
       // ③ それでもだめなら 道を引きなおす。
       //    逃げているときは 行き先が門なので、必ず引きなおせる
       if (this.stuck > 1.0) {
-        const t2 = this.state === "flee" ? (this.gate || w.exit) : this.target;
-        if (t2) this.goTo(t2.x, t2.z, t2.floor === undefined ? 0 : t2.floor);
+        this.reroutes = (this.reroutes || 0) + 1;
+        if (this.state !== "flee" && this.reroutes >= 3) {
+          // 同じ行き先だと 何度 引きなおしても 同じ道に なる。
+          //  行き先ごと あきらめて、べつの所へ 行かせる
+          this.reroutes = 0;
+          this.plan = null;
+          this.path = null;
+          this.wanderSomewhere();
+          this.stateT = this.path ? rand(10, 20) : rand(0.6, 1.6);
+        } else {
+          const t2 = this.state === "flee" ? (this.gate || w.exit) : this.target;
+          if (t2) this.goTo(t2.x, t2.z, t2.floor === undefined ? 0 : t2.floor);
+        }
         this.slideDir = -(this.slideDir || 1);      // 次は 反対がわへ よけてみる
         this.stuck = 0;
       }
@@ -838,6 +877,7 @@ export class Human {
       }
     } else {
       this.stuck = 0;
+      this.reroutes = 0;
       if (this.state !== "flee") this.fleeStuck = 0;
     }
 

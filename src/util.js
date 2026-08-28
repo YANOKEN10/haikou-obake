@@ -34,6 +34,14 @@ export function angleLerp(a, b, t) {
 //  当たり判定：XZ平面の AABB 集合
 //  box = {x1,z1,x2,z2, y1,y2, tag}
 // ============================================================
+// 人の からだの はば（半分）。道さがしで、すきまを 通れるか みるのに つかう。
+//  人間の あたり判定の 半径（0.27）より すこし 大きめにして、
+//  かべの かどを かすめる ぎりぎりの道を えらばせない。
+const BODY_W = 0.34;
+// よこの線が これいじょう つづけて ふさがれていたら、
+//  柱ではなく かべ。そこは 通り道に しない。
+const SIDE_RUN = 0.7;
+
 export class Colliders {
   constructor() { this.boxes = []; this.grid = null; this.cell = 8; }
 
@@ -110,8 +118,43 @@ export class Colliders {
   }
 
   // 歩いて通り抜けられるか（腰高の窓で止まる高さで見る。机やイスは迂回できるので無視）
+  //  人には はばが あるので、まんなかだけでなく 左右にも 見る。
+  //  ただし、電柱や ゴールの支柱のような 細いものは
+  //  よけて 歩けるので、じゃまと 数えない。
+  //  「よこの線が ずっと ふさがれている」＝かべに そって いる、
+  //  というときだけ 通れないと する。
   navSight(ax, az, bx, bz, floorY = 0) {
-    return this.lineOfSight(ax, az, bx, bz, floorY + 0.6, 0.12, ["furn"]);
+    const y = floorY + 0.6;
+    if (!this.lineOfSight(ax, az, bx, bz, y, 0.12, ["furn"])) return false;
+    const dx = bx - ax, dz = bz - az;
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-4) return true;
+    const nx = (-dz / len) * BODY_W, nz = (dx / len) * BODY_W;   // 進む向きの 横
+    return this.sideRun(ax + nx, az + nz, bx + nx, bz + nz, y) <= SIDE_RUN
+        && this.sideRun(ax - nx, az - nz, bx - nx, bz - nz, y) <= SIDE_RUN;
+  }
+
+  // よこの線が「つづけて 何メートル ふさがれているか」を かえす。
+  //  細い柱なら みじかく、かべに そっていれば 長くなる。
+  sideRun(ax, az, bx, bz, y) {
+    const dx = bx - ax, dz = bz - az;
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-4) return 0;
+    const step = 0.12;
+    const n = Math.ceil(len / step);
+    let run = 0, worst = 0;
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, px = ax + dx * t, pz = az + dz * t;
+      let hit = false;
+      for (const b of this.near(px, pz, 0.2)) {
+        if (b.tag === "soft" || b.tag === "furn" || b.tag === "stair") continue;
+        if (y < b.y1 || y > b.y2) continue;
+        if (px > b.x1 && px < b.x2 && pz > b.z1 && pz < b.z2) { hit = true; break; }
+      }
+      if (hit) { run += len / n; if (run > worst) worst = run; }
+      else run = 0;
+    }
+    return worst;
   }
 
   // 視線が通るか（XZ平面のレイ vs AABB、指定の高さ帯のみ）
