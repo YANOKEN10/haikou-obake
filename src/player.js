@@ -8,6 +8,10 @@ import { CHARS } from "./data.js";
 // ============================================================
 // おばけの大きさ（1.0 が以前の大きさ。人間より小さくして、こそこそ感を出す）
 export const GHOST_SCALE = 0.4;
+// 屋根より 何メートル 上まで 浮けるか（校舎は 高さ14.4m）
+const SKY_UP = 18;
+const RISE = 3.4;        // 上がる速さ
+const FALL_MAX = 5.5;    // 手をはなしたときの、下りる いちばんの速さ
 
 export class Player {
   constructor(scene, world, charId) {
@@ -411,12 +415,29 @@ export class Player {
       }
       hover = clamp(best, 1.02, FLOORS * FLOOR_H + 1.02);
     }
-    if (up !== 0) this.vy = lerp(this.vy, up * 3.0, clamp(9 * dt, 0, 1));
-    else this.vy = lerp(this.vy, (hover - this.y) * 3.2, clamp(6 * dt, 0, 1));
-    let lo = 0.38, hi = 5.0;
-    const onRoof = indoors && this.y > w.roofY - 1.0;
-    if (onRoof) {
-      lo = w.roofY + 0.38; hi = w.roofY + 3.2;
+    // 空のたかさ。屋根より ずっと上まで 行ける
+    const skyTop = w.roofY + SKY_UP;
+    // 屋根より うんと上にいる＝空をとんでいる
+    const inSky = this.y > w.roofY + 3.0;
+
+    if (up !== 0) {
+      // 高く上がるほど、上がる速さが ゆっくりになる
+      const room = clamp((skyTop - this.y) / 6, 0, 1);
+      const rise = up > 0 ? RISE * (0.35 + 0.65 * room) : -RISE * 1.15;
+      this.vy = lerp(this.vy, rise, clamp(9 * dt, 0, 1));
+    } else {
+      // 手をはなしたら、すーっと 下りてくる。
+      //  高いところからでも 落ちないよう、速さに かぎりをつける
+      const want = clamp((hover - this.y) * 3.2, -FALL_MAX, 3.0);
+      this.vy = lerp(this.vy, want, clamp(6 * dt, 0, 1));
+    }
+
+    let lo = 0.38, hi = skyTop;
+    const onRoof = indoors && !inSky && this.y > w.roofY - 1.0;
+    if (inSky) {
+      lo = 0.38; hi = skyTop;               // 空では さえぎるものが ない
+    } else if (onRoof) {
+      lo = w.roofY + 0.38; hi = skyTop;     // 屋根からも そのまま 上に行ける
     } else if (indoors) {
       lo = inShaft ? 0.38 : base + 0.38;
       hi = inShaft ? FLOORS * FLOOR_H + 2.4 : base + 2.55;
@@ -424,6 +445,7 @@ export class Player {
       hi = w.gymCeil;                       // 体育館は天井が高い
     }
     this.y = clamp(this.y + this.vy * dt, lo, hi);
+    this.inSky = inSky;
     this.inShaft = inShaft;
 
     // --- 移動と衝突 ----------------------------------------
