@@ -1089,7 +1089,7 @@ class Game {
     const r = await this.net.create(name || (this.home && this.home.playerName ? this.home.playerName() : "おばけ"));
     if (!r.ok) return r;
     this.netReseed(r.data.seed);
-    this.ui.toast("🚪 あいことば「" + this.net.code + "」でともだちを呼ぼう！", "gold");
+    this.ui.toast("🚪 あいことば「" + this.net.code + "」でともだちを呼ぼう！", "gold", 30000);
     this.audio.rankUp();
     return r;
   }
@@ -1098,7 +1098,7 @@ class Game {
     const r = await this.net.join(code, name || (this.home && this.home.playerName ? this.home.playerName() : "おばけ"));
     if (!r.ok) return r;
     this.netReseed(r.data.seed);
-    this.ui.toast("🚪 部屋「" + this.net.code + "」に入りました", "gold");
+    this.ui.toast("🚪 部屋「" + this.net.code + "」に入りました", "gold", 30000);
     this.audio.rankUp();
     return r;
   }

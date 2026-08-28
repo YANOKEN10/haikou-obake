@@ -72,6 +72,25 @@ export class Home {
       g.ui.setRoom(g.net);
     });
 
+    // あいことばを おして コピーできるようにする。
+    //  子どもが 書きうつさなくても、そのまま おくれるように
+    $("#rCodeBig").addEventListener("click", async () => {
+      const c = g.net.code;
+      if (!c) return;
+      try {
+        await navigator.clipboard.writeText(c);
+        g.ui.roomMsg("あいことば「" + c + "」を コピーしました", true);
+      } catch (e) {
+        // コピーできない ブラウザでは、えらんだ状態にして あげる
+        const r = document.createRange();
+        r.selectNodeContents($("#rCodeBig"));
+        const s = window.getSelection();
+        s.removeAllRanges(); s.addRange(r);
+        g.ui.roomMsg("あいことばを えらびました。長おしで コピーできます", true);
+      }
+      g.audio.click();
+    });
+
     $("#rLeave").addEventListener("click", async () => {
       busy(true);
       await g.roomLeave();

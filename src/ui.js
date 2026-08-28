@@ -161,15 +161,16 @@ export class UI {
     e.classList.toggle("on", !!text);
   }
 
-  toast(text, cls = "") {
+  //  ms … 何ミリ秒 出しておくか（あいことばなど、消えると困るものは長く）
+  toast(text, cls = "", ms = 2200) {
     const e = document.createElement("div");
     e.className = "toast " + cls;
     e.textContent = text;
     const box = $("#toasts");
     box.appendChild(e);
     while (box.children.length > 5) box.removeChild(box.firstChild);
-    setTimeout(() => { e.style.transition = "opacity .4s,transform .4s"; e.style.opacity = "0"; e.style.transform = "translateY(-10px)"; }, 2200);
-    setTimeout(() => e.remove(), 2700);
+    setTimeout(() => { e.style.transition = "opacity .4s,transform .4s"; e.style.opacity = "0"; e.style.transform = "translateY(-10px)"; }, ms);
+    setTimeout(() => e.remove(), ms + 500);
   }
 
   vignette(v) { $("#vignette").style.opacity = clamp(v, 0, 1); }
@@ -279,6 +280,61 @@ export class UI {
         g.exchange(c.dataset.kind, c.dataset.id);
       });
     });
+  }
+
+  // --- ともだちと あそぶ -------------------------------------
+  openRoom(net) {
+    $("#room").classList.add("on");
+    this.roomMsg("");
+    this.setRoom(net, true);
+  }
+
+  closeRoom() { $("#room").classList.remove("on"); }
+
+  get roomOpen() { return $("#room").classList.contains("on"); }
+
+  //  ok = true で みどり色（お知らせ）、false で 赤色（うまくいかなかった）
+  roomMsg(text, ok = false) {
+    const e = $("#rMsg");
+    e.textContent = text || "";
+    e.classList.toggle("ok", !!ok);
+  }
+
+  setRoom(net, force) {
+    const on = !!(net && net.on);
+    // 画面いっぱいの まとめを 作って、変わったときだけ 書きかえる
+    const names = on ? Array.from(net.peers.values()).map((p) => p.name) : [];
+    const key = [on, on && net.code, on && net.isHost, on && net.name, names.join(" ")].join("|");
+    if (!force && key === this._roomKey) return;
+    this._roomKey = key;
+
+    // 画面のうえに いつも出しておく ちいさな ふだ
+    const chip = $("#roomChip");
+    if (chip) {
+      chip.hidden = !on;
+      if (on) chip.textContent = "あいことば " + net.code + "・" + (net.peers.size + 1) + "人";
+    }
+
+    const box = $("#room");
+    if (!box || !box.classList.contains("on")) return;   // 画面を出していないなら ここまで
+
+    $("#roomOut").hidden = on;
+    $("#roomIn").hidden = !on;
+    if (!on) return;
+
+    $("#rCodeBig").textContent = net.code || "----";
+
+    // だれが いるか。じぶんが いちばん上
+    const mem = [{ name: net.name || "じぶん", me: true, host: net.isHost }];
+    for (const p of net.peers.values()) mem.push({ name: p.name, me: false, host: false });
+    $("#rMembers").innerHTML = mem.map((m) =>
+      "<div class='rmem'><span>" + (m.me ? "🫵 " : "👻 ") + esc(m.name) + "</span>" +
+      "<span class='tag'>" + (m.me ? (m.host ? "じぶん・おや" : "じぶん") : "ともだち") + "</span></div>").join("");
+
+    $("#rRole").innerHTML = (net.isHost
+      ? "あなたが <b>おや</b> です。人間たちは あなたの画面で動いています。"
+      : "あなたは <b>おきゃくさん</b> です。おやの画面の人間たちが 見えています。") +
+      "<br>いま " + (net.peers.size + 1) + "人 であそんでいます（4人まで）";
   }
 
   showScreen(html) {
