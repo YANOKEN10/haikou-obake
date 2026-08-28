@@ -100,7 +100,8 @@ export class UI {
   // --- 人間リスト --------------------------------------------
   setHumans(humans, peers) {
     const extra = peers && peers.length ? peers.map((p) => p.name).join(",") : "";
-    const sig = humans.map((h) => h.name + "|" + Math.round(h.fear) + "|" + h.state + "|" + h.out).join(";") + "#" + extra;
+    const sig = humans.map((h) => h.name + "|" + Math.round(h.fear) + "|" + h.state + "|" + h.out).join(";") + "#" + extra
+      + "#" + (this.game ? this.game.trackHid : "");
     if (sig === this._humanSig) return;
     this._humanSig = sig;
     const label = { wander: "うろうろ", investigate: "様子を見に行った", spooked: "びくびく", panic: "パニック！", flee: "逃走中！！" };
@@ -116,8 +117,10 @@ export class UI {
       const p = clamp(h.fear / h.maxFear, 0, 1);
       const hue = 165 - p * 165;
       const st = h.out ? "追い出した！" : (label[h.state] || h.state);
-      return '<div class="hrow' + (h.out ? " gone" : "") + '">' +
-        '<div class="n"><span>' + esc(h.name) + '</span><span class="st">' + st + "</span></div>" +
+      const on = !h.out && this.game && this.game.trackHid === h.hid;
+      return '<div class="hrow' + (h.out ? " gone" : "") + (on ? " track" : "") +
+        '" data-hid="' + h.hid + '">' +
+        '<div class="n"><span>' + (on ? "🔎 " : "") + esc(h.name) + '</span><span class="st">' + st + "</span></div>" +
         '<div class="hbar"><i style="width:' + (p * 100) + "%;background:hsl(" + hue + ',85%,58%)"></i></div></div>';
     }).join("");
     box.classList.remove("s1", "s2", "s3", "s4", "bare");
@@ -146,6 +149,19 @@ export class UI {
     }
     // いちばん小さくしても あふれるときだけ、バーを消してさらに詰める
     box.classList.add("s4", "bare");
+  }
+
+  // --- さがしている人の やじるし ------------------------------
+  //  ang … 画面のまんなかから 見て、どっちの向きか（ラジアン）
+  //  d   … 何メートル はなれているか
+  setFind(name, ang, d, where) {
+    const bar = $("#findBar");
+    if (!name) { bar.hidden = true; return; }
+    bar.hidden = false;
+    if (this._findName !== name) { this._findName = name; $("#findName").textContent = name; }
+    $("#findArrow").style.transform = "rotate(" + (ang * 180 / Math.PI) + "deg)";
+    const txt = Math.round(d) + "m　" + where;
+    if (this._findWhere !== txt) { this._findWhere = txt; $("#findWhere").textContent = txt; }
   }
 
   setGauges(phase, stamina) {

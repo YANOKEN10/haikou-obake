@@ -12,7 +12,7 @@ import { Net } from "./net.js";
 import { checkReturn } from "./support.js";
 import { UI } from "./ui.js";
 import { Audio } from "./audio.js";
-import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, pickRarity, CHARS, EXCHANGE } from "./data.js";
+import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, pickRarity, CHARS, EXCHANGE, HUMAN_DROPS } from "./data.js";
 import { Roster } from "./people.js";
 import { clamp, rand, randi, choice, dist } from "./util.js";
 const FLOOR_HEIGHT_HALF = 3.2;
@@ -75,6 +75,12 @@ function pickQuality() {
   return { name: "desktop", torches: 5, lamps: 4, dust: 700, grass: 1, pickups: 60, maxPickups: 110, pixelRatio: 1.75, aa: true, far: 260, fov: 62 };
 }
 
+// ともだちと やったとき わけあう 材料
+const SHARE_DROPS = HUMAN_DROPS;
+
+// マップに いっぺんに いられる 人数
+const MAX_ALIVE = 15;
+
 const NET_STATES = ["wander", "investigate", "spooked", "panic", "flee"];
 
 class Game {
@@ -105,6 +111,11 @@ class Game {
     this.wave = 0;
     this.waveTimer = 0;
     this.spawnTimer = 6;
+    this.waveRoom = new Map();      // 波の番号 → その波で 入れた人数
+    this.myScareT = new Map();      // 自分がおどかした時こく（hid → 時こく）
+    this.trackHid = 0;              // さがしている人の番号（0はさがしていない）
+    this.beacon = null;             // その人のところに 立てる 光の柱
+    this.bindFind();
     this.scareFx = 0;
     this.rankName = RANKS[0].name;
     this.charId = "obake";
@@ -223,6 +234,29 @@ class Game {
     const r = this.world.colliders.resolve(x + rand(-0.6, 0.6), z + rand(-0.6, 0.6), 0.3, yy + 0.6);
     const t = tier === undefined ? pickRarity(this.remoteAt(x, z, yy) * 0.7) : tier;
     this.pickups.push(new Pickup(this.scene, kind, r.x, r.z, yy + 0.55, t));
+    this.trimPickups();
+  }
+
+  // 拾いものが たまりすぎたら、遠くの 安い色から 片づける。
+  //  （人間が15人になって 落としものが ふえたため。
+  //    そばにあるものや、いい色のものは 消さない）
+  trimPickups() {
+    const cap = (this.q.maxPickups || 110) * 2;
+    if (this.pickups.length <= cap) return;
+    const p = this.player;
+    let worst = -1, score = -1;
+    for (let i = 0; i < this.pickups.length; i++) {
+      const q = this.pickups[i];
+      const d = dist(q.x, q.z, p.x, p.z);
+      if (d < 22) continue;                       // 近くのものは のこす
+      if ((q.tier || 0) >= 3) continue;           // 赤より上は のこす
+      const s = d - (q.tier || 0) * 12;
+      if (s > score) { score = s; worst = i; }
+    }
+    if (worst < 0) return;
+    const q = this.pickups[worst];
+    if (q.dispose) q.dispose(); else this.scene.remove(q.mesh || q.g);
+    this.pickups.splice(worst, 1);
   }
 
   // その場所の「へんぴさ」を、近くの湧き場所から しらべる
@@ -236,10 +270,36 @@ class Game {
     return best;
   }
 
+  // つぎの波まで 何秒 待つか。
+  //  遊びはじめは ゆっくり、なれてきたら どんどん来る。
+  //  だれもいないときは 待たせない。
+  nextWaveGap(alive) {
+    const min = (this.profile && this.profile.playSeconds) ? this.profile.playSeconds / 60 : 0;
+    // 0分で26秒 → 10分で12秒 → 20分いこう 7秒
+    const base = Math.max(7, 26 - min * 1.1);
+    if (alive === 0) return Math.min(5, base);
+    // まだ のこっている人数が多いほど、すこし待つ
+    return base * (0.7 + alive / MAX_ALIVE * 0.6);
+  }
+
   // --- 人間の襲来 --------------------------------------------
-  spawnWave() {
+  //  room … いま あと何人 入れるか（マップの上限まで）
+  spawnWave(room) {
     if (this.isGuest && !this._netSpawn) return;   // お客さんは、おやに合わせてだけ出す
     this.wave++;
+    // 人数を わたされていなければ、いまの あきを 数える
+    if (room === undefined && !this._netSpawn) {
+      let n = 0;
+      for (const h of this.humans) if (!h.out) n++;
+      room = MAX_ALIVE - n;
+    }
+    // お客さんは、おやが使った人数を そのまま使う
+    if (this._netSpawn) room = this.waveRoom.get(this.wave);
+    else if (this.net.on) {
+      this.waveRoom.set(this.wave, room === undefined ? 99 : room);
+      // 古いものは 捨てる（送るのは さいきんの ぶんだけ）
+      if (this.waveRoom.size > 60) this.waveRoom.delete(this.wave - 60);
+    }
     const group = this.roster.next();
     // 毎回、4つの門から どれかを えらんで そこから入ってくる
     const gates = this.world.gates || [{ in: this.world.entry, out: this.world.exit, name: "正門" }];
@@ -251,10 +311,14 @@ class Game {
     for (const h0 of this.humans) if (!h0.out) live.add(h0.name);
     let came = 0;
     const made = [];
+    // 入れる人数。番号（hid）は へらさずに 進めるので、
+    // ともだちと遊ぶときも おやとお客さんで 番号がそろう
+    const canCome = room === undefined ? 99 : Math.max(0, room);
     for (let i = 0; i < group.members.length; i++) {
       const t = group.members[i];
       const hid = this.hidNext++;
       if (live.has(t.name)) continue;
+      if (came >= canCome) continue;               // マップが いっぱい
       live.add(t.name);
       came++;
       const h = new Human(this.scene, this.world, t, e.x + rand(-2.4, 2.4), e.z + rand(-2, 2));
@@ -558,11 +622,14 @@ class Game {
     const behind = diff > 1.7;
     // あまのじゃくは ふいうちが とくい
     const behindK = p.charId === "amanojaku" ? 2.5 : 1.75;
-    let amount = 34 * p.C.scare * (behind ? behindK : 1.0) * (bd < 2.5 ? 1.2 : 1.0);
+    // ともだちと はさみうちにすると、うんと よく効く
+    const mate = this.pincerWith(best);
+    let amount = 34 * p.C.scare * (behind ? behindK : 1.0) * (bd < 2.5 ? 1.2 : 1.0)
+      * (mate ? 2.1 : 1.0);
     if (best.seenGhostT > 0.2) amount *= 0.7;      // 見られていると効きが悪い
 
     const eff = best.addFear(amount, p.x, p.z, "direct", "おどかし");
-    if (this.net.on) this.net.reportScare(best.hid, amount, "direct");
+    if (this.net.on) { this.net.reportScare(best.hid, amount, "direct"); this.myScareT.set(best.hid, Date.now()); }
     this.texts.push(new FloatText(this.scene, "わっ！", p.x, p.y + 2.1, p.z, "#ffe27a", 2.3));
 
     if (eff > 0) {
@@ -578,11 +645,60 @@ class Game {
         best.x, 2.9, best.z, best.lastCombo ? "#9dffe0" : behind ? "#ff8ac4" : "#ffd45e", (behind || best.lastCombo) ? 2.2 : 1.7));
       const drop = best.takeDrop();
       if (drop) { this.dropAt(drop, best.x, best.z, best.y); this.texts.push(new FloatText(this.scene, MATERIALS[drop].icon + "落とした", best.x, 2.0, best.z, "#7fe8b8", 1.5)); }
+      if (mate) {
+        // はさみうち大成功。よい色の材料が どっさり落ちる
+        this.bump("pincer");
+        this.audio.rankUp();
+        this.ui.flash(0.6);
+        this.texts.push(new FloatText(this.scene, "はさみうち成功！ " + mate.name + " と",
+          best.x, 3.5, best.z, "#ffd45e", 2.6));
+        this.ui.toast("🤝 はさみうち成功！ " + mate.name + " と いっしょに おどかした", "gold", 4000);
+        const far = Math.max(this.remoteAt(best.x, best.z, best.y), 0.55);
+        for (let i = 0; i < 3; i++)
+          this.dropAt(choice(SHARE_DROPS), best.x + rand(-1.6, 1.6), best.z + rand(-1.6, 1.6),
+            best.y, pickRarity(far, 1));
+      }
     } else {
       this.bump("laughed");
       this.audio.laugh();
       this.texts.push(new FloatText(this.scene, "笑われた…", best.x, 2.7, best.z, "#8fa8c8", 1.6));
     }
+  }
+
+  // 人間をはさんで、ともだちが 反対がわに いるか？
+  //  いれば「はさみうち」。こわさも 材料も うんと よくなる。
+  pincerWith(h) {
+    if (!this.net.on || !this.net.peers.size) return null;
+    const p = this.player;
+    const myA = Math.atan2(p.x - h.x, p.z - h.z);
+    const myD = dist(p.x, p.z, h.x, h.z);
+    if (myD > 16) return null;
+    for (const pr of this.net.peers.values()) {
+      const d2 = dist(pr.x, pr.z, h.x, h.z);
+      if (d2 > 16) continue;
+      if (Math.abs((pr.y || 0) - h.y) > 3) continue;        // ちがう階なら はさめない
+      const a2 = Math.atan2(pr.x - h.x, pr.z - h.z);
+      let diff = Math.abs(((a2 - myA + Math.PI) % (Math.PI * 2)) - Math.PI);
+      if (diff > 2.1) return pr;                            // 120度より 外＝反対がわ
+    }
+    return null;
+  }
+
+  // だれかが おどかしたら、この画面の おばけにも 材料を 1つ わたす。
+  //  ともだちと やっていると、自分が おどかしていなくても もらえる。
+  //  （拾いものは 画面ごとに 別なので、取りあいには ならない）
+  giveShare(h, why) {
+    const p = this.player;
+    // ひといきに 出しすぎない（1秒に3つまで）
+    const now = Date.now();
+    if (now - (this._shareT || 0) > 1000) { this._shareT = now; this._shareN = 0; }
+    if (++this._shareN > 3) return;
+    const kind = choice(SHARE_DROPS);
+    const bonus = this.remoteAt(h.x, h.z, h.y) * 0.7;
+    // ともだちの ぶんは、自分の すぐそばに 落とす（かならず 取れるように）
+    this.dropAt(kind, p.x + rand(-1.2, 1.2), p.z + rand(-1.2, 1.2), p.y < 0.6 ? 0 : p.y, pickRarity(bonus));
+    this.texts.push(new FloatText(this.scene, MATERIALS[kind].icon + (why || "ともだちの ぶんも！"),
+      p.x, p.y + 1.6, p.z, "#ffd45e", 1.8));
   }
 
   // --- 人間が逃げ切った --------------------------------------
@@ -602,6 +718,84 @@ class Game {
       this.ui.toast("👑 ランクアップ！ " + r.name, "gold");
       setTimeout(() => this.ui.toast(r.note, "gold"), 900);
     }
+  }
+
+  // 名まえの行を おしたら、その人を さがす／やめる
+  bindFind() {
+    const list = document.getElementById("humanList");
+    if (list) list.addEventListener("click", (e) => {
+      const row = e.target.closest ? e.target.closest(".hrow") : null;
+      if (!row || !row.dataset.hid) return;
+      this.setTrack(Number(row.dataset.hid));
+    });
+    const stop = document.getElementById("findStop");
+    if (stop) stop.addEventListener("click", () => this.setTrack(0));
+  }
+
+  setTrack(hid) {
+    const same = this.trackHid === hid;
+    this.trackHid = same ? 0 : hid;
+    this.ui._humanSig = null;                    // 行を えがきなおす
+    if (this.trackHid) {
+      const h = this.humans.find((x) => x.hid === this.trackHid && !x.out);
+      if (h) { this.ui.toast("🔎 「" + h.name + "」を さがしています", "gold", 4000); this.audio.pickup(); }
+      else { this.trackHid = 0; }
+    } else {
+      this.ui.setFind(null);
+      this.audio.click();
+      if (this.beacon) this.beacon.visible = false;
+    }
+  }
+
+  // 光の柱を つくる（一度だけ）
+  makeBeacon() {
+    const g = new THREE.Group();
+    const mat = (o) => new THREE.MeshBasicMaterial({ color: 0xffd45e, transparent: true,
+      opacity: o, depthTest: false, depthWrite: false });
+    // ほそい柱
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.34, 26, 8, 1, true), mat(0.3));
+    pole.position.y = 13; g.add(pole);
+    // 足もとの わ
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.7, 1.05, 22), mat(0.62));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06; g.add(ring);
+    // 頭の上の しるし
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.7, 4), mat(0.9));
+    tip.rotation.x = Math.PI; tip.position.y = 3.1; g.add(tip);
+    g.traverse((o) => { o.renderOrder = 999; });   // かべの手前に えがく
+    g.visible = false;
+    this.scene.add(g);
+    return g;
+  }
+
+  // 毎フレーム、やじるしと 光の柱を あわせる
+  updateFind(dt, t) {
+    if (!this.trackHid) return;
+    const h = this.humans.find((x) => x.hid === this.trackHid);
+    if (!h || h.out) {
+      const gone = h ? h.name : "その人";
+      this.trackHid = 0; this.ui.setFind(null); this.ui._humanSig = null;
+      if (this.beacon) this.beacon.visible = false;
+      this.ui.toast("🔎 「" + gone + "」は 出ていきました", "good", 3500);
+      return;
+    }
+    if (!this.beacon) this.beacon = this.makeBeacon();
+    this.beacon.visible = true;
+    this.beacon.position.set(h.x, h.y, h.z);
+    const pulse = 0.75 + Math.sin(t * 5) * 0.25;
+    this.beacon.scale.set(pulse, 1, pulse);
+
+    // 画面から見て どっちの向きか
+    const v = new THREE.Vector3(h.x, h.y + 1.2, h.z);
+    this.camera.worldToLocal(v);
+    const bearing = Math.atan2(v.x, -v.z);        // 0 = まっすぐ前
+    const p = this.player;
+    const d = Math.hypot(h.x - p.x, h.z - p.z);
+    // どの階にいるか、上か下か
+    let where = this.world.roomAt(h.x, h.z, h.y);
+    const dy = h.y - p.y;
+    if (dy > 1.6) where = "⬆ " + where;
+    else if (dy < -1.6) where = "⬇ " + where;
+    this.ui.setFind(h.name, bearing - Math.PI / 2, d, where);
   }
 
   // --- 毎フレーム --------------------------------------------
@@ -739,7 +933,7 @@ class Game {
           const line = h.slip();
           if (!line) continue;
           h.addFear(tr.def.fear, tr.x, tr.z, "trap:" + tr.id, tr.def.name);
-          if (this.net.on) this.net.reportScare(h.hid, tr.def.fear, "trap:" + tr.id);
+          if (this.net.on) { this.net.reportScare(h.hid, tr.def.fear, "trap:" + tr.id); this.myScareT.set(h.hid, Date.now()); }
           h.speak(line, 3.0);
           this.bump("slipped");
           tr.fire();
@@ -757,7 +951,7 @@ class Game {
         if (d > tr.def.radius) continue;
         if (!w.colliders.lineOfSight(tr.x, tr.z, h.x, h.z, 1.2, 0.7)) continue;
         const eff = h.addFear(tr.def.fear, tr.x, tr.z, "trap:" + tr.id, tr.def.name);
-        if (this.net.on) this.net.reportScare(h.hid, tr.def.fear, "trap:" + tr.id);
+        if (this.net.on) { this.net.reportScare(h.hid, tr.def.fear, "trap:" + tr.id); this.myScareT.set(h.hid, Date.now()); }
         tr.fire();
         this.bump("trapsFired");
         if (dist(tr.x, tr.z, p.x, p.z) < 34) this.audio.trapSound(tr.id);
@@ -804,10 +998,20 @@ class Game {
     }
 
     // --- 次の波 ---------------------------------------------
-    if (alive === 0) {
+    //  ・だれもいなければ すぐ来る
+    //  ・のこっていても、時間がたつほど 早く つぎが来る
+    //  ・ただし マップには MAX_ALIVE 人までしか いない
+    this.aliveNow = alive;
+    if (!this.isGuest && alive < MAX_ALIVE) {
       this.waveTimer -= dt;
-      if (this.waveTimer <= 0 && !this.isGuest) { this.spawnWave(); this.waveTimer = 26; }
-    } else this.waveTimer = 26;
+      if (this.waveTimer <= 0) {
+        this.spawnWave(MAX_ALIVE - alive);
+        this.waveTimer = this.nextWaveGap(alive);
+      }
+    } else if (alive >= MAX_ALIVE) {
+      // いっぱいのときは、待ち時間を すこしだけ もどしておく
+      this.waveTimer = Math.min(this.waveTimer, 4);
+    }
 
     // --- 隠し要素 -------------------------------------------
     if (this.redLady && this.redLady.update(dt, w, p, this.humans) === "appeared") {
@@ -892,6 +1096,7 @@ class Game {
   updateHud(dt, t) {
     const p = this.player, w = this.world;
     this.ui.setPlace(w.roomAt(p.x, p.z, p.y));
+    this.updateFind(dt, t);
     this.ui.setBag(this.inv);
     this.ui.setHotbar(this.built, this.selTrap);
     this.ui.setHumans(this.humans, this.netPeerList());
@@ -1117,20 +1322,34 @@ class Game {
       hs.push([h.hid, +h.x.toFixed(2), +h.y.toFixed(2), +h.z.toFixed(2), +h.yaw.toFixed(2),
         Math.round(h.fear), NET_STATES.indexOf(h.state), h.out ? 1 : 0]);
     }
-    return { wave: this.wave, hs };
+    // さいきん40波ぶんの「入れた人数」も いっしょに送る
+    const rooms = [];
+    for (let k = Math.max(1, this.wave - 40); k <= this.wave; k++) {
+      const v = this.waveRoom.get(k);
+      if (v !== undefined) rooms.push([k, v]);
+    }
+    return { wave: this.wave, hs, rooms };
   }
 
   applyRemoteWorld(rw) {
     let guard = 0;
+    for (const [k, v] of rw.rooms || []) this.waveRoom.set(k, v);
     this._netSpawn = true;
     while (this.wave < rw.wave && guard++ < 24) this.spawnWave();
     this._netSpawn = false;   // 同じ順番で同じ人たちが来る
     const by = new Map();
     for (const h of this.humans) by.set(h.hid, h);
+    const now = Date.now();
     for (const a of rw.hs || []) {
       const h = by.get(a[0]);
       if (!h) continue;
-      if (h.setNet(a[1], a[2], a[3], a[4], a[5], NET_STATES[a[6]] || "wander", a[7])) this.onEscape(h);
+      const was = h.fear;
+      const escaped = h.setNet(a[1], a[2], a[3], a[4], a[5], NET_STATES[a[6]] || "wander", a[7]);
+      // こわさが ぐんと上がった＝だれかが おどかした。
+      //  自分がおどかしたぶんは、すでに 材料をもらっているので よける
+      const mine = this.myScareT.get(h.hid) || 0;
+      if (!escaped && h.fear - was >= 10 && now - mine > 3500) this.giveShare(h);
+      if (escaped) this.onEscape(h);
     }
   }
 
@@ -1152,7 +1371,9 @@ class Game {
         if (a.k !== "scare") continue;
         for (const h of this.humans) {
           if (h.hid !== a.hid || h.out) continue;
-          h.addFear(a.a, h.x, h.z, a.w || "mate", "ともだち");
+          const eff = h.addFear(a.a, h.x, h.z, a.w || "mate", "ともだち");
+          // ともだちが おどかしてくれたぶん、こちらにも 材料が 1つ
+          if (eff > 0) this.giveShare(h);
           break;
         }
       }
