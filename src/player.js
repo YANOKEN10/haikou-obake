@@ -1,7 +1,7 @@
 import * as THREE from "../lib/three.module.js";
 import { clamp, lerp, angleLerp } from "./util.js";
 import { FLOOR_H, FLOORS, stairSurface } from "./world.js";
-import { CHARS, UPG_STEP } from "./data.js";
+import { CHARS, UPG_STEP, paintById } from "./data.js";
 
 // ============================================================
 //  プレイヤー（おばけ）と3人称カメラ
@@ -22,6 +22,8 @@ export class Player {
     //  CHARS そのものは みんなで つかう表なので、書きかえない。
     //  かわりに stat() で 足しあわせて つかう。
     this.up = {};
+    // すがたごとの 色。{body:"kin", deco:"sora", ...}
+    this.paint = {};
     this.x = 0; this.y = 1.5; this.z = 20;
     this.vx = 0; this.vz = 0; this.vy = 0;
     this.yaw = Math.PI;
@@ -65,6 +67,7 @@ export class Player {
     }
     this.build();
     this.group.add(this.light);
+    this.applyPaint();                       // あかりの色も つけなおす
     this.group.scale.setScalar(GHOST_SCALE * this.C.size);
     return true;
   }
@@ -151,6 +154,76 @@ export class Player {
     this.group.add(this.handL, this.handR);
 
     this.decorate(bodyMat, eyeMat);
+
+    // もとの色を おぼえておく。色をかえても、
+    // 「もとの色」に もどせるように するため
+    this.baseColors = {
+      body: bodyMat.color.clone(),
+      skirt: this.skirtMat ? this.skirtMat.color.clone() : null,
+      eye: eyeMat.color.clone(),
+      glow: new THREE.Color((this.C || CHARS.obake).glow),
+      // 自分で光る色は すがたごとに ちがう（一つ目小僧の はかまなど）。
+      //  ひかりの色を えらんでいないときは、これに もどす
+      bodyE: bodyMat.emissive.clone(),
+      skirtE: this.skirtMat ? this.skirtMat.emissive.clone() : null,
+    };
+    this.extraBase = this.extras.map((m) => (m.material ? m.material.color.clone() : null));
+    this.applyPaint();
+  }
+
+  // --- 色がえ ------------------------------------------------
+  //  paint = {body:"kin", deco:"sora", glow:"yami", eye:"snow"}
+  //  「もとの色」のパーツは さわらない
+  setPaint(paint) { this.paint = paint || {}; this.applyPaint(); }
+
+  applyPaint() {
+    const P = this.paint || {};
+    const base = this.baseColors;
+    if (!base) return;
+    const hex = (k) => { const q = paintById(P[k]); return q && q.hex !== null && q.hex !== undefined ? q.hex : null; };
+
+    // からだ（あたま・手・すそ）
+    const b = hex("body");
+    if (this.bodyMat) {
+      if (b !== null) this.bodyMat.color.setHex(b); else this.bodyMat.color.copy(base.body);
+    }
+    if (this.skirtMat && base.skirt) {
+      if (b !== null) this.skirtMat.color.setHex(b); else this.skirtMat.color.copy(base.skirt);
+    }
+
+    // ひかり（emissive と、かべごしの りんかく と 手あかり）
+    const gcol = hex("glow");
+    const gc = gcol !== null ? new THREE.Color(gcol) : base.glow;
+    if (this.bodyMat) {
+      if (gcol !== null) this.bodyMat.emissive.copy(gc); else this.bodyMat.emissive.copy(base.bodyE);
+    }
+    if (this.skirtMat && base.skirtE) {
+      if (gcol !== null) this.skirtMat.emissive.copy(gc); else this.skirtMat.emissive.copy(base.skirtE);
+    }
+    if (this.xrayMat) this.xrayMat.color.copy(gc);
+    if (this.light) this.light.color.copy(gc);
+
+    // め と くち
+    const e = hex("eye");
+    if (this.eyeMat) {
+      if (e !== null) this.eyeMat.color.setHex(e); else this.eyeMat.color.copy(base.eye);
+    }
+
+    // かざり（すがたごとの ぶひん）。
+    //  もとの色みを のこしたいので、そのまま ぬりつぶさず
+    //  えらんだ色に 7わり よせる
+    const dcol = hex("deco");
+    const ecol = hex("eye");
+    for (let i = 0; i < this.extras.length; i++) {
+      const m = this.extras[i], ob = this.extraBase[i];
+      if (!m || !m.material || !ob) continue;
+      const part = m.userData.part || "deco";
+      const want = part === "eye" ? ecol : part === "body" ? b : dcol;
+      if (want === null) { m.material.color.copy(ob); continue; }
+      const mix = part === "eye" ? 0.85 : part === "body" ? 0.9 : 0.7;
+      m.material.color.copy(ob).lerp(new THREE.Color(want), mix);
+      if (m.material.emissive) m.material.emissive.copy(m.material.color).multiplyScalar(0.5);
+    }
   }
 
   // すがたごとの かざり。参考の絵に合わせて 作ってある。
@@ -168,12 +241,16 @@ export class Player {
     const M = (c, opt) => new THREE.MeshLambertMaterial({ color: c, emissive: opt && opt.e !== undefined ? opt.e : c,
       emissiveIntensity: opt && opt.i !== undefined ? opt.i : 0.35 });
     const B = (c) => new THREE.MeshBasicMaterial({ color: c });
-    const add = (m) => { this.group.add(m); this.extras.push(m); return m; };
+    // part … "deco"（かざり）か "eye"（目）。あとで 色を かえるとき つかう
+    const add = (m, part) => {
+      m.userData.part = part || "deco";
+      this.group.add(m); this.extras.push(m); return m;
+    };
     // まんまるの目玉（白目＋黒目）をひとつ作る
     const bigEye = (x, y, z, r, look) => {
-      const white = add(new THREE.Mesh(new THREE.SphereGeometry(r, 16, 14), B(0xfdfbf4)));
+      const white = add(new THREE.Mesh(new THREE.SphereGeometry(r, 16, 14), B(0xfdfbf4)), "eye");
       white.position.set(x, y, z); white.scale.set(1, 1, 0.55); white.renderOrder = 2;
-      const pup = add(new THREE.Mesh(new THREE.SphereGeometry(r * 0.5, 12, 10), B(0x1a1418)));
+      const pup = add(new THREE.Mesh(new THREE.SphereGeometry(r * 0.5, 12, 10), B(0x1a1418)), "eye");
       pup.position.set(x + (look || 0) * r * 0.25, y, z + r * 0.42); pup.scale.set(1, 1, 0.6); pup.renderOrder = 3;
       return { white, pup };
     };
@@ -202,7 +279,9 @@ export class Player {
       bigEye(0, 1.32, 0.40, 0.30);
       cheeks(1.12, 0.40, 0xf7b8b0);
       tongue(1.06, 0.44, 0.34);
-      this.skirtMat.color.setHex(0x6a6a72);           // 灰色のはかま
+      this.skirtMat.color.setHex(0x35353d);           // 黒っぽい 鼠色の はかま
+      this.skirtMat.emissive.setHex(0x14141a);        // 体は 光らせない（顔だけ ほんのり）
+      this.skirtMat.emissiveIntensity = 0.3;
       const belt = add(new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.56, 0.12, 18), B(0xfdfbf4)));
       belt.position.y = 1.02;
       const geta = add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.09, 0.46), M(0xb08a52)));
@@ -214,7 +293,7 @@ export class Player {
       this.head.visible = false; this.eyeL.visible = false; this.eyeR.visible = false; this.mouth.visible = false;
       this.handL.visible = false; this.handR.visible = false;
       this.skirt.visible = false;
-      const canopy = add(new THREE.Mesh(new THREE.ConeGeometry(1.02, 1.5, 8), M(0x9a2026, { e: 0x5a1014, i: 0.4 })));
+      const canopy = add(new THREE.Mesh(new THREE.ConeGeometry(1.02, 1.5, 8), M(0x9a2026, { e: 0x5a1014, i: 0.4 })), "body");
       canopy.position.y = 1.32;
       for (let i = 0; i < 8; i++) {                    // 骨のすじ
         const a2 = (i / 8) * Math.PI * 2;
@@ -286,7 +365,7 @@ export class Player {
       cheeks(1.1, 0.40, 0xf59ab4);
       const beak = add(new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.3, 6), B(0xf5b93a)));
       beak.position.set(0, 1.1, 0.48); beak.rotation.x = Math.PI / 2; beak.renderOrder = 2;
-      const belly = add(new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 12), B(0xfdfbf4)));
+      const belly = add(new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 12), B(0xfdfbf4)), "body");
       belly.position.set(0, 0.86, 0.3); belly.scale.set(1, 0.9, 0.4);
       const shell = add(new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), M(0x3f6a2a, { i: 0.25 })));
       shell.position.set(0, 0.9, -0.34); shell.scale.set(1, 0.85, 0.45);

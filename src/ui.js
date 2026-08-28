@@ -1,5 +1,5 @@
 import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, CHARS, EXCHANGE,
-  UPGRADES, UPG_MAX, UPG_STEP, upgCost } from "./data.js";
+  UPGRADES, UPG_MAX, UPG_STEP, upgCost, PARTS, PAINTS, paintById } from "./data.js";
 import { clamp } from "./util.js";
 
 const $ = (s) => document.querySelector(s);
@@ -211,6 +211,7 @@ export class UI {
     const grid = $("#cgrid");
     if (this.craftTab === "shop") { this.renderShop(grid); return; }
     if (this.craftTab === "upg") { this.renderUpg(grid); return; }
+    if (this.craftTab === "paint") { this.renderPaint(grid); return; }
     const isTrap = this.craftTab === "trap";
     const src = isTrap ? TRAPS : GHOSTS;
     grid.innerHTML = Object.entries(src).map(([id, d]) => {
@@ -243,6 +244,75 @@ export class UI {
   }
 
   // --- 交換所：かけらで、すがた・仕掛け・おばけ と ひきかえる ---
+  // --- 色を かえる -------------------------------------------
+  //  すがた → パーツ → 色 の じゅんに えらぶ。
+  //  もっていない色は、材料をはらうと 使えるようになる。
+  renderPaint(grid) {
+    const g = this.game;
+    if (!this.pntChar || !g.chars[this.pntChar]) this.pntChar = g.charId;
+    if (!this.pntPart || !PARTS[this.pntPart]) this.pntPart = "body";
+    const cid = this.pntChar, part = this.pntPart;
+
+    const chars = Object.entries(CHARS).sort((a, b) => a[1].order - b[1].order)
+      .map(([id, c]) => "<div class='uchar" + (id === cid ? " on" : "") + (g.chars[id] ? "" : " lock") +
+        "' data-c='" + id + "'>" + c.icon + " " + c.name + (g.chars[id] ? "" : " 🔒") + "</div>").join("");
+
+    const parts = Object.entries(PARTS).map(([pk, P]) => {
+      const cur = paintById(g.paintOn(cid, pk));
+      const sw = cur.hex !== null && cur.hex !== undefined
+        ? "#" + cur.hex.toString(16).padStart(6, "0")
+        : "#" + CHARS[cid].body.toString(16).padStart(6, "0");
+      return "<div class='ppart" + (pk === part ? " on" : "") + "' data-p='" + pk + "'>" +
+        "<i style='background:" + sw + "'></i>" + P.icon + " " + P.name + "</div>";
+    }).join("");
+
+    const nowId = g.paintOn(cid, part);
+    const cards = PAINTS.map((q) => {
+      const have = g.hasPaint(q.id);
+      const can = !have && g.canBuyPaint(q.id) === true;
+      const sw = q.hex !== null && q.hex !== undefined
+        ? "#" + q.hex.toString(16).padStart(6, "0")
+        : "linear-gradient(135deg," + "#" + CHARS[cid].body.toString(16).padStart(6, "0") + " 50%,#444 50%)";
+      let st;
+      if (have) st = q.id === nowId ? "<span style='color:var(--gold)'>いま これ</span>" : "ぬる";
+      else {
+        const mats = Object.entries(q.cost || {}).map(([k, n]) => {
+          const h = g.inv[k] || 0;
+          return "<b class='" + (h >= n ? "" : "lack") + "'>" + MATERIALS[k].icon + h + "/" + n + "</b>";
+        }).join(" ");
+        const sh = Object.entries(q.shards || {}).map(([t, n]) => {
+          const h = g.shards[t] || 0;
+          return "<b class='" + (h >= n ? "" : "lack") + "'>💠" + RARITY[t].name + h + "/" + n + "</b>";
+        }).join(" ");
+        st = mats + (sh ? " " + sh : "");
+      }
+      return "<div class='pcard " + (have ? (q.id === nowId ? "on" : "") : can ? "can" : "no") +
+        "' data-i='" + q.id + "' data-have='" + (have ? 1 : 0) + "'>" +
+        "<div class='sw' style='background:" + sw + "'></div>" +
+        "<div class='nm'>" + q.name + "</div><div class='st'>" + st + "</div></div>";
+    }).join("");
+
+    grid.innerHTML = "<div id='pntHead'>" + chars + "</div>" +
+      "<div id='pntParts'>" + parts + "</div>" +
+      "<div id='pntNote'>" + PARTS[part].icon + " <b>" + PARTS[part].name + "</b> … " + PARTS[part].desc +
+      "<br>色は いちど 手に入れれば、どの すがたでも つかえます。ぬる色は すがたごとに 決められます。</div>" +
+      cards;
+
+    grid.querySelectorAll(".uchar").forEach((el) => el.addEventListener("click", () => {
+      if (el.classList.contains("lock")) { g.ui.toast("まだ 使えない すがたです", "bad"); g.audio.deny(); return; }
+      this.pntChar = el.dataset.c; g.audio.click(); this.renderPaint(grid);
+    }));
+    grid.querySelectorAll(".ppart").forEach((el) => el.addEventListener("click", () => {
+      this.pntPart = el.dataset.p; g.audio.click(); this.renderPaint(grid);
+    }));
+    grid.querySelectorAll(".pcard").forEach((el) => el.addEventListener("click", () => {
+      const id = el.dataset.i;
+      if (el.dataset.have === "1") { g.setPaintOn(this.pntChar, this.pntPart, id); this.renderPaint(grid); }
+      else if (g.buyPaint(id)) { g.setPaintOn(this.pntChar, this.pntPart, id); this.renderPaint(grid); }
+      else this.renderPaint(grid);
+    }));
+  }
+
   // --- すがたを きたえる -------------------------------------
   //  すがたごとに、はやさ・ダッシュ・こわさ・とどく・すりぬけ を
   //  1レベルずつ 上げていく。上げるほど 材料も かけらも いる。

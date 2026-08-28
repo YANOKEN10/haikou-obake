@@ -379,3 +379,51 @@ export function upgCost(key, lv) {
     shards: { [tier]: 3 + L * 2 },
   };
 }
+
+
+// ============================================================
+//  すがたの 色がえ
+//   ・パーツ（からだ／ひかり／め／かざり）ごとに 色を かえられる
+//   ・色は はじめ すこししか なくて、材料を つかうと ふえていく
+//   ・どの色を つかうかは すがたごと。
+//     河童を みどりのままに して、天狗だけ 金色に、も できる
+//   ・色そのものは いちど 手に入れれば、どのすがたでも つかえる
+// ============================================================
+export const PARTS = {
+  body: { name: "からだ",   icon: "🫧", desc: "あたま・手・すそ" },
+  deco: { name: "かざり",   icon: "🎀", desc: "すがたごとの かざり（甲羅・傘・しっぽ など）" },
+  glow: { name: "ひかり",   icon: "✨", desc: "まわりの ひかりと、かべごしの りんかく" },
+  eye:  { name: "め",       icon: "👀", desc: "目と 口" },
+};
+
+// つかえる色。上から じゅんに 手に入れていく。
+//  cost が null の色は はじめから つかえる。
+export const PAINTS = [
+  { id: "base",   name: "もとの色",     hex: null,     cost: null },
+  { id: "snow",   name: "ゆきいろ",     hex: 0xf4f1e8, cost: null },
+  { id: "sumi",   name: "すみいろ",     hex: 0x2a2732, cost: null },
+  { id: "momo",   name: "ももいろ",     hex: 0xf5a8c0, cost: { hokori: 12, chalk: 8 } },
+  { id: "sora",   name: "そらいろ",     hex: 0x7fc4f0, cost: { hokori: 16, kami: 10 } },
+  { id: "wakaba", name: "わかばいろ",   hex: 0x86d06a, cost: { nurunuru: 14, chalk: 12 } },
+  { id: "yamabuki", name: "やまぶきいろ", hex: 0xf5c23a, cost: { pan: 16, wax: 12 } },
+  { id: "akane",  name: "あかねいろ",   hex: 0xe85a5a, cost: { onnen: 18, kami: 14 } },
+  { id: "fuji",   name: "ふじいろ",     hex: 0xb49ae8, cost: { uwabaki: 18, nurunuru: 16 }, shards: { 1: 4 } },
+  { id: "mikan",  name: "みかんいろ",   hex: 0xf59340, cost: { pan: 24, denchi: 18 }, shards: { 1: 6 } },
+  { id: "wasabi", name: "わさびいろ",   hex: 0x4f8a4a, cost: { nurunuru: 26, wax: 20 }, shards: { 1: 8 } },
+  { id: "mizu",   name: "みずいろ",     hex: 0x9fe8e0, cost: { kami: 28, hokori: 24 }, shards: { 2: 6 } },
+  { id: "budou",  name: "ぶどういろ",   hex: 0x7a3a8a, cost: { onnen: 30, uwabaki: 22 }, shards: { 2: 9 } },
+  { id: "chairo", name: "こげちゃ",     hex: 0x6a4a32, cost: { pan: 32, wax: 26 }, shards: { 2: 12 } },
+  { id: "kurenai", name: "くれないいろ", hex: 0xc41f3a, cost: { onnen: 36, denchi: 28 }, shards: { 3: 8 } },
+  { id: "ruri",   name: "るりいろ",     hex: 0x2a4fd8, cost: { denchi: 38, kami: 30 }, shards: { 3: 11 } },
+  { id: "moegi",  name: "もえぎいろ",   hex: 0xa8e02a, cost: { nurunuru: 40, chalk: 32 }, shards: { 3: 14 } },
+  { id: "sakura", name: "さくらいろ",   hex: 0xffd0e0, cost: { chalk: 44, hokori: 36 }, shards: { 4: 9 } },
+  { id: "yami",   name: "やみいろ",     hex: 0x14121c, cost: { onnen: 48, uwabaki: 38 }, shards: { 4: 13 } },
+  { id: "aotake", name: "あおたけいろ", hex: 0x1fbf9a, cost: { nurunuru: 50, wax: 40 }, shards: { 4: 17 } },
+  { id: "kohaku", name: "こはくいろ",   hex: 0xffab2e, cost: { pan: 56, denchi: 44 }, shards: { 5: 10 } },
+  { id: "gin",    name: "ぎんいろ",     hex: 0xd8dee8, cost: { wax: 60, chalk: 50 }, shards: { 5: 16 } },
+  { id: "kin",    name: "きんいろ",     hex: 0xffd23a, cost: { onnen: 70, pan: 55 }, shards: { 6: 12 } },
+  { id: "nijiao", name: "オーロラいろ", hex: 0x8affe8, cost: { kami: 75, nurunuru: 60 }, shards: { 6: 18 } },
+  { id: "gokusai", name: "ごくさいしき", hex: 0xff4fd8, cost: { onnen: 90, uwabaki: 70 }, shards: { 6: 26 } },
+];
+
+export function paintById(id) { return PAINTS.find((p) => p.id === id) || PAINTS[0]; }

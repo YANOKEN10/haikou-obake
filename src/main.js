@@ -14,7 +14,7 @@ import { checkReturn } from "./support.js";
 import { UI } from "./ui.js";
 import { Audio } from "./audio.js";
 import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, pickRarity, CHARS, EXCHANGE, HUMAN_DROPS,
-  UPGRADES, UPG_MAX, UPG_STEP, upgCost } from "./data.js";
+  UPGRADES, UPG_MAX, UPG_STEP, upgCost, PARTS, PAINTS, paintById } from "./data.js";
 import { Roster } from "./people.js";
 import { clamp, rand, randi, choice, dist } from "./util.js";
 const FLOOR_HEIGHT_HALF = 3.2;
@@ -397,6 +397,7 @@ class Game {
     if (this.player.setChar(id)) {
       this.charId = id;
       this.player.setUpgrades(this.upg[id]);
+      this.player.setPaint(this.paint[id]);
       this.ui.toast(CHARS[id].icon + " " + CHARS[id].name + " に なった！", "good");
       this.ui.setCharChip(CHARS[id]);
       this.audio.summon();
@@ -1199,6 +1200,8 @@ class Game {
     p.chars = { ...this.chars };
     p.charId = this.charId;
     p.upg = JSON.parse(JSON.stringify(this.upg || {}));   // すがたごとの きょうか
+    p.paints = { ...this.paints };                        // 手に入れた色
+    p.paint = JSON.parse(JSON.stringify(this.paint || {}));  // すがたごとの 色
     p.traps = this.traps.map((t) => ({ id: t.id, x: +t.x.toFixed(2), z: +t.z.toFixed(2), uses: t.uses }));
     p.pos = { x: +this.player.x.toFixed(2), z: +this.player.z.toFixed(2) };
     p.playSeconds = Math.round(p.playSeconds || 0);
@@ -1225,8 +1228,11 @@ class Game {
     this.shards = { ...(p.shards || {}) };
     this.chars = { obake: 1, ...(p.chars || {}) };
     this.upg = JSON.parse(JSON.stringify(p.upg || {}));
+    this.paints = { base: 1, snow: 1, sumi: 1, ...(p.paints || {}) };
+    this.paint = JSON.parse(JSON.stringify(p.paint || {}));
     if (p.charId && this.chars[p.charId]) { this.charId = p.charId; this.player.setChar(p.charId); }
     this.player.setUpgrades(this.upg[this.charId]);
+    this.player.setPaint(this.paint[this.charId]);
     this.ui.setShards(this.shards);
     this.ui.setCharChip(CHARS[this.charId]);
     this.wave = p.wave || 0;
@@ -1257,6 +1263,8 @@ class Game {
     this.shards = {};                      // 色ごとの かけら
     this.chars = { obake: 1 };          // 使えるすがた
     this.upg = {};                      // すがたごとの きょうか {kappa:{speed:3}}
+    this.paints = { base: 1, snow: 1, sumi: 1 };   // 手に入れた色（すがた共通）
+    this.paint = {};                    // すがたごとの 色 {kappa:{body:"kin"}}
     this.charId = "obake";
     this.kicked = 0; this.wave = 0; this.selTrap = 0;
     this.waveTimer = 0; this.spawnTimer = 6; this.scareFx = 0;
@@ -1344,6 +1352,57 @@ class Game {
     this.ui.setCharChip(CHARS[this.charId]);
     this.saveNow(false);
     return true;
+  }
+
+  // ============================================================
+  //  色がえ
+  //   ・色は 材料で 手に入れる。いちど手に入れれば
+  //     どの すがたでも つかえる
+  //   ・どの色を ぬるかは すがたごと・パーツごと
+  // ============================================================
+  hasPaint(id) { return !!this.paints[id]; }
+
+  canBuyPaint(id) {
+    const q = paintById(id);
+    if (!q || !q.cost) return false;
+    if (this.paints[id]) return "have";
+    for (const k in q.cost) if ((this.inv[k] || 0) < q.cost[k]) return false;
+    for (const t in (q.shards || {})) if ((this.shards[t] || 0) < q.shards[t]) return false;
+    return true;
+  }
+
+  buyPaint(id) {
+    const q = paintById(id);
+    const ok = this.canBuyPaint(id);
+    if (ok === "have") return true;
+    if (!ok) { this.ui.toast("材料か かけらが たりません", "bad"); this.audio.deny(); return false; }
+    for (const k in q.cost) this.inv[k] -= q.cost[k];
+    for (const t in (q.shards || {})) this.shards[t] -= q.shards[t];
+    this.paints[id] = 1;
+    this.ui.toast("🎨 「" + q.name + "」が つかえるように なりました", "gold", 4500);
+    this.audio.rankUp();
+    this.ui.setBag(this.inv);
+    this.ui.setShards(this.shards);
+    this.saveNow(false);
+    return true;
+  }
+
+  // すがたの パーツに 色を ぬる
+  setPaintOn(charId, part, paintId) {
+    if (!CHARS[charId] || !PARTS[part]) return false;
+    if (!this.paints[paintId]) { this.ui.toast("その色は まだ もっていません", "bad"); this.audio.deny(); return false; }
+    if (!this.paint[charId]) this.paint[charId] = {};
+    if (paintId === "base") delete this.paint[charId][part];
+    else this.paint[charId][part] = paintId;
+    if (charId === this.charId) this.player.setPaint(this.paint[charId]);
+    this.audio.pickup();
+    this.saveNow(false);
+    return true;
+  }
+
+  paintOn(charId, part) {
+    const c = this.paint[charId];
+    return (c && c[part]) || "base";
   }
 
   // ============================================================
