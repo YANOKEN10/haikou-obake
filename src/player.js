@@ -1,7 +1,7 @@
 import * as THREE from "../lib/three.module.js";
 import { clamp, lerp, angleLerp } from "./util.js";
 import { FLOOR_H, FLOORS, stairSurface } from "./world.js";
-import { CHARS } from "./data.js";
+import { CHARS, UPG_STEP } from "./data.js";
 
 // ============================================================
 //  プレイヤー（おばけ）と3人称カメラ
@@ -18,6 +18,10 @@ export class Player {
     this.world = world;
     this.charId = CHARS[charId] ? charId : "obake";
     this.C = CHARS[this.charId];
+    // すがたごとの きょうか。{speed:3, scare:1, ...}
+    //  CHARS そのものは みんなで つかう表なので、書きかえない。
+    //  かわりに stat() で 足しあわせて つかう。
+    this.up = {};
     this.x = 0; this.y = 1.5; this.z = 20;
     this.vx = 0; this.vz = 0; this.vy = 0;
     this.yaw = Math.PI;
@@ -63,6 +67,16 @@ export class Player {
     this.group.add(this.light);
     this.group.scale.setScalar(GHOST_SCALE * this.C.size);
     return true;
+  }
+
+  // いまの すがたの きょうかレベルを 入れる
+  setUpgrades(up) { this.up = up || {}; }
+
+  // きょうかを 足した あとの 数値。
+  //  例：河童の はやさ 1.28 に レベル1（+0.02）で 1.30
+  stat(key) {
+    const base = (this.C && this.C[key] !== undefined) ? this.C[key] : 1;
+    return base + (this.up[key] || 0) * UPG_STEP;
   }
 
   build() {
@@ -383,10 +397,11 @@ export class Player {
 
     this.dashing = (input.k("ShiftLeft") || input.dash) && mag > 0 && this.stamina > 1;
     // すがたによって、だっしゅの もちが変わる
-    if (this.dashing) this.stamina = Math.max(0, this.stamina - dt * 26 / this.C.dash);
-    else this.stamina = Math.min(100, this.stamina + dt * 17 * this.C.dash);
+    const kDash = this.stat("dash");
+    if (this.dashing) this.stamina = Math.max(0, this.stamina - dt * 26 / kDash);
+    else this.stamina = Math.min(100, this.stamina + dt * 17 * kDash);
 
-    const speed = (this.dashing ? 9.6 : 5.4) * this.C.speed;
+    const speed = (this.dashing ? 9.6 : 5.4) * this.stat("speed");
     const accel = mag > 0 ? 22 : 13;
     this.vx = lerp(this.vx, dirX * speed, clamp(accel * dt, 0, 1));
     this.vz = lerp(this.vz, dirZ * speed, clamp(accel * dt, 0, 1));
@@ -394,8 +409,9 @@ export class Player {
     // --- すりぬけ ------------------------------------------
     this.phasing = input.k("KeyQ") && this.phase > 0;
     // すがたによって、すりぬけの もちが変わる
-    if (this.phasing) this.phase = Math.max(0, this.phase - dt * 34 / this.C.phase);
-    else this.phase = Math.min(100, this.phase + dt * 13 * this.C.phase);
+    const kPhase = this.stat("phase");
+    if (this.phasing) this.phase = Math.max(0, this.phase - dt * 34 / kPhase);
+    else this.phase = Math.min(100, this.phase + dt * 13 * kPhase);
 
     // --- 上下 ----------------------------------------------
     const up = input.k("Space") ? 1 : input.k("KeyC") ? -1 : 0;

@@ -13,7 +13,8 @@ import { Battle } from "./battle.js";
 import { checkReturn } from "./support.js";
 import { UI } from "./ui.js";
 import { Audio } from "./audio.js";
-import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, pickRarity, CHARS, EXCHANGE, HUMAN_DROPS } from "./data.js";
+import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, pickRarity, CHARS, EXCHANGE, HUMAN_DROPS,
+  UPGRADES, UPG_MAX, UPG_STEP, upgCost } from "./data.js";
 import { Roster } from "./people.js";
 import { clamp, rand, randi, choice, dist } from "./util.js";
 const FLOOR_HEIGHT_HALF = 3.2;
@@ -395,6 +396,7 @@ class Game {
     if (!this.chars[id]) { this.audio.deny(); return; }
     if (this.player.setChar(id)) {
       this.charId = id;
+      this.player.setUpgrades(this.upg[id]);
       this.ui.toast(CHARS[id].icon + " " + CHARS[id].name + " に なった！", "good");
       this.ui.setCharChip(CHARS[id]);
       this.audio.summon();
@@ -579,7 +581,7 @@ class Game {
   doScare() {
     const p = this.player;
     if (p.scareCooldown > 0) return;
-    let best = null, bd = 5.2 * p.C.reach;
+    let best = null, bd = 5.2 * p.stat("reach");
     for (const h of this.humans) {
       if (h.out) continue;
       const d = dist(p.x, p.z, h.x, h.z);
@@ -600,7 +602,7 @@ class Game {
     // ネコも おどろく（人間より すこし近くでないと気づかない）
     if (this.cat && this.cat.active && this.cat.startled <= 0) {
       const cp = this.cat.g.position;
-      if (dist(cp.x, cp.z, p.x, p.z) < 4.2 * p.C.reach &&
+      if (dist(cp.x, cp.z, p.x, p.z) < 4.2 * p.stat("reach") &&
           this.world.colliders.lineOfSight(p.x, p.z, cp.x, cp.z, 1.0, 0.6) &&
           this.cat.scare(p.x, p.z)) {
         this.audio.scare();
@@ -631,7 +633,7 @@ class Game {
     const behindK = p.charId === "amanojaku" ? 2.5 : 1.75;
     // ともだちと はさみうちにすると、うんと よく効く
     const mate = this.pincerWith(best);
-    let amount = 34 * p.C.scare * (behind ? behindK : 1.0) * (bd < 2.5 ? 1.2 : 1.0)
+    let amount = 34 * p.stat("scare") * (behind ? behindK : 1.0) * (bd < 2.5 ? 1.2 : 1.0)
       * (mate ? 2.1 : 1.0);
     if (best.seenGhostT > 0.2) amount *= 0.7;      // 見られていると効きが悪い
 
@@ -1196,6 +1198,7 @@ class Game {
     p.shards = { ...this.shards };
     p.chars = { ...this.chars };
     p.charId = this.charId;
+    p.upg = JSON.parse(JSON.stringify(this.upg || {}));   // すがたごとの きょうか
     p.traps = this.traps.map((t) => ({ id: t.id, x: +t.x.toFixed(2), z: +t.z.toFixed(2), uses: t.uses }));
     p.pos = { x: +this.player.x.toFixed(2), z: +this.player.z.toFixed(2) };
     p.playSeconds = Math.round(p.playSeconds || 0);
@@ -1221,7 +1224,9 @@ class Game {
     this.kicked = p.kicked || 0;
     this.shards = { ...(p.shards || {}) };
     this.chars = { obake: 1, ...(p.chars || {}) };
+    this.upg = JSON.parse(JSON.stringify(p.upg || {}));
     if (p.charId && this.chars[p.charId]) { this.charId = p.charId; this.player.setChar(p.charId); }
+    this.player.setUpgrades(this.upg[this.charId]);
     this.ui.setShards(this.shards);
     this.ui.setCharChip(CHARS[this.charId]);
     this.wave = p.wave || 0;
@@ -1251,6 +1256,7 @@ class Game {
     this.inv = {}; this.built = {};
     this.shards = {};                      // 色ごとの かけら
     this.chars = { obake: 1 };          // 使えるすがた
+    this.upg = {};                      // すがたごとの きょうか {kappa:{speed:3}}
     this.charId = "obake";
     this.kicked = 0; this.wave = 0; this.selTrap = 0;
     this.waveTimer = 0; this.spawnTimer = 6; this.scareFx = 0;
@@ -1291,6 +1297,54 @@ class Game {
     }
   }
 
+
+  // ============================================================
+  //  すがたの きょうか（レベルアップ）
+  //   ・すがたごとに 上げる。河童を上げても 天狗は 上がらない
+  //   ・材料と かけらを つかう
+  //   ・1レベルで +0.02（はやさ ×1.28 → ×1.30 のように）
+  // ============================================================
+  upgLevel(charId, key) {
+    const u = this.upg[charId];
+    return (u && u[key]) || 0;
+  }
+
+  canUpgrade(charId, key) {
+    const lv = this.upgLevel(charId, key);
+    if (lv >= UPG_MAX) return "max";
+    const c = upgCost(key, lv);
+    for (const k in c.mats) if ((this.inv[k] || 0) < c.mats[k]) return false;
+    for (const t in c.shards) if ((this.shards[t] || 0) < c.shards[t]) return false;
+    return true;
+  }
+
+  upgrade(charId, key) {
+    if (!CHARS[charId] || !UPGRADES[key]) return false;
+    if (!this.chars[charId]) { this.ui.toast("まだ 使えない すがたです", "bad"); this.audio.deny(); return false; }
+    const ok = this.canUpgrade(charId, key);
+    if (ok === "max") { this.ui.toast("もう いちばん 上です", "bad"); this.audio.deny(); return false; }
+    if (!ok) { this.ui.toast("材料か かけらが たりません", "bad"); this.audio.deny(); return false; }
+
+    const lv = this.upgLevel(charId, key);
+    const c = upgCost(key, lv);
+    for (const k in c.mats) this.inv[k] -= c.mats[k];
+    for (const t in c.shards) this.shards[t] -= c.shards[t];
+    if (!this.upg[charId]) this.upg[charId] = {};
+    this.upg[charId][key] = lv + 1;
+    if (charId === this.charId) this.player.setUpgrades(this.upg[charId]);
+
+    const U = UPGRADES[key];
+    const before = (CHARS[charId][key] + lv * UPG_STEP).toFixed(2);
+    const after = (CHARS[charId][key] + (lv + 1) * UPG_STEP).toFixed(2);
+    this.ui.toast(U.icon + " " + CHARS[charId].name + "の「" + U.name + "」が ×" +
+      before + " → ×" + after + "（Lv" + (lv + 1) + "）", "gold", 5000);
+    this.audio.rankUp();
+    this.ui.setBag(this.inv);
+    this.ui.setShards(this.shards);
+    this.ui.setCharChip(CHARS[this.charId]);
+    this.saveNow(false);
+    return true;
+  }
 
   // ============================================================
   //  ともだちと一緒にあそぶ

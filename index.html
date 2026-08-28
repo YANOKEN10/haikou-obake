@@ -221,6 +221,30 @@ body.touch .hpanel, body.touch .namelist, body.touch .cwrap{-webkit-overflow-scr
 #bCraft{left:24px;bottom:158px;width:62px;height:62px;border-color:var(--gold);color:var(--gold)}
 
 
+/* すがたを きたえる */
+#upgHead{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:2px}
+.uchar{background:rgba(10,9,20,.6);border:1px solid var(--edge);border-radius:999px;
+  padding:4px 11px;font-size:12px;cursor:pointer;white-space:nowrap}
+.uchar.on{border-color:var(--gold);color:var(--gold);background:rgba(58,46,20,.6)}
+.uchar.lock{opacity:.35;cursor:not-allowed}
+.ucard{background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:10px 12px}
+.ucard.can{border-color:#8fe6b0}
+.ucard.max{border-color:var(--gold);opacity:.9}
+.ucard h4{margin:0 0 3px;font-size:14px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.ucard .lv{font:700 12px/1 'DotGothic16',monospace;color:var(--gold)}
+.ucard .now{font-size:12.5px;color:#9dffe0;margin:3px 0 5px}
+.ucard .now s{color:var(--muted);text-decoration:none;font-size:11.5px}
+.ucard .d{font-size:11px;color:var(--muted);margin-bottom:6px;line-height:1.5}
+.ucard .cost{display:flex;flex-wrap:wrap;gap:4px 8px;font-size:11px;color:var(--muted)}
+.ucard .cost b{font-weight:400}
+.ucard .cost b.lack{color:var(--fear)}
+.ubar{height:5px;background:rgba(255,255,255,.09);border-radius:3px;overflow:hidden;margin:5px 0 7px}
+.ubar i{display:block;height:100%;background:linear-gradient(90deg,#6ad2a0,#ffd45e)}
+.ubtn{width:100%;margin-top:8px;background:rgba(20,17,38,.9);border:1px solid var(--edge2);
+  border-radius:9px;color:var(--ink);font:inherit;font-size:12.5px;padding:6px;cursor:pointer}
+.ucard.can .ubtn{border-color:#8fe6b0;color:#9dffe0}
+.ucard.no .ubtn{opacity:.45;cursor:not-allowed}
+
 /* おどかし勝負 */
 #battleBar{position:absolute;left:50%;transform:translateX(-50%);top:56px;z-index:7;
   display:flex;align-items:center;gap:10px;background:rgba(24,14,32,.88);
@@ -851,6 +875,7 @@ body.touch #craftClose{display:block}
       <div class="ctab on" data-tab="trap">🪤 仕掛けをつくる</div>
       <div class="ctab" data-tab="ghost">👻 おばけを生み出す</div>
       <div class="ctab" data-tab="shop">💠 交換所・すがた</div>
+      <div class="ctab" data-tab="upg">💪 すがたを きたえる</div>
     </div>
     <div class="cgrid" id="cgrid"></div>
   </div>

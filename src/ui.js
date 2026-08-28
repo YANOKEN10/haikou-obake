@@ -1,4 +1,5 @@
-import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, CHARS, EXCHANGE } from "./data.js";
+import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, CHARS, EXCHANGE,
+  UPGRADES, UPG_MAX, UPG_STEP, upgCost } from "./data.js";
 import { clamp } from "./util.js";
 
 const $ = (s) => document.querySelector(s);
@@ -67,7 +68,10 @@ export class UI {
   setCharChip(c) {
     const e = $("#charChip");
     if (!e || !c) return;
-    e.textContent = c.icon + " " + c.name;
+    const g = this.game;
+    let lv = 0;
+    if (g && g.upgLevel) for (const k in UPGRADES) lv += g.upgLevel(g.charId, k);
+    e.textContent = c.icon + " " + c.name + (lv ? "  +" + lv : "");
   }
 
   setPlace(name) { const e = $("#place"); if (e.textContent !== name) e.textContent = name; }
@@ -206,6 +210,7 @@ export class UI {
     const g = this.game;
     const grid = $("#cgrid");
     if (this.craftTab === "shop") { this.renderShop(grid); return; }
+    if (this.craftTab === "upg") { this.renderUpg(grid); return; }
     const isTrap = this.craftTab === "trap";
     const src = isTrap ? TRAPS : GHOSTS;
     grid.innerHTML = Object.entries(src).map(([id, d]) => {
@@ -238,6 +243,67 @@ export class UI {
   }
 
   // --- 交換所：かけらで、すがた・仕掛け・おばけ と ひきかえる ---
+  // --- すがたを きたえる -------------------------------------
+  //  すがたごとに、はやさ・ダッシュ・こわさ・とどく・すりぬけ を
+  //  1レベルずつ 上げていく。上げるほど 材料も かけらも いる。
+  renderUpg(grid) {
+    const g = this.game;
+    // どの すがたを きたえるか。はじめは いま つかっている すがた
+    if (!this.upgChar || !g.chars[this.upgChar]) this.upgChar = g.charId;
+    const cid = this.upgChar;
+
+    const tabs = Object.entries(CHARS)
+      .sort((a, b) => a[1].order - b[1].order)
+      .map(([id, c]) => {
+        const has = !!g.chars[id];
+        const lv = has ? Object.keys(UPGRADES).reduce((s, k) => s + g.upgLevel(id, k), 0) : 0;
+        return "<div class='uchar" + (id === cid ? " on" : "") + (has ? "" : " lock") + "' data-c='" + id + "'>" +
+          c.icon + " " + c.name + (has && lv ? " <b style='color:var(--gold)'>+" + lv + "</b>" : has ? "" : " 🔒") + "</div>";
+      }).join("");
+
+    const cards = Object.entries(UPGRADES).map(([key, U]) => {
+      const lv = g.upgLevel(cid, key);
+      const ok = g.canUpgrade(cid, key);
+      const maxed = ok === "max";
+      const base = CHARS[cid][key];
+      const now = (base + lv * UPG_STEP).toFixed(2);
+      const next = (base + (lv + 1) * UPG_STEP).toFixed(2);
+      const c = upgCost(key, lv);
+      const cost = Object.entries(c.mats).map(([mk, n]) => {
+        const have = g.inv[mk] || 0;
+        return "<b class='" + (have >= n ? "" : "lack") + "'>" + MATERIALS[mk].icon + MATERIALS[mk].name + " " + have + "/" + n + "</b>";
+      }).concat(Object.entries(c.shards).map(([t, n]) => {
+        const have = g.shards[t] || 0;
+        return "<b class='" + (have >= n ? "" : "lack") + "'>💠" + RARITY[t].name + "のかけら " + have + "/" + n + "</b>";
+      })).join("");
+      return "<div class='ucard " + (maxed ? "max" : ok ? "can" : "no") + "' data-k='" + key + "'>" +
+        "<h4><span>" + U.icon + " " + U.name + "</span><span class='lv'>Lv " + lv + " / " + UPG_MAX + "</span></h4>" +
+        "<div class='ubar'><i style='width:" + Math.round(lv / UPG_MAX * 100) + "%'></i></div>" +
+        "<div class='now'>いま ×" + now + (maxed ? "" : "　→　<s>つぎ ×" + next + "</s>") + "</div>" +
+        "<div class='d'>" + U.desc + "</div>" +
+        (maxed ? "<div class='d' style='color:var(--gold)'>いちばん 上まで きたえました</div>"
+               : "<div class='cost'>" + cost + "</div>") +
+        "<button class='ubtn'>" + (maxed ? "カンスト" : "きたえる（Lv" + (lv + 1) + "へ）") + "</button></div>";
+    }).join("");
+
+    grid.innerHTML = "<div id='upgHead'>" + tabs + "</div>" + cards;
+
+    grid.querySelectorAll(".uchar").forEach((el) => {
+      el.addEventListener("click", () => {
+        if (el.classList.contains("lock")) {
+          g.ui.toast("まだ 使えない すがたです。交換所で 手に入れてね", "bad");
+          g.audio.deny(); return;
+        }
+        this.upgChar = el.dataset.c; g.audio.click(); this.renderUpg(grid);
+      });
+    });
+    grid.querySelectorAll(".ucard").forEach((el) => {
+      el.querySelector(".ubtn").addEventListener("click", () => {
+        if (g.upgrade(this.upgChar, el.dataset.k)) this.renderUpg(grid);
+      });
+    });
+  }
+
   renderShop(grid) {
     const g = this.game;
     const chip = (cost) => Object.keys(cost).map((k) => {
