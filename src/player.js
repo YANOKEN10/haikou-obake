@@ -169,6 +169,7 @@ export class Player {
       skirtE: this.skirtMat ? this.skirtMat.emissive.clone() : null,
     };
     this.extraBase = this.extras.map((m) => (m.material ? m.material.color.clone() : null));
+    this.extraEmis = this.extras.map((m) => (m.material && m.material.emissive ? m.material.emissive.clone() : null));
     this.applyPaint();
   }
 
@@ -191,6 +192,9 @@ export class Player {
     if (this.skirtMat && base.skirt) {
       if (b !== null) this.skirtMat.color.setHex(b); else this.skirtMat.color.copy(base.skirt);
     }
+    // 色を えらんだら、明るさの くせも そろえて 見本どおりに 見せる
+    if (this.bodyMat) this.bodyMat.emissiveIntensity = b !== null ? 0.34 : 0.55;
+    if (this.skirtMat) this.skirtMat.emissiveIntensity = b !== null ? 0.3 : 0.45;
 
     // ひかり（emissive と、かべごしの りんかく と 手あかり）
     const gcol = hex("glow");
@@ -220,10 +224,15 @@ export class Player {
       if (!m || !m.material || !ob) continue;
       const part = m.userData.part || "deco";
       const want = part === "eye" ? ecol : part === "body" ? b : dcol;
-      if (want === null) { m.material.color.copy(ob); continue; }
-      const mix = part === "eye" ? 0.85 : part === "body" ? 0.9 : 0.7;
-      m.material.color.copy(ob).lerp(new THREE.Color(want), mix);
-      if (m.material.emissive) m.material.emissive.copy(m.material.color).multiplyScalar(0.5);
+      if (want === null) {
+        m.material.color.copy(ob);
+        if (m.material.emissive && this.extraEmis[i]) m.material.emissive.copy(this.extraEmis[i]);
+        continue;
+      }
+      // えらんだ色を そのまま。まぜない
+      m.material.color.setHex(want);
+      // 自分で光る色も 同じ色にして、見本どおりに 見えるようにする
+      if (m.material.emissive) m.material.emissive.setHex(want).multiplyScalar(0.34);
     }
   }
 
