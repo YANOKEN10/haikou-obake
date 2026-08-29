@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://haikou-obake-daisakusen.vercel.app/sitemap.xml
