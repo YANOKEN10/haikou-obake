@@ -434,6 +434,7 @@ export const PAINTS = [
   { id: "matcha",  name: "まっちゃいろ", hex: 0x9ab04a, cost: { nurunuru: 24, wax: 18 }, shards: { 1: 5 } },
   { id: "sunairo", name: "すないろ",     hex: 0xd8c49a, cost: { hokori: 26, pan: 20 }, shards: { 1: 7 } },
   { id: "kachi",   name: "かちいろ",     hex: 0x2a3a5e, cost: { denchi: 26, kami: 20 }, shards: { 1: 9 } },
+  { id: "ai",      name: "あいいろ",     hex: 0x203864, cost: { denchi: 28, uwabaki: 22 }, shards: { 1: 10 } },
   { id: "shu",     name: "しゅいろ",     hex: 0xe85a28, cost: { onnen: 28, pan: 22 }, shards: { 2: 7 } },
   { id: "wakakusa", name: "わかくさいろ", hex: 0x6ad06a, cost: { nurunuru: 30, chalk: 24 }, shards: { 2: 8 } },
   { id: "kikyo",   name: "ききょういろ", hex: 0x6a5ad0, cost: { uwabaki: 32, kami: 24 }, shards: { 2: 10 } },

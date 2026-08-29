@@ -200,10 +200,14 @@ export class Player {
     const gcol = hex("glow");
     const gc = gcol !== null ? new THREE.Color(gcol) : base.glow;
     if (this.bodyMat) {
-      if (gcol !== null) this.bodyMat.emissive.copy(gc); else this.bodyMat.emissive.copy(base.bodyE);
+      if (gcol !== null) this.bodyMat.emissive.copy(gc);
+      else if (b !== null) this.bodyMat.emissive.setHex(b);
+      else this.bodyMat.emissive.copy(base.bodyE);
     }
     if (this.skirtMat && base.skirtE) {
-      if (gcol !== null) this.skirtMat.emissive.copy(gc); else this.skirtMat.emissive.copy(base.skirtE);
+      if (gcol !== null) this.skirtMat.emissive.copy(gc);
+      else if (b !== null) this.skirtMat.emissive.setHex(b);
+      else this.skirtMat.emissive.copy(base.skirtE);
     }
     if (this.xrayMat) this.xrayMat.color.copy(gc);
     if (this.light) this.light.color.copy(gc);
@@ -223,6 +227,13 @@ export class Player {
       const m = this.extras[i], ob = this.extraBase[i];
       if (!m || !m.material || !ob) continue;
       const part = m.userData.part || "deco";
+      // 瞳孔など、色がえしても黒いまま残す細部。
+      // 虹彩と同色にすると目の形が消えてしまうため、もとの色を保つ。
+      if (part === "fixed") {
+        m.material.color.copy(ob);
+        if (m.material.emissive && this.extraEmis[i]) m.material.emissive.copy(this.extraEmis[i]);
+        continue;
+      }
       const want = part === "eye" ? ecol : part === "body" ? b : dcol;
       if (want === null) {
         m.material.color.copy(ob);
@@ -245,6 +256,7 @@ export class Player {
     this.headScale = 1;
     this.tongue = null;
     this.smoke = null;
+    this.mane = null;
     this.wings = null;
     this.tails = null;
     this.foot = null;
@@ -327,20 +339,50 @@ export class Player {
       this.foot = geta;
 
     } else if (id === "amanojaku") {
-      // 青おに。もらった絵に あわせて 作りなおした。
-      //  ・まっ赤な 長い髪が あたまを おおい、うしろへ たなびく
-      //  ・腹まきに 見えていた 腰みのを やめて、
-      //    足もとは ジーニーのような ゆらめく けむりに
-      //  ・手を 大きくして、するどい つめと 金のうでわを つけた
-      this.headScale = 1.06;
+      // 添付の鬼らしい要素（赤い長髪・大きな腕・包帯）を参考にしつつ、
+      // ゲーム用の独自デザインとして、力強い二本脚の鬼へ作りなおした。
+      // 細い煙の下半身では遠くから頼りなく見えたので、肩・胸・脚で
+      // はっきり読める三角形のシルエットにする。
+      this.headScale = 1.12;
       this.mouth.visible = false;
       this.eyeL.visible = false; this.eyeR.visible = false;
       const HAIR = 0xc41f28, HAIR2 = 0x8a1218;
 
+      // --- 鬼らしい 大きな体 --------------------------------
+      this.skirt.visible = false;
+      const chest = add(new THREE.Mesh(new THREE.SphereGeometry(0.58, 18, 14),
+        M(this.C.body, { e: this.C.glow, i: 0.34 })), "body");
+      chest.position.set(0, 0.78, 0); chest.scale.set(1.28, 1.15, 0.72);
+      const belly = add(new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12),
+        M(this.C.body, { e: this.C.glow, i: 0.3 })), "body");
+      belly.position.set(0, 0.48, 0.08); belly.scale.set(1.12, 1.05, 0.72);
+      for (const sx of [-1, 1]) {
+        const shoulder = add(new THREE.Mesh(new THREE.SphereGeometry(0.31, 14, 10),
+          M(this.C.body, { e: this.C.glow, i: 0.32 })), "body");
+        shoulder.position.set(sx * 0.63, 1.04, 0); shoulder.scale.set(1.15, 1, 0.9);
+        const arm = add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.23, 0.78, 12),
+          M(this.C.body, { e: this.C.glow, i: 0.3 })), "body");
+        arm.position.set(sx * 0.69, 0.73, 0.08); arm.rotation.z = sx * 0.22;
+        // 生成画像を貼らず、細い輪を重ねて包帯を立体で表す。
+        for (let i = 0; i < 4; i++) {
+          const wrap = add(new THREE.Mesh(new THREE.TorusGeometry(0.205 - i * 0.008, 0.035, 6, 14),
+            M(0xd8c49a, { i: 0.18 })));
+          wrap.position.set(sx * (0.76 - i * 0.012), 0.52 - i * 0.11, 0.1);
+          wrap.rotation.set(Math.PI / 2, 0, sx * 0.22);
+        }
+      }
+      // 左右で色のちがう胸の文様。かざり色を選ぶと一緒に変えられる。
+      for (const sx of [-1, 1]) for (let i = 0; i < 2; i++) {
+        const mark = add(new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.1, 0.045),
+          M(sx < 0 ? 0x8e5ac8 : 0x45c4d8, { i: 0.3 })), "deco");
+        mark.position.set(sx * 0.25, 0.88 - i * 0.17, 0.43);
+        mark.rotation.z = sx * -0.08;
+      }
+
       for (const sx of [-1, 1]) {                      // つり上がった 金の目
         const e = add(new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), B(0xffd23a)), "eye");
         e.position.set(sx * 0.2, 1.29, 0.45); e.scale.set(1.3, 0.8, 0.5); e.renderOrder = 2;
-        const pu = add(new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 8), B(0x1a1418)), "eye");
+        const pu = add(new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 8), B(0x1a1418)), "fixed");
         pu.position.set(sx * 0.2, 1.29, 0.51); pu.scale.set(0.85, 1.3, 0.5); pu.renderOrder = 3;
         const brow = add(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.055, 0.05), B(0x1e4a68)));
         brow.position.set(sx * 0.21, 1.44, 0.47); brow.rotation.z = sx * 0.5;
@@ -363,12 +405,14 @@ export class Player {
         hair.rotateX(-back * 1.35);                          // うしろの髪を ねかせる
       }
       // うしろへ 長く ながれる ひとふさ
+      this.mane = [];
       for (let i = 0; i < 5; i++) {
         const t2 = i / 4;
         const st = add(new THREE.Mesh(new THREE.ConeGeometry(0.24 - t2 * 0.16, 0.9, 6),
           M(i % 2 ? HAIR : HAIR2, { i: 0.32 })));
         st.position.set((i - 2) * 0.12, 1.78 + t2 * 0.5, -0.55 - t2 * 0.75);
         st.rotation.set(-1.15 - t2 * 0.5, (i - 2) * 0.14, 0);
+        this.mane.push({ m: st, rx: st.rotation.x, rz: st.rotation.z, phase: i * 0.8 });
       }
       // ひたいを おおう 前髪
       for (let i = 0; i < 7; i++) {
@@ -388,50 +432,35 @@ export class Player {
         f.position.set(sx, 1.12, 0.5); f.rotation.x = Math.PI; f.renderOrder = 3;
       }
 
-      // --- 足もと：ジーニーのような けむり -------------------
-      this.skirt.visible = false;
-      this.smoke = [];
-      const SEG = 7;                                   // けむりの わっか の数
-      for (let i = 0; i < SEG; i++) {
-        const t2 = i / (SEG - 1);                      // 0（こし）→ 1（さき）
-        const rTop = 0.60 - t2 * 0.52;                 // 下へ いくほど 細くなる
-        const rBot = 0.60 - (i + 1) / (SEG - 1) * 0.52;
-        const s2 = add(new THREE.Mesh(
-          new THREE.CylinderGeometry(Math.max(0.03, rBot), rTop, 0.3, 14, 1, true),
-          M(this.C.body, { e: this.C.glow, i: 0.4 })), "body");
-        s2.position.y = 0.88 - i * 0.27;               // こしから 下へ ずらりと
-        s2.material.transparent = true;
-        s2.material.opacity = 0.95 - t2 * 0.45;
-        s2.material.side = THREE.DoubleSide;
-        this.smoke.push(s2);
+      // --- どっしりした 二本脚 -------------------------------
+      for (const sx of [-1, 1]) {
+        const thigh = add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.27, 0.64, 12),
+          M(this.C.body, { e: this.C.glow, i: 0.3 })), "body");
+        thigh.position.set(sx * 0.3, 0.18, 0); thigh.rotation.z = sx * -0.08;
+        const shin = add(new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.22, 0.55, 12),
+          M(0xd8c49a, { i: 0.18 })), "deco");
+        shin.position.set(sx * 0.32, -0.3, 0.02);
+        for (let i = 0; i < 4; i++) {
+          const band = add(new THREE.Mesh(new THREE.TorusGeometry(0.195, 0.028, 6, 14),
+            M(0xb89e78, { i: 0.15 })), "deco");
+          band.position.set(sx * 0.32, -0.16 - i * 0.11, 0.02); band.rotation.x = Math.PI / 2;
+        }
+        const foot = add(new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 9),
+          M(this.C.body, { e: this.C.glow, i: 0.28 })), "body");
+        foot.position.set(sx * 0.32, -0.61, 0.12); foot.scale.set(1, 0.62, 1.38);
+        for (let i = 0; i < 3; i++) {
+          const toe = add(new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.17, 5), M(0xf5d27a, { i: 0.25 })), "deco");
+          toe.position.set(sx * 0.32 + (i - 1) * 0.08, -0.67, 0.4); toe.rotation.x = Math.PI / 2;
+        }
       }
-      // さきっぽ。くるんと 上へ はねる
-      const tip = add(new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.42, 10),
-        M(this.C.body, { e: this.C.glow, i: 0.45 })), "body");
-      tip.position.set(0.16, -1.02, 0.02); tip.rotation.z = -0.8;
-      tip.material.transparent = true; tip.material.opacity = 0.5;
-      this.smoke.push(tip);
 
       // --- 大きな 手 ----------------------------------------
-      this.handL.scale.setScalar(1.7);
-      this.handR.scale.setScalar(1.7);
+      this.handL.scale.setScalar(1.9);
+      this.handR.scale.setScalar(1.9);
       this.handL.position.set(-0.52, 0.92, 0.42);      // 前へ かまえる
       this.handR.position.set(0.52, 0.92, 0.42);
-      for (const hand of [this.handL, this.handR]) {
-        for (let i = 0; i < 3; i++) {                  // するどい つめ
-          const cl = new THREE.Mesh(new THREE.ConeGeometry(0.026, 0.2, 4), B(0xf5e3b0));
-          cl.position.set((i - 1) * 0.07, -0.13, 0.09);
-          // 下へ 向けて、ちょっと 前がかりに（つかみかかる かたち）
-          cl.rotation.set(Math.PI - 0.45, 0, (i - 1) * 0.34);
-          cl.renderOrder = 2;
-          cl.userData.part = "deco";
-          hand.add(cl); this.extras.push(cl);
-        }
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.03, 8, 16), M(0xffc23a, { i: 0.45 }));
-        ring.rotation.x = Math.PI / 2; ring.position.y = 0.12;
-        ring.userData.part = "deco";
-        hand.add(ring); this.extras.push(ring);        // 金の うでわ
-      }
+      // 手は大きな拳として読ませる。細い爪は遠景で一本の横棒に
+      // つながって見えたため、シルエットを優先して付けない。
 
     } else if (id === "kappa") {
       // 頭の皿と おかっぱ髪、大きな目、黄色いくちばし、白いおなか
@@ -673,6 +702,12 @@ export class Player {
         s2.rotation.y = Math.sin(ph) * 0.6;
         s2.position.x = Math.sin(ph) * 0.16 * k;
         s2.position.z = Math.cos(ph * 0.85) * 0.13 * k;
+      }
+    }
+    if (this.mane) {                                   // あまのじゃく：長い髪が たなびく
+      for (const h of this.mane) {
+        h.m.rotation.x = h.rx + Math.sin(t * 2.2 + h.phase) * 0.1;
+        h.m.rotation.z = h.rz + Math.sin(t * 2.8 + h.phase) * 0.08;
       }
     }
     if (this.wings) {                                  // 天狗：はばたく
