@@ -208,7 +208,7 @@ export class Net {
         p = { name: o.name, x: g.x || 0, y: g.y || 1.2, z: g.z || 0, yaw: g.yaw || 0,
               tx: g.x || 0, ty: g.y || 1.2, tz: g.z || 0, tyaw: g.yaw || 0,
               vx: 0, vy: 0, vz: 0, age: 0, last: 0, charId: g.c || "obake",
-              score: 0, isHost: false,
+              score: 0, isHost: false, got: [],
               placed: [], phasing: false, scaring: 0 };
         this.peers.set(o.pid, p);
         if (this.onEvent) this.onEvent("join", o.name);
@@ -233,6 +233,7 @@ export class Net {
         p.phasing = !!o.g.p; p.scaring = o.g.s || 0;
         p.charId = o.g.c || "obake";           // ともだちの すがた
         p.score = o.g.sc || 0;                 // おどかし勝負の 人数
+        p.got = o.g.got || [];                 // その人が 拾った 拾いものの 番号
         p.isHost = !!o.g.h;                    // この人が おや か
         if (o.g.h) this.remoteBattle = o.g.bt || null;   // 勝負の ようす
         // はなれすぎていたら（ワープしたときなど）、いきなり合わせる

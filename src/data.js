@@ -38,7 +38,7 @@ export const RARITY = [
 const W_NEAR = [ 720,  200,   62,   16,   2.0,  0.35,  0.06];   // ふつうの場所
 const W_FAR  = [ 180,  230,   215,  190,  120,   48,    17 ];   // へんぴな場所
 
-export function pickRarity(far, luck) {
+export function pickRarity(far, luck, rng) {
   const f = Math.max(0, Math.min(1, far)) * (luck === undefined ? 1 : luck);
   const g = Math.max(0, Math.min(1, f));
   let total = 0;
@@ -50,7 +50,7 @@ export function pickRarity(far, luck) {
     w.push(v);
     total += v;
   }
-  let r = Math.random() * total;
+  let r = (rng || Math.random)() * total;
   for (let i = 0; i < 7; i++) { r -= w[i]; if (r <= 0) return i; }
   return 0;
 }

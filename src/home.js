@@ -247,7 +247,32 @@ export class Home {
         "<div class='detail' hidden></div></div>";
     };
 
+    const g2 = this.game;
+    const net = g2.net;
     let html = "";
+
+    // いま 部屋に いるなら、あいことばと なかまを 見せる。
+    //  ここから ともだちを 何人でも よべる（2人だけに ならない）
+    if (net.on) {
+      const names = [net.name || "じぶん"].concat(Array.from(net.peers.values()).map((p) => p.name));
+      const full = names.length >= 4;
+      html += "<div class='frroom'><div class='t'>🎮 いま みんなで あそんでいます（" + names.length + "／4人）</div>" +
+        "<div class='cd' id='frCode' title='おすと コピー'>" + esc(net.code) + "</div>" +
+        "<div class='who'>" + names.map(esc).join("　/　") + "</div>" +
+        "<div class='btns'>" +
+        (full ? "<button disabled style='opacity:.5'>いっぱいです</button>"
+              : "<button class='go' id='frAll'>📣 ともだち みんなを さそう</button>") +
+        "<button class='no' id='frLeave'>👋 部屋を出る</button></div></div>";
+    } else {
+      html += "<div class='frjoin'>" +
+        "<input id='frCodeIn' maxlength='4' placeholder='ABCD' autocomplete='off' " +
+        "autocapitalize='characters' spellcheck='false' inputmode='text'>" +
+        "<button id='frCodeGo'>あいことばで 入る</button></div>" +
+        "<div class='frnote' style='margin-top:-2px'>ともだちに 教えてもらった " +
+        "<b>あいことば4文字</b>を 入れると、その部屋に 入れます。<br>" +
+        "下の「いっしょに あそぶ」を おすと、部屋を つくって さそえます。</div>";
+    }
+
     if (d.invite) {
       html += "<div class='frinvite'><div class='t'>🎮 <b>" + esc(d.invite.display) +
         "</b> が いっしょに あそぼうと さそっています</div>" +
@@ -327,6 +352,43 @@ export class Home {
       });
     }
 
+    // あいことばで 入る
+    const cin = $("#frCodeIn");
+    if (cin) {
+      cin.addEventListener("input", () => {
+        cin.value = cin.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+      });
+      const go = async () => {
+        const c = cin.value.trim();
+        if (c.length !== 4) { this.frMsg("あいことばは 4文字です"); return; }
+        this.frMsg("部屋を さがしています…", true);
+        if (!this.game.started) this.game.startGame(true);
+        const r = await this.game.roomJoin(c, this.playerName());
+        if (!r.ok) { this.frMsg(r.why); return; }
+        this.frMsg("入りました！ みんなで あそぼう", true);
+        this.drawFriends();
+      };
+      cin.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+      const gb = $("#frCodeGo");
+      if (gb) gb.addEventListener("click", go);
+    }
+    // あいことばを コピー
+    const cd = $("#frCode");
+    if (cd) cd.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(this.game.net.code); this.frMsg("あいことばを コピーしました", true); }
+      catch (e) { this.frMsg("長おしで コピーしてね", true); }
+      this.game.audio.click();
+    });
+    // ともだち みんなを いっぺんに さそう
+    const all = $("#frAll");
+    if (all) all.addEventListener("click", () => this.inviteAll());
+    const lv = $("#frLeave");
+    if (lv) lv.addEventListener("click", async () => {
+      await this.game.roomLeave();
+      this.frMsg("部屋を 出ました", true);
+      this.drawFriends();
+    });
+
     $("#frBody").querySelectorAll("button[data-act]").forEach((b) => {
       b.addEventListener("click", async () => {
         const act = b.dataset.act, id = b.dataset.id;
@@ -374,6 +436,28 @@ export class Home {
       "</div>";
   }
 
+  // ともだち ぜんいんを、いまの 部屋に さそう。
+  //  ひとりずつ おさなくても、みんなで あそべる
+  async inviteAll() {
+    const g = this.game;
+    const list = (this.fr && this.fr.friends) || [];
+    if (!list.length) { this.frMsg("まだ ともだちが いません"); return; }
+    this.frMsg("部屋を よういしています…", true);
+    if (!g.started) g.startGame(true);
+    if (!g.net.on) {
+      const r = await g.roomCreate(this.playerName());
+      if (!r.ok) { this.frMsg(r.why); return; }
+    }
+    let ok = 0, ng = 0;
+    for (const c of list) {
+      const r = await g.cloud.inviteFriend(c.id, g.net.code);
+      if (r.ok) ok++; else ng++;
+    }
+    this.frMsg(ok + "人を さそいました" + (ng ? "（" + ng + "人は とどきませんでした）" : "") +
+      "。あいことばは「" + g.net.code + "」", true);
+    this.drawFriends();
+  }
+
   async inviteTo(id) {
     const g = this.game;
     this.frMsg("部屋を よういしています…", true);
@@ -384,7 +468,9 @@ export class Home {
     }
     const r = await g.cloud.inviteFriend(id, g.net.code);
     if (!r.ok) { this.frMsg(r.why); return; }
-    this.frMsg(r.data.display + " を さそいました！（5分いないに 入ってもらってね）", true);
+    this.frMsg(r.data.display + " を さそいました！ あいことばは「" + g.net.code +
+      "」（5分いないに 入ってもらってね）", true);
+    this.drawFriends();
   }
 
   // --- ゲームを始める ---------------------------------------

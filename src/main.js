@@ -16,7 +16,7 @@ import { Audio } from "./audio.js";
 import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, pickRarity, CHARS, EXCHANGE, HUMAN_DROPS,
   UPGRADES, UPG_MAX, UPG_STEP, upgCost, PARTS, PAINTS, paintById } from "./data.js";
 import { Roster } from "./people.js";
-import { clamp, rand, randi, choice, dist } from "./util.js";
+import { clamp, rand, randi, choice, dist, makeRng } from "./util.js";
 const FLOOR_HEIGHT_HALF = 3.2;
 
 // ============================================================
@@ -221,14 +221,21 @@ class Game {
   spawnPickup() {
     const spots = this.world.spawnSpots;
     if (!spots.length || this.pickups.length > this.q.maxPickups) return;
-    const s = choice(spots);
+    // ともだちと遊ぶときは、みんなで 同じ たねから 出す。
+    //  そうすると おなじ場所に おなじものが わく
+    const R = this.pickRng || Math.random;
+    const id = ++this.pickSeq;
+    const s = spots[Math.floor(R() * spots.length) % spots.length];
     const table = ["hokori", "hokori", "hokori", "chalk", "chalk", "uwabaki", "pan", "denchi", "nurunuru", "wax", "kami"];
-    const kind = choice(table);
+    const kind = table[Math.floor(R() * table.length) % table.length];
     const y = s.y || 0;
-    const r = this.world.colliders.resolve(s.x + rand(-0.8, 0.8), s.z + rand(-0.8, 0.8), 0.3, y + 0.6);
+    const r = this.world.colliders.resolve(
+      s.x + (R() * 1.6 - 0.8), s.z + (R() * 1.6 - 0.8), 0.3, y + 0.6);
     // へんぴな場所ほど、いい色が出る
-    const tier = pickRarity(s.far || 0);
-    this.pickups.push(new Pickup(this.scene, kind, r.x, r.z, y + rand(0.45, 0.75), tier));
+    const tier = pickRarity(s.far || 0, undefined, R);
+    const p = new Pickup(this.scene, kind, r.x, r.z, y + 0.45 + R() * 0.3, tier);
+    p.pid = id;                     // みんなで そろえる 通し番号
+    this.pickups.push(p);
   }
 
   // 人間が落とすもの。おどかした場所が へんぴなら、いい色で落ちる
@@ -860,6 +867,12 @@ class Game {
       const it = this.pickups[i];
       it.update(dt, t);
       if (dist(it.x, it.z, p.x, p.z) < 1.35 && Math.abs(it.y - p.y) < 1.8) {
+        // ともだちにも「これを 拾った」と 知らせる。
+        //  むこうの画面からも 消えて、材料は むこうも もらえる
+        if (this.net.on && it.pid) {
+          this.gotOut.push(it.pid);
+          if (this.gotOut.length > 24) this.gotOut.shift();
+        }
         const R = RARITY[it.tier || 0];
         this.inv[it.kind] = (this.inv[it.kind] || 0) + R.mult;
         this.bump("materials");
@@ -1263,6 +1276,10 @@ class Game {
     this.shards = {};                      // 色ごとの かけら
     this.chars = { obake: 1 };          // 使えるすがた
     this.upg = {};                      // すがたごとの きょうか {kappa:{speed:3}}
+    this.pickSeq = 0;             // 拾いものの 通し番号（みんなで そろえる）
+    this.pickRng = null;          // 部屋のときは みんなで 同じ たね
+    this.gotOut = [];             // 「拾った」と みんなに 知らせる 番号
+    this.gotSeen = new Set();     // もう 消した 番号
     this.paints = { base: 1, snow: 1, sumi: 1 };   // 手に入れた色（すがた共通）
     this.paint = {};                    // すがたごとの 色 {kappa:{body:"kin"}}
     this.charId = "obake";
@@ -1427,6 +1444,15 @@ class Game {
 
   // 部屋に入ったら、来る人たちの順番をそろえる
   netReseed(seed) {
+    // 拾いものも みんなで そろえる。
+    //  いま出ているものを 片づけて、同じ たねから 出しなおす
+    this.pickRng = makeRng((seed ^ 0x1f2e3d4c) >>> 0);
+    this.pickSeq = 0;
+    this.gotOut.length = 0;
+    this.gotSeen.clear();
+    for (const q of this.pickups) q.dispose();
+    this.pickups.length = 0;
+    for (let i = 0; i < this.q.pickups; i++) this.spawnPickup();
     this.roster = new Roster(100, seed);
     for (const h of this.humans) this.scene.remove(h.group);
     this.humans = [];
@@ -1454,12 +1480,58 @@ class Game {
   }
 
   async roomLeave() {
+    this.pickRng = null;                    // ひとりに もどったら 自由に わく
     if (this.battle.on) this.battle.finish(true);
+    if (this.peerPlaced) { for (const o of this.peerPlaced.values()) o.dispose(); this.peerPlaced.clear(); }
     await this.net.leave();
     for (const [, g] of this.peerGhosts) g.dispose();
     this.peerGhosts.clear();
     this.waveTimer = 6;
     this.ui.toast("ひとりで遊ぶモードに もどりました", "good");
+  }
+
+  // ともだちの 置きもの（仕掛け・召喚おばけ）を 画面に 出す。
+  //  作りなおしを へらすため、しるし（キー）で 見わけて
+  //  変わったものだけ 足したり 消したりする。
+  syncPlaced() {
+    if (!this.peerPlaced) this.peerPlaced = new Map();
+    const want = new Map();
+    if (this.net.on) {
+      for (const [pid, pr] of this.net.peers) {
+        const list = pr.placed || [];
+        for (let i = 0; i < list.length; i++) {
+          const q = list[i];
+          // しるしに 場所を 入れない。
+          //  入れると おばけが 動くたびに 作りなおしになって 重い
+          want.set(pid + "|" + q.k + "|" + q.id + "|" + i, q);
+        }
+      }
+    }
+    // いらなくなったものを 消す
+    for (const [key, obj] of this.peerPlaced) {
+      if (want.has(key)) continue;
+      obj.dispose();
+      this.peerPlaced.delete(key);
+    }
+    // 新しく 置かれたものを 足し、あるものは 場所だけ 合わせる
+    for (const [key, q] of want) {
+      let obj = this.peerPlaced.get(key);
+      if (!obj) {
+        if (q.k === "t" && TRAPS[q.id]) obj = new Trap(this.scene, q.id, q.x, q.z, 0);
+        else if (q.k === "g" && GHOSTS[q.id]) obj = new Summon(this.scene, this.world, q.id, q.x, q.z, q.y || 0);
+        if (!obj) continue;
+        obj.isPeer = true;                    // 見た目だけ。発動は 置いた人の画面で
+        this.peerPlaced.set(key, obj);
+      }
+      // とどいた 場所へ なめらかに 寄せる（ワープに 見えないように）
+      obj.x = q.x; obj.z = q.z;
+      const gy = q.k === "g" ? (q.y || 0) + 1.15 : 0;
+      const gp = obj.group.position;
+      gp.x += (q.x - gp.x) * 0.25;
+      gp.z += (q.z - gp.z) * 0.25;
+      gp.y = gy;
+      if (obj.life !== undefined && obj.def) obj.life = obj.def.life;   // 勝手に 消えないように
+    }
   }
 
   hostSnapshot() {
@@ -1508,10 +1580,11 @@ class Game {
       sc: this.battle.score,                       // おどかし勝負で おどかした人数
       h: this.net.isHost ? 1 : 0,                  // この人が おや か
       bt: this.net.isHost ? this.battle.netState() : undefined,
+      got: this.gotOut.slice(),                    // 拾ったものの 番号
     };
     const placed = [];
     for (const tr of this.traps) placed.push({ k: "t", id: tr.id, x: +tr.x.toFixed(1), z: +tr.z.toFixed(1) });
-    for (const s of this.summons) placed.push({ k: "g", id: s.id, x: +s.x.toFixed(1), z: +s.z.toFixed(1) });
+    for (const s of this.summons) placed.push({ k: "g", id: s.id, x: +s.x.toFixed(1), z: +s.z.toFixed(1), y: +(s.baseY || 0).toFixed(1) });
 
     this.net.update(dt, me, placed, this.net.isHost ? this.hostSnapshot() : null);
 
@@ -1536,6 +1609,32 @@ class Game {
     if (!this.net.isHost) this.battle.applyRemote(this.net.remoteBattle);
     this.battle.peerScores = {};
     for (const [pid, pr] of this.net.peers) this.battle.peerScores[pid] = pr.score || 0;
+
+    // ともだちが 拾ったものを、こちらの画面からも 消す。
+    //  材料は こちらにも 入る（取りあいに ならない）
+    for (const [, pr] of this.net.peers) {
+      for (const gid of pr.got || []) {
+        if (this.gotSeen.has(gid)) continue;
+        this.gotSeen.add(gid);
+        const i = this.pickups.findIndex((q) => q.pid === gid);
+        if (i < 0) continue;
+        const it = this.pickups[i];
+        const R = RARITY[it.tier || 0];
+        this.inv[it.kind] = (this.inv[it.kind] || 0) + R.mult;
+        if (it.tier >= 1) this.shards[it.tier] = (this.shards[it.tier] || 0) + 1;
+        this.texts.push(new FloatText(this.scene,
+          MATERIALS[it.kind].icon + "+" + R.mult + "（ともだちが 拾った）",
+          it.x, it.y + 0.9, it.z, "#ffd45e", 1.4));
+        it.dispose();
+        this.pickups.splice(i, 1);
+        this.ui.setBag(this.inv);
+        this.ui.setShards(this.shards);
+      }
+    }
+    if (this.gotSeen.size > 400) this.gotSeen.clear();
+
+    // ともだちが 置いた 仕掛け・おばけを 出す
+    this.syncPlaced();
 
     // ともだちのおばけを出す
     const seen = new Set();
