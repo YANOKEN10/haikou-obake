@@ -50,6 +50,7 @@ export class Net {
     this.fails = 0;
     this.status = "";
     this.onEvent = null;         // (kind, detail) => void
+    this.directSeq = 1;          // 順番なし通信で、古い画面を見分ける番号
 
     // --- ブラウザ同士を 直接つなぐ ---------------------------
     //  サーバーごしだと 行って もどるのに 1.1〜1.5秒 かかる。
@@ -89,6 +90,7 @@ export class Net {
     this.code = r.data.code; this.pid = r.data.pid; this.name = r.data.name;
     this.isHost = true; this.on = true; this.fails = 0;
     this.peers.clear(); this.remoteWorld = null;
+    this.directSeq = 1;
     this.status = "部屋をつくりました";
     this.lastSend = 0; this.pending = null;
     this.startBeat();
@@ -101,6 +103,7 @@ export class Net {
     this.code = r.data.code; this.pid = r.data.pid; this.name = r.data.name;
     this.isHost = r.data.room.youAreHost; this.on = true; this.fails = 0;
     this.peers.clear(); this.remoteWorld = null;
+    this.directSeq = 1;
     this.apply(r.data.room);
     this.status = "部屋に入りました";
     this.lastSend = 0; this.pending = null;
@@ -181,6 +184,7 @@ export class Net {
     // 直接つないでいる 相手には、1秒に20回 じかに おくる
     if (this.rtc.links.size) {
       this.rtc.send({
+        q: this.directSeq++,
         g: me,
         placed: placed || [],
         world: this.isHost && world ? world : undefined,
@@ -341,6 +345,11 @@ export class Net {
   takeDirect(pid, msg) {
     const p = this.peers.get(pid);
     if (!p || !msg) return;
+    // DataChannel は、わざと「順番を待たない」設定にしている。
+    // 遅れて来た古い位置を当てると、一瞬うしろへ戻ってラグに見えるので捨てる。
+    const seq = Number(msg.q || 0);
+    if (seq && seq <= (p.directSeq || 0)) return;
+    if (seq) p.directSeq = seq;
     p.fast = true;                       // この人は 直接つながっている
     p.fastT = Date.now();
     if (msg.g) {

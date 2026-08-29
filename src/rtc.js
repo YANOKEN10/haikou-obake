@@ -28,6 +28,7 @@ const ICE = [
 ];
 
 const SEND_HZ = 20;            // 1秒に 何回 送るか
+const MAX_BUFFERED = 64 * 1024; // 古い位置を ためず、いつも いちばん新しい画面を送る
 const GIVE_UP = 45000;         // これだけ たっても つながらなければ あきらめる
 //  あいさつは サーバーごしなので 1往復 1〜2秒。
 //  ぜんぶ そろうのに 15〜25秒 かかることが ある。
@@ -180,6 +181,10 @@ export class Rtc {
         if (!l.ready && !busy && Date.now() - l.born > GIVE_UP) this.close(pid);
         continue;
       }
+      // 端末や回線が一時的に重くなったとき、古い位置を何十個もためると
+      // あとから古い画面を順番に見せることになる。位置は次の便でまた来るので、
+      // つまっている間は捨てて「いま」を優先する。
+      if ((l.ch.bufferedAmount || 0) > MAX_BUFFERED) continue;
       if (s === null) s = JSON.stringify(payload);
       try { l.ch.send(s); } catch (e) { /* いっぱいのときは とばす */ }
     }
