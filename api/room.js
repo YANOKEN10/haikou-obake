@@ -166,7 +166,13 @@ module.exports = async function handler(req, res) {
     if (act === "sync") {
       const code = cleanCode(b.code);
       const pid = String(b.pid || "");
-      const room = await readRoom(code);
+      // おきゃくさんは「人間たちの ようす」も 要るので、
+      //  部屋と いっしょに 同時に 読む（順ばんに 読むと おそい）
+      const wantWorld = !b.world;
+      const [room, worldNow] = await Promise.all([
+        readRoom(code),
+        wantWorld ? readWorld(code) : Promise.resolve(null),
+      ]);
       if (!room || !room.players[pid]) {
         res.status(404).json({ error: "none", message: "部屋から はなれてしまいました。" });
         return;
@@ -190,19 +196,22 @@ module.exports = async function handler(req, res) {
       }
 
       const out = view(room, pid);
+      out.acts = [];
       if (isHost) {
-        if (b.world && typeof b.world === "object") await writeWorld(code, b.world);
-        out.acts = [];
         for (const q of Object.keys(room.players)) {
           if (q === pid) continue;
           for (const a of room.players[q].acts || []) out.acts.push({ q, i: a.i, k: a.k, hid: a.hid, a: a.a, w: a.w });
         }
         out.world = null;                            // 自分が書いたものは返さなくてよい
       } else {
-        out.acts = [];
-        out.world = await readWorld(code);
+        out.world = worldNow;                        // さっき 同時に 読んだもの
       }
-      await writeRoom(room);
+      // 書くほうも 同時に。順ばんに 書くと その ぶん おそくなる
+      await Promise.all([
+        writeRoom(room),
+        (isHost && b.world && typeof b.world === "object")
+          ? writeWorld(code, b.world) : Promise.resolve(),
+      ]);
       res.status(200).json({ room: out });
       return;
     }
