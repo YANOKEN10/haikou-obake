@@ -14,7 +14,9 @@ const L = require("./_lib");
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";   // 見まちがえる字は使わない
 const MAX_PLAYERS = 4;
 const STALE_MS = 45000;        // これだけ音沙汰がなければ、抜けたとみなす
-const ROOM_MAX = 24 * 1024;    // 部屋1つの上限
+const ROOM_MAX = 64 * 1024;    // 部屋1つの上限（あいさつの手紙が 入るぶん 大きめ）
+const SIG_MAX = 8;             // ポストに ためておける 手紙の数
+const SIG_LEN = 9000;          // 手紙 1通の 大きさの かぎり
 
 const roomKey = (code) => "hobake/room/" + code + ".json";
 // 人間たちのようすは、おやだけが書くので、べつのファイルに分ける。
@@ -137,7 +139,7 @@ module.exports = async function handler(req, res) {
       const pid = newPid();
       const room = {
         code, host: pid, born: now, seed: crypto.randomBytes(4).readUInt32BE(0),
-        players: { [pid]: { name, joined: now, t: now, g: null, placed: [], acts: [] } },
+        players: { [pid]: { name, joined: now, t: now, g: null, placed: [], acts: [], sigIn: [] } },
       };
       await writeRoom(room);
       res.status(200).json({ code, pid, name, seed: room.seed, room: view(room, pid) });
@@ -156,7 +158,7 @@ module.exports = async function handler(req, res) {
         return;
       }
       const pid = newPid();
-      room.players[pid] = { name: cleanName(b.name), joined: now, t: now, g: null, placed: [], acts: [] };
+      room.players[pid] = { name: cleanName(b.name), joined: now, t: now, g: null, placed: [], acts: [], sigIn: [] };
       await writeRoom(room);
       res.status(200).json({ code, pid, name: room.players[pid].name, seed: room.seed || 1, room: view(room, pid) });
       return;
@@ -187,6 +189,21 @@ module.exports = async function handler(req, res) {
       // 1回とどかなくても、つぎの回でちゃんととどく
       if (!isHost && Array.isArray(b.acts)) me.acts = b.acts.slice(-8);
 
+      // 直接つなぐための 手紙を、あて先の ポストに 入れる
+      if (Array.isArray(b.sig)) {
+        for (const s of b.sig.slice(0, SIG_MAX)) {
+          if (!s || typeof s !== "object") continue;
+          const to = String(s.to || "");
+          const box = room.players[to];
+          if (!box || to === pid) continue;
+          const d = typeof s.d === "string" ? s.d : JSON.stringify(s.d || null);
+          if (d.length > SIG_LEN) continue;
+          if (!Array.isArray(box.sigIn)) box.sigIn = [];
+          box.sigIn.push({ from: pid, k: String(s.k || "").slice(0, 12), d });
+          if (box.sigIn.length > SIG_MAX) box.sigIn.shift();
+        }
+      }
+
       const alive = prune(room, now);
       if (!alive) {
         try { await del(roomKey(code)); } catch (e) {}
@@ -196,6 +213,9 @@ module.exports = async function handler(req, res) {
       }
 
       const out = view(room, pid);
+      // 自分あての 手紙を わたして、ポストを 空にする
+      out.sig = me.sigIn || [];
+      me.sigIn = [];
       out.acts = [];
       if (isHost) {
         for (const q of Object.keys(room.players)) {

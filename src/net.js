@@ -7,9 +7,12 @@
 //     ほかの人は、その人間たちを見ている
 //   ・おどかした合図だけをホストに送り、ホストが結果を返す
 // ============================================================
+import { Rtc } from "./rtc.js";
+
 const API = "/api/room";
 const TICK = 520;           // ふだんの送信かんかく
 const TICK_SLOW = 2500;     // 画面を見ていないとき
+const TICK_FAST_OK = 2500;  // 直接つながっているとき（なかま確認だけ）
 const PREDICT_MAX = 2.0;    // 「このまま進む」と よそうしていい 秒数
 const FIX_MAX = 4.0;        // ずれを 直すときの いちばんの速さ（m/秒）
 //  おばけの ふつうの速さ（5.4）より おそくしてある。
@@ -47,6 +50,18 @@ export class Net {
     this.fails = 0;
     this.status = "";
     this.onEvent = null;         // (kind, detail) => void
+
+    // --- ブラウザ同士を 直接つなぐ ---------------------------
+    //  サーバーごしだと 行って もどるのに 1.1〜1.5秒 かかる。
+    //  直接つなげば 30〜80ミリ秒、1秒に20回 やりとりできる。
+    //  つながらない ネットの人は、これまでどおり サーバーごし。
+    this.sigOut = [];            // 相手へ おくる あいさつ
+    this.rtc = new Rtc(this);
+    this.rtc.onData = (pid, msg) => this.takeDirect(pid, msg);
+    this.rtc.onOpen = (pid) => {
+      const p = this.peers.get(pid);
+      if (this.onEvent) this.onEvent("fast", (p ? p.name : "ともだち") + " と 直接つながりました");
+    };
   }
 
   get playerCount() { return this.on ? this.peers.size + 1 : 0; }
@@ -94,6 +109,8 @@ export class Net {
   }
 
   async leave() {
+    this.rtc.closeAll();
+    this.sigOut.length = 0;
     this.stopBeat();
     this.pending = null;
     const code = this.code, pid = this.pid;
@@ -161,6 +178,16 @@ export class Net {
       p.yaw += angDiff(want2, p.yaw) * Math.min(1, dt * 8);
     }
 
+    // 直接つないでいる 相手には、1秒に20回 じかに おくる
+    if (this.rtc.links.size) {
+      this.rtc.send({
+        g: me,
+        placed: placed || [],
+        world: this.isHost && world ? world : undefined,
+        acts: !this.isHost ? this.outActs : undefined,
+      });
+    }
+
     this.send();
   }
 
@@ -169,13 +196,17 @@ export class Net {
   send() {
     if (!this.on || this.busy || !this.pending) return;
     const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
-    const gap = (document.hidden ? TICK_SLOW : TICK) + this.fails * 1500;
+    // 直接つながっている人が いるなら、サーバーごしは
+    //  なかまの ようすを 見るだけで よいので ゆっくりでいい
+    const base = document.hidden ? TICK_SLOW : (this.rtc.anyReady ? TICK_FAST_OK : TICK);
+    const gap = base + this.fails * 1500;
     if (this.lastSend && now - this.lastSend < gap) return;
     this.lastSend = now;
     this.busy = true;
 
     const { me, placed, world } = this.pending;
     const body = { action: "sync", code: this.code, pid: this.pid, g: me, placed: placed || [] };
+    if (this.sigOut.length) { body.sig = this.sigOut.slice(); this.sigOut.length = 0; }
     if (this.isHost && world) body.world = world;
     else if (!this.isHost) body.acts = this.outActs;   // 消さずに、そのまま送りつづける
 
@@ -198,6 +229,12 @@ export class Net {
       this.status = "";
       if (!r.data.room) { this.on = false; this.peers.clear(); if (this.onEvent) this.onEvent("lost", "部屋がとじました"); return; }
       this.apply(r.data.room);
+      // あいさつが とどいていたら すすめる
+      if (r.data.room && r.data.room.sig && r.data.room.sig.length) {
+        this.rtc.take(r.data.room.sig);
+      }
+      // まだ つないでいない ともだちが いたら つなぎにいく
+      this.rtc.ensure(Array.from(this.peers.keys()));
     });
   }
 
@@ -250,7 +287,9 @@ export class Net {
       }
       p.name = o.name;
       p.placed = o.placed || [];
-      if (o.g) {
+      // 直接つながっている人の ようすは、そちらの ほうが ずっと 新しい。
+      //  サーバーごしの 古いもので 上書きしない
+      if (o.g && !(p.fast && Date.now() - (p.fastT || 0) < 3000)) {
         // 速さは 本人が はかって 送ってくれている。
         //  通信の ゆらぎが まざらないので、これが いちばん たしか
         if (o.g.vx !== undefined) { p.vx = o.g.vx; p.vy = o.g.vy || 0; p.vz = o.g.vz; }
@@ -280,6 +319,44 @@ export class Net {
         const key = a.q || "?";
         const last = this.actSeen.get(key) || 0;
         if (!a.i || a.i <= last) continue;            // もう使った合図はとばす
+        this.actSeen.set(key, a.i);
+        this.inActs.push(a);
+      }
+    }
+  }
+
+  // 直接 とどいた ようす。
+  //  サーバーごしと 中身は 同じ。とどくのが ずっと 速いだけ。
+  takeDirect(pid, msg) {
+    const p = this.peers.get(pid);
+    if (!p || !msg) return;
+    p.fast = true;                       // この人は 直接つながっている
+    p.fastT = Date.now();
+    if (msg.g) {
+      const g = msg.g;
+      if (g.vx !== undefined) { p.vx = g.vx; p.vy = g.vy || 0; p.vz = g.vz; }
+      p.tx = g.x; p.ty = g.y; p.tz = g.z; p.tyaw = g.yaw;
+      p.age = 0;
+      if (p.first === undefined) { p.first = 1; p.x = p.tx; p.y = p.ty; p.z = p.tz; p.yaw = p.tyaw; }
+      p.phasing = !!g.p; p.scaring = g.s || 0;
+      p.charId = g.c || "obake";
+      p.score = g.sc || 0;
+      p.got = g.got || [];
+      p.isHost = !!g.h;
+      if (g.h) this.remoteBattle = g.bt || null;
+    }
+    if (msg.placed) p.placed = msg.placed;
+    // おやから とどいた 人間たちの ようす
+    if (msg.world && !this.isHost) {
+      this.remoteWorld = msg.world;
+      this.worldSeq = (this.worldSeq || 0) + 1;
+    }
+    // おきゃくさんから とどいた「おどかした」合図
+    if (this.isHost && Array.isArray(msg.acts)) {
+      for (const a of msg.acts) {
+        const key = pid;
+        const last = this.actSeen.get(key) || 0;
+        if (!a.i || a.i <= last) continue;
         this.actSeen.set(key, a.i);
         this.inActs.push(a);
       }
