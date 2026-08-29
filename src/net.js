@@ -206,12 +206,20 @@ export class Net {
 
     const { me, placed, world } = this.pending;
     const body = { action: "sync", code: this.code, pid: this.pid, g: me, placed: placed || [] };
-    if (this.sigOut.length) { body.sig = this.sigOut.slice(); this.sigOut.length = 0; }
+    // 手紙は、ちゃんと とどいたのを 見てから 消す。
+    //  さきに 消すと、通信に しっぱいしたとき あいさつが 消えてしまい、
+    //  いつまでも つながらなく なる
+    const sigSent = this.sigOut.length ? this.sigOut.slice() : null;
+    if (sigSent) body.sig = sigSent;
     if (this.isHost && world) body.world = world;
     else if (!this.isHost) body.acts = this.outActs;   // 消さずに、そのまま送りつづける
 
     this.call(body).then((r) => {
       this.busy = false;
+      if (r.ok && sigSent) {
+        // とどいたので、送った ぶんだけ 消す
+        this.sigOut.splice(0, sigSent.length);
+      }
       if (!r.ok) {
         this.fails++;
         this.status = r.why;

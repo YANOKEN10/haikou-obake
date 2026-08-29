@@ -95,7 +95,15 @@ export class Rtc {
     const link = this.links.get(pid);
     if (!link) return;
     link.ch = ch;
-    ch.onopen = () => { link.ready = true; if (this.onOpen) this.onOpen(pid); };
+    const opened = () => {
+      if (link.ready) return;
+      link.ready = true;
+      if (this.onOpen) this.onOpen(pid);
+    };
+    // もう ひらいていることが ある。そのときは onopen が 来ないので、
+    //  ここで 気づいて おく（これを 入れないと ずっと ready に ならない）
+    if (ch.readyState === "open") opened();
+    ch.onopen = opened;
     ch.onclose = () => { link.ready = false; };
     ch.onmessage = (e) => {
       if (!this.onData) return;
@@ -118,7 +126,13 @@ export class Rtc {
       let link = this.links.get(pid);
 
       if (m.k === "offer") {
-        // 声を かけられた。まだ つないでいなければ ここで 用意する
+        // 声を かけられた。
+        //  こちらに 古い つなぎが のこっていたら、いちど 捨てて 作りなおす。
+        //  （相手が つなぎなおした ときに、かた方だけ 古いまま に ならないように）
+        if (link && (link.ready || link.pc.signalingState !== "stable" ||
+                     link.pc.connectionState === "failed")) {
+          this.close(pid); link = null;
+        }
         if (!link) { this.open(pid, false); link = this.links.get(pid); }
         if (!link) continue;
         try {
