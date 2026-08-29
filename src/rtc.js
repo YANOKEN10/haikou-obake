@@ -28,7 +28,10 @@ const ICE = [
 ];
 
 const SEND_HZ = 20;            // 1秒に 何回 送るか
-const GIVE_UP = 12000;         // これだけ たっても つながらなければ あきらめる
+const GIVE_UP = 45000;         // これだけ たっても つながらなければ あきらめる
+//  あいさつは サーバーごしなので 1往復 1〜2秒。
+//  ぜんぶ そろうのに 15〜25秒 かかることが ある。
+//  みじかくすると、もうすこしで つながる ところで こわしてしまう。
 
 export class Rtc {
   constructor(net) {
@@ -169,8 +172,12 @@ export class Rtc {
     let s = null;
     for (const [pid, l] of this.links) {
       if (!l.ready || !l.ch || l.ch.readyState !== "open") {
-        // いつまでも つながらないものは 片づける（ふつうの やりかたに もどる）
-        if (!l.ready && Date.now() - l.born > GIVE_UP) this.close(pid);
+        // いつまでも つながらないものだけ 片づける。
+        //  あいさつの とちゅうや、道をさがしている とちゅうは こわさない
+        const busy = l.pc.signalingState !== "stable" ||
+                     l.pc.iceConnectionState === "checking" ||
+                     l.pc.iceConnectionState === "connected";
+        if (!l.ready && !busy && Date.now() - l.born > GIVE_UP) this.close(pid);
         continue;
       }
       if (s === null) s = JSON.stringify(payload);

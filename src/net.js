@@ -198,7 +198,10 @@ export class Net {
     const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
     // 直接つながっている人が いるなら、サーバーごしは
     //  なかまの ようすを 見るだけで よいので ゆっくりでいい
-    const base = document.hidden ? TICK_SLOW : (this.rtc.anyReady ? TICK_FAST_OK : TICK);
+    let base = document.hidden ? TICK_SLOW : (this.rtc.anyReady ? TICK_FAST_OK : TICK);
+    // あいさつが たまっているなら、待たずに すぐ 送る。
+    //  ここで 待つと、直接つなぐまでに よけいな 時間が かかる
+    if (this.sigOut.length) base = 0;
     const gap = base + this.fails * 1500;
     if (this.lastSend && now - this.lastSend < gap) return;
     this.lastSend = now;
