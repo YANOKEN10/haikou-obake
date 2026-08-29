@@ -8,9 +8,22 @@
 //   ・おどかした合図だけをホストに送り、ホストが結果を返す
 // ============================================================
 const API = "/api/room";
-const TICK = 700;           // ふだんの送信かんかく
+const TICK = 520;           // ふだんの送信かんかく
 const TICK_SLOW = 2500;     // 画面を見ていないとき
-const PREDICT_MAX = 1.4;    // 「このまま進む」と よそうしていい 秒数
+const PREDICT_MAX = 2.0;    // 「このまま進む」と よそうしていい 秒数
+const FIX_MAX = 4.0;        // ずれを 直すときの いちばんの速さ（m/秒）
+//  おばけの ふつうの速さ（5.4）より おそくしてある。
+//  こうすると「追いつくために 走っている」ようには 見えない。
+const WARP = 20;            // これいじょう はなれたら すぐ 合わせる
+//  すりぬけや 階の 行き来など、ほんとうに とんだときだけ。
+//  ここを 小さくすると、ぐるぐる 走る人で カクッと なる
+
+// 角どの ちがい（-π〜π に おさめる）
+function angDiff(to, from) {
+  let d = ((to - from + Math.PI) % (Math.PI * 2)) - Math.PI;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
 
 export class Net {
   constructor() {
@@ -108,22 +121,44 @@ export class Net {
     if (!this.on) return;
     this.pending = { me, placed, world };
 
-    // とどいた位置から「そのまま進んだら いまここ」を よそうして、
-    // そこへ なめらかに 寄せる。こうすると 止まって見えない。
-    const k = Math.min(1, dt * 9);
+    // ともだちのおばけを なめらかに 動かす。
+    //  ① いつも その人の 速さで 進みつづける（止まらない）
+    //  ② とどいた位置との ずれは、ゆっくり 一定の速さで 直す
+    //     （追いつくために 走らないので、ワープに 見えない）
     for (const p of this.peers.values()) {
       p.age = (p.age || 0) + dt;
-      // よそうしすぎないように、上限をつける（とどかなかったとき用）
       const ah = Math.min(p.age, PREDICT_MAX);
-      const px = p.tx + (p.vx || 0) * ah;
-      const pz = p.tz + (p.vz || 0) * ah;
-      const py = p.ty + (p.vy || 0) * ah;
-      p.x += (px - p.x) * k;
-      p.y += (py - p.y) * k;
-      p.z += (pz - p.z) * k;
-      let d = ((p.tyaw - p.yaw + Math.PI) % (Math.PI * 2)) - Math.PI;
-      if (d < -Math.PI) d += Math.PI * 2;
-      p.yaw += d * Math.min(1, dt * 10);
+
+      // その人の 速さで 進む
+      p.x += (p.vx || 0) * dt;
+      p.y += (p.vy || 0) * dt;
+      p.z += (p.vz || 0) * dt;
+
+      // 「とどいた位置＋そのあと 進んだはず のぶん」＝ いるはずの ところ
+      const tx = p.tx + (p.vx || 0) * ah;
+      const ty = p.ty + (p.vy || 0) * ah;
+      const tz = p.tz + (p.vz || 0) * ah;
+
+      const ex = tx - p.x, ey = ty - p.y, ez = tz - p.z;
+      const err = Math.hypot(ex, ez);
+      if (err > WARP) {
+        // はなれすぎ。すりぬけや 階の 行き来。すぐ 合わせる
+        p.x = tx; p.y = ty; p.z = tz;
+      } else if (err > 0.001) {
+        // 直す 速さに かぎりを つける。
+        //  ずれが 大きいほど 速く 直すが、上限を こえない
+        const want = Math.min(err * 2.4, FIX_MAX) * dt;
+        const k = Math.min(1, want / err);
+        p.x += ex * k;
+        p.z += ez * k;
+      }
+      // たかさは ゆっくりでも 気にならないので そのまま ならす
+      p.y += ey * Math.min(1, dt * 4);
+
+      // 向きは 進んでいるほうへ。止まっているときは とどいた向き
+      const sp = Math.hypot(p.vx || 0, p.vz || 0);
+      const want2 = sp > 0.3 ? Math.atan2(p.vx, p.vz) : p.tyaw;
+      p.yaw += angDiff(want2, p.yaw) * Math.min(1, dt * 8);
     }
 
     this.send();
@@ -216,30 +251,19 @@ export class Net {
       p.name = o.name;
       p.placed = o.placed || [];
       if (o.g) {
-        // まえにとどいた所からの ずれで、動く速さを 出す
-        const now = (typeof performance !== "undefined" ? performance.now() : Date.now()) / 1000;
-        const gap = p.last ? Math.min(2.5, Math.max(0.15, now - p.last)) : 0;
-        if (gap > 0) {
-          p.vx = (o.g.x - p.tx) / gap;
-          p.vy = (o.g.y - p.ty) / gap;
-          p.vz = (o.g.z - p.tz) / gap;
-          // 速すぎる値は 通信のゆらぎ。おさえておく
-          const sp = Math.hypot(p.vx, p.vz);
-          if (sp > 14) { p.vx = p.vx / sp * 14; p.vz = p.vz / sp * 14; }
-        } else { p.vx = p.vy = p.vz = 0; }
-        p.last = now;
-        p.age = 0;
+        // 速さは 本人が はかって 送ってくれている。
+        //  通信の ゆらぎが まざらないので、これが いちばん たしか
+        if (o.g.vx !== undefined) { p.vx = o.g.vx; p.vy = o.g.vy || 0; p.vz = o.g.vz; }
+        else { p.vx = 0; p.vy = 0; p.vz = 0; }
         p.tx = o.g.x; p.ty = o.g.y; p.tz = o.g.z; p.tyaw = o.g.yaw;
+        p.age = 0;
+        if (p.first === undefined) { p.first = 1; p.x = p.tx; p.y = p.ty; p.z = p.tz; p.yaw = p.tyaw; }
         p.phasing = !!o.g.p; p.scaring = o.g.s || 0;
         p.charId = o.g.c || "obake";           // ともだちの すがた
         p.score = o.g.sc || 0;                 // おどかし勝負の 人数
         p.got = o.g.got || [];                 // その人が 拾った 拾いものの 番号
         p.isHost = !!o.g.h;                    // この人が おや か
         if (o.g.h) this.remoteBattle = o.g.bt || null;   // 勝負の ようす
-        // はなれすぎていたら（ワープしたときなど）、いきなり合わせる
-        if (Math.abs(p.tx - p.x) > 14 || Math.abs(p.tz - p.z) > 14) {
-          p.x = p.tx; p.y = p.ty; p.z = p.tz; p.vx = p.vy = p.vz = 0;
-        }
       }
     }
     if (!sawHost && !this.isHost) this.remoteBattle = null;   // おやが いない＝勝負は なし

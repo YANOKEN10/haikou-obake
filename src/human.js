@@ -55,6 +55,8 @@ export const HUMAN_SCALE = 0.72;
 // 目の高さ（腰高の窓ごしでも相手が見えるよう、下がりすぎないようにする）
 export // 「このまま歩く」と よそうしていい 秒数
 const NET_PREDICT_MAX = 1.4;
+// ずれを 直す はやさ。小さいほど なめらか（でも ずれが のこる）
+const NET_CORRECT = 2.2;
 
 const EYE_Y = Math.max(1.05, 1.35 * HUMAN_SCALE);
 
@@ -893,19 +895,24 @@ export class Human {
   // --- ともだちと遊ぶとき ---------------------------------
   //  おや（部屋を作った人）から来た位置に、そっと合わせていく。
   //  1秒に1回しか来ないので、そのあいだは自分でなめらかにつなぐ
-  setNet(x, y, z, yaw, fear, state, out) {
-    // まえにとどいた所からの ずれで、歩く速さを 出す
+  setNet(x, y, z, yaw, fear, state, out, vx, vz) {
+    // 歩く速さは おやが はかって 送ってくれている。
+    //  通信の ゆらぎが まざらないので、これが いちばん たしか。
+    //  むかしの版から つないだ人のためだけ、ずれから 出す
     const now = (typeof performance !== "undefined" ? performance.now() : Date.now()) / 1000;
     const o = this.netT;
-    if (o) {
+    if (vx !== undefined) {
+      this.netV = { x: vx, y: 0, z: vz };
+    } else if (o) {
       const gap = Math.min(2.5, Math.max(0.15, now - (this.netLast || now)));
-      let vx = (x - o.x) / gap, vy = (y - o.y) / gap, vz = (z - o.z) / gap;
-      const sp = Math.hypot(vx, vz);
-      if (sp > 12) { vx = vx / sp * 12; vz = vz / sp * 12; }   // 通信のゆらぎは おさえる
-      this.netV = { x: vx, y: vy, z: vz };
+      let ax = (x - o.x) / gap, ay = (y - o.y) / gap, az = (z - o.z) / gap;
+      const sp = Math.hypot(ax, az);
+      if (sp > 12) { ax = ax / sp * 12; az = az / sp * 12; }
+      this.netV = { x: ax, y: ay, z: az };
     } else this.netV = { x: 0, y: 0, z: 0 };
     this.netLast = now;
     this.netAge = 0;
+    if (!this.netT) { this.x = x; this.y = y; this.z = z; }   // はじめては その場に
     this.netT = { x, y, z, yaw };
     this.fear = fear;
     if (!this.out) this.state = state;
@@ -918,15 +925,17 @@ export class Human {
     if (!n) return;
     const px = this.x, pz = this.z;
     this.netAge = (this.netAge || 0) + dt;
-    if (Math.abs(n.x - this.x) > 12 || Math.abs(n.z - this.z) > 12) {
-      this.x = n.x; this.y = n.y; this.z = n.z;      // ワープしたときは、いきなり合わせる
-      this.netV = { x: 0, y: 0, z: 0 };
+    // ・その速さで つねに 歩きつづける（止まらない）
+    // ・とどいた位置との ずれは、ゆっくり 直す（引きもどされない）
+    const v = this.netV || { x: 0, y: 0, z: 0 };
+    const ah = Math.min(this.netAge, NET_PREDICT_MAX);
+    this.x += v.x * dt;
+    this.z += v.z * dt;
+    const tx = n.x + v.x * ah, ty = n.y + v.y * ah, tz = n.z + v.z * ah;
+    if (Math.hypot(tx - this.x, tz - this.z) > 9) {
+      this.x = tx; this.y = ty; this.z = tz;         // はなれすぎ＝ワープ
     } else {
-      // 「そのまま歩いたら いまここ」を よそうして、そこへ 寄せる
-      const v = this.netV || { x: 0, y: 0, z: 0 };
-      const ah = Math.min(this.netAge, NET_PREDICT_MAX);
-      const tx = n.x + v.x * ah, ty = n.y + v.y * ah, tz = n.z + v.z * ah;
-      const k = Math.min(1, dt * 9);
+      const k = Math.min(1, dt * NET_CORRECT);
       this.x += (tx - this.x) * k;
       this.y += (ty - this.y) * k;
       this.z += (tz - this.z) * k;

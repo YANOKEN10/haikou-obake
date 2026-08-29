@@ -1538,7 +1538,9 @@ class Game {
     const hs = [];
     for (const h of this.humans) {
       hs.push([h.hid, +h.x.toFixed(2), +h.y.toFixed(2), +h.z.toFixed(2), +h.yaw.toFixed(2),
-        Math.round(h.fear), NET_STATES.indexOf(h.state), h.out ? 1 : 0]);
+        Math.round(h.fear), NET_STATES.indexOf(h.state), h.out ? 1 : 0,
+        // 歩く 速さ。むこうで なめらかに 動かすのに つかう
+        +(h.vx || 0).toFixed(2), +(h.vz || 0).toFixed(2)]);
     }
     // さいきん40波ぶんの「入れた人数」も いっしょに送る
     const rooms = [];
@@ -1562,7 +1564,7 @@ class Game {
       const h = by.get(a[0]);
       if (!h) continue;
       const was = h.fear;
-      const escaped = h.setNet(a[1], a[2], a[3], a[4], a[5], NET_STATES[a[6]] || "wander", a[7]);
+      const escaped = h.setNet(a[1], a[2], a[3], a[4], a[5], NET_STATES[a[6]] || "wander", a[7], a[8], a[9]);
       // こわさが ぐんと上がった＝だれかが おどかした。
       //  自分がおどかしたぶんは、すでに 材料をもらっているので よける
       const mine = this.myScareT.get(h.hid) || 0;
@@ -1576,6 +1578,10 @@ class Game {
     const me = {
       x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), yaw: +p.yaw.toFixed(2),
       p: p.phasing ? 1 : 0, s: p.scarePose > 0 ? 1 : 0,
+      // 動く 速さも いっしょに 送る。
+      //  むこうは これで「いま どこに いるはず か」を 出すので、
+      //  とどく間かくが ゆらいでも なめらかに 動く
+      vx: +p.vx.toFixed(2), vy: +(p.vy || 0).toFixed(2), vz: +p.vz.toFixed(2),
       c: this.charId || "obake",                   // どの すがたで 遊んでいるか
       sc: this.battle.score,                       // おどかし勝負で おどかした人数
       h: this.net.isHost ? 1 : 0,                  // この人が おや か
