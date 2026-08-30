@@ -15,6 +15,7 @@ scene.add(new THREE.HemisphereLight(0xc9b8d8, 0x303038, 3.2));
 const sun = new THREE.DirectionalLight(0xffd8b0, 2.5); sun.position.set(-30, 70, 50); scene.add(sun);
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 300);
 if (ground && id === "park") { camera.position.set(0, 3.2, 70); camera.lookAt(0, 5, 6); }
+else if (ground && id === "branch") { camera.position.set(-24, 2.2, 29); camera.lookAt(-24, 1.5, -20); }
 else { camera.position.set(id === "branch" ? 78 : 88, id === "branch" ? 55 : 62, 105); camera.lookAt(0, 2, 14); }
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); renderer.setSize(innerWidth, innerHeight); document.body.append(renderer.domElement);

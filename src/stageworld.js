@@ -91,30 +91,90 @@ function buildBranch(scene, opts) {
     { id: "east", name: "給食室のドア", out: { x: 39, z: 3 }, in: { x: 31, z: 3 } },
     { id: "west", name: "割れた美術室", out: { x: -39, z: -4 }, in: { x: -31, z: -4 } },
   ];
-  mb.slab(bounds.x1, bounds.z1, bounds.x2, bounds.z2, 0, 0.3, 0x394340);
-  // 以前の木造四階建てと重ならない、低いコンクリートのコの字校舎。
+  mb.slab(bounds.x1, bounds.z1, bounds.x2, bounds.z2, 0, 0.3, 0x252e31);
+  // 青白い月明かりに沈む、低いコンクリートのコの字校舎。
   const wings = [
-    { x1: -38, x2: -10, z1: -28, z2: 18, c: 0x596269 },
-    { x1: 10, x2: 38, z1: -28, z2: 18, c: 0x536069 },
-    { x1: -10, x2: 10, z1: -28, z2: -12, c: 0x4d5962 },
+    { x1: -38, x2: -10, z1: -28, z2: 18, c: 0x40575a },
+    { x1: 10, x2: 38, z1: -28, z2: 18, c: 0x394f54 },
+    { x1: -10, x2: 10, z1: -28, z2: -12, c: 0x354a50 },
   ];
   for (const w of wings) {
-    mb.slab(w.x1, w.z1, w.x2, w.z2, 0.12, 0.24, 0x4b5052);
-    mb.slab(w.x1, w.z1, w.x2, w.z2, 3.55, 0.28, 0x30383e);
+    mb.slab(w.x1, w.z1, w.x2, w.z2, 0.12, 0.24, 0x33474c);
+    mb.slab(w.x1, w.z1, w.x2, w.z2, 3.55, 0.28, 0x202b31);
     for (const [axis, fixed, from, to] of [["x", w.z1, w.x1, w.x2], ["x", w.z2, w.x1, w.x2], ["z", w.x1, w.z1, w.z2], ["z", w.x2, w.z1, w.z2]])
       wallWithHoles(mb, col, { axis, fixed, from, to, y1: 0, y2: 3.6, thick: 0.25, color: w.c,
         holes: [{ a: (from + to) / 2 - 1.2, b: (from + to) / 2 + 1.2, y1: 0, y2: 2.5 }] });
-    // 青緑の連続窓が、この分校の見分けやすいしるし。
+    // 冷たい月色の連続窓と、ところどころ消えた蛍光灯。
     const n = Math.max(2, Math.floor((w.x2 - w.x1) / 5));
-    for (let i = 0; i < n; i++) mb.box(w.x1 + 2.5 + i * 5, 2.1, w.z2 + 0.15, 2.8, 1.0, 0.08, 0x49737a);
+    for (let i = 0; i < n; i++) {
+      mb.box(w.x1 + 2.5 + i * 5, 2.1, w.z2 + 0.15, 2.8, 1.0, 0.08, i%3===0?0x7daab8:0x456d78);
+      mb.box(w.x1 + 2.5 + i * 5, 3.32, (w.z1+w.z2)/2, 2.5, 0.08, 0.28, i%4===0?0x243237:0x9bc9c8);
+    }
   }
   const indoorRects = wings;
-  addRoom(rooms, spawnSpots, "science", "標本だらけの理科室", "science", -36, -25, -12, -7, 0.7);
-  addRoom(rooms, spawnSpots, "art", "石こう像の美術室", "art", -36, -5, -12, 15, 0.55);
-  addRoom(rooms, spawnSpots, "lunch", "止まった給食室", "home", 12, -25, 36, -7, 0.68);
-  addRoom(rooms, spawnSpots, "broadcast", "霧の放送室", "music", 12, -5, 36, 15, 0.58);
-  addRoom(rooms, spawnSpots, "archive", "地下資料庫への入口", "library", -8, -26, 8, -14, 0.9);
-  addRoom(rooms, spawnSpots, "court", "ひびわれた中庭", "yard", -9, -10, 9, 30, 0.35);
+  addRoom(rooms, spawnSpots, "toilet", "青ざめた旧トイレ", "toilet", -36, -25, -12, -7, 0.7);
+  addRoom(rooms, spawnSpots, "moonclass", "月明かりの教室", "class", -36, -5, -12, 15, 0.55);
+  addRoom(rooms, spawnSpots, "desks", "机が残る教室", "class", 12, -25, 36, -7, 0.68);
+  addRoom(rooms, spawnSpots, "candles", "ろうそくの特別教室", "music", 12, -5, 36, 15, 0.58);
+  addRoom(rooms, spawnSpots, "archive", "明かりの消えた資料室", "library", -8, -26, 8, -14, 0.9);
+  addRoom(rooms, spawnSpots, "court", "雨だまりの中庭", "yard", -9, -10, 9, 30, 0.35);
+
+  // 長廊下の錆びたロッカーとベンチ。扉の濃淡を変えて放置感を出す。
+  for (const sx of [-1,1]) for (let i=0;i<7;i++) {
+    const x=sx*12.2,z=-24+i*6.1;
+    mb.box(x,1.05,z,0.72,2.1,2.35,i%3===0?0x2d4852:0x42606a);
+    mb.box(x-sx*.38,1.35,z,0.06,.16,1.45,0x182a31);
+    if(i%2===0) mb.box(x-sx*1.2,.42,z+1.3,1.5,.18,.42,0x4a4640);
+  }
+
+  // 旧トイレ：青いタイル、個室、洗面台。赤い表現は使わず黒い水染みだけ。
+  mb.slab(-36,-25,-12,-7,.16,.08,0x49666d);
+  for(let i=0;i<4;i++){
+    const x=-33+i*5.2;
+    mb.box(x,1.25,-22.8,.16,2.5,4.0,0x557176);
+    col.add(x-.1,-24.8,x+.1,-20.8,0,2.5,"furn");
+    mb.box(x+2.2,.42,-23.2,1.15,.84,1.25,0xc4cbc3);
+  }
+  for(let i=0;i<4;i++){
+    const x=-33+i*5.4;
+    mb.box(x,.78,-9.0,2.1,.25,.85,0xb2c4c3);
+    mb.box(x,1.45,-8.58,1.5,1.05,.06,0x416773);
+  }
+
+  // 二つの教室：机と椅子を中央の通路を空けて並べる。
+  const deskRows=[
+    {xs:[-33,-29,-19,-15],zs:[0,5,10],frontZ:14.5},
+    {xs:[16,21,27,32],zs:[-22,-17,-12],frontZ:-7.5},
+  ];
+  for(const room of deskRows){
+    for(const x of room.xs) for(const z of room.zs){
+      mb.box(x,.82,z,2.1,.16,1.25,0x525451);
+      mb.box(x,.42,z-.42,.16,.78,.16,0x303b3d);
+      mb.box(x,.42,z+.42,.16,.78,.16,0x303b3d);
+      mb.box(x,.62,z+1.0,1.35,.18,.22,0x3b4546);
+    }
+    mb.box((room.xs[0]+room.xs.at(-1))/2,1.65,room.frontZ,15.5,1.35,.12,0x182e2e);
+    mb.box((room.xs[0]+room.xs.at(-1))/2,.35,room.frontZ-.8,4.2,.7,1.2,0x474a45);
+  }
+
+  // 特別教室：机を輪にして、紙とろうそくを置く。儀式めくが子ども向けの非残酷表現。
+  const rx=24,rz=5;
+  for(let i=0;i<12;i++){
+    const a=i/12*Math.PI*2,x=rx+Math.cos(a)*6,z=rz+Math.sin(a)*6;
+    mb.box(x,.72,z,2.1,.18,1.15,0x4a4547,{rotY:-a});
+    mb.box(x,1.18,z,.16,.9,.16,0xf2df9a);
+    mb.box(x,1.7,z,.22,.28,.22,i%3===0?0xb85b9b:0xf0b35b);
+  }
+  mb.slab(rx-2.3,rz-1.5,rx+2.3,rz+1.5,.2,.04,0xe0d3ad);
+  for(let i=0;i<16;i++){
+    const a=i/16*Math.PI*2;
+    mb.box(rx+Math.cos(a)*3.3,.18,rz+Math.sin(a)*3.3,.38,.04,.16,0xc9c08a,{rotY:-a});
+  }
+
+  // ひび、はがれた床材、黒い雨染み。血ではなく経年劣化として見せる。
+  const stains=[[-30,3,3.2,1.1],[-18,-16,2.4,.8],[29,-19,3.6,1.2],[18,10,2.8,.9],[-2,-19,3.3,1.0]];
+  for(const [x,z,w,d] of stains) mb.slab(x-w/2,z-d/2,x+w/2,z+d/2,.205,.025,0x20282a);
+  for(let i=0;i<18;i++) mb.box(-8+i*.9,.22,-12.2+(i%3)*.35,.75,.05,.12,i%2?0x627277:0x27373b,{rotY:(i%3-1)*.45});
   // 中庭の枯れた噴水と時計塔。
   for (let i = 0; i < 12; i++) {
     const a = i / 12 * Math.PI * 2;
