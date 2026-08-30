@@ -1244,7 +1244,7 @@ class Game {
     if (!this.profile) return false;
     const ok = S.saveProfile(this.collectSave());
     if (showToast) {
-      if (ok) { this.ui.toast("💾 「" + this.profile.name + "」の記録をセーブしました", "good"); this.audio.pickup(); }
+      if (ok) { this.ui.toast("💾 セーブできました", "good"); this.audio.pickup(); }
       else { this.ui.toast("セーブできませんでした", "bad"); this.audio.deny(); }
     }
     this._autosaveT = 0;
@@ -1710,9 +1710,10 @@ class Game {
     this.input.unlock();
     if (this.touch) this.touch.release();
     this.ui.showScreen();
-    this.home.show(this.home.tab);
+    // 「戻る」は、直前にプロフィール等を見ていても必ずゲーム開始画面へ戻す。
+    this.home.show("play");
     this.home.render();
-    if (ok) this.ui.toast("記録をセーブしました", "good");
+    if (ok) this.ui.toast("💾 セーブできました", "good");
   }
 
   // --- クラウド（メールでログインしている人だけ） -------------
