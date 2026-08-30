@@ -502,14 +502,16 @@ export class Home {
   renderPlay() {
     mountSupport(this.game.ui);
     const p = this.profile();
-    $("#whoPlay").innerHTML = p
+    $("#whoPlay").innerHTML = this.game.adminPreview
+      ? "<b>🧪 管理者の試験モード</b>　記録には保存されません"
+      : p
       ? "いま遊ぶ人： <b>" + esc(p.name) + "</b>　<span style='font-size:11px'>（「ログイン」で変えられます）</span>"
       : "なまえを決めると記録が残ります。<b>ゲスト</b>のままでも遊べます。";
 
     const card = $("#saveCard");
     const kicked = p ? Number(p.kicked || 0) : 0;
     $("#stageList").innerHTML = STAGES.map((s) => {
-      const open = stageUnlocked(s, kicked);
+      const open = stageUnlocked(s, kicked, this.game.adminPreview);
       const on = s.id === this.game.stageId;
       const need = s.unlock ? (s.unlock + 1) + "人 追い出すと解放" : "はじめから遊べる";
       return "<button class='stagecard" + (on ? " on" : "") + "' data-stage='" + s.id + "' " + (open ? "" : "disabled") + ">" +

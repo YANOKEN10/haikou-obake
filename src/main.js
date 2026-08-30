@@ -1,10 +1,11 @@
 import * as THREE from "../lib/three.module.js";
 import { buildWorld, clampPlay, inPlay } from "./world.js";
 import { buildStageWorld } from "./stageworld.js";
-import { STAGES, stageById, stageUnlocked, requestedStage } from "./stages.js";
+import { STAGES, stageById, stageUnlocked, requestedStage, stageUrl } from "./stages.js";
 import { buildSky } from "./sky.js";
 import { TouchControls, isTouchDevice, goFullscreen } from "./touch.js";
 import { Home } from "./home.js";
+import { verifyAdminPreview } from "./admin-preview.js";
 import * as S from "./save.js";
 import { Cloud } from "./cloud.js";
 import { Player } from "./player.js";
@@ -88,10 +89,11 @@ const MAX_ALIVE = 15;
 const NET_STATES = ["wander", "investigate", "spooked", "panic", "flee"];
 
 class Game {
-  constructor() {
+  constructor(adminPreview = false) {
     const savedName = S.currentName();
     const savedProfile = savedName ? S.getProfile(savedName) : null;
-    this.stageId = requestedStage(savedProfile ? savedProfile.kicked : 0);
+    this.adminPreview = adminPreview;
+    this.stageId = requestedStage(savedProfile ? savedProfile.kicked : 0, adminPreview);
     this.stage = stageById(this.stageId);
     this.q = pickQuality();
     this.renderer = new THREE.WebGLRenderer({ antialias: this.q.aa, powerPreference: "high-performance" });
@@ -1252,6 +1254,10 @@ class Game {
   }
 
   saveNow(showToast) {
+    if (this.adminPreview) {
+      if (showToast) this.ui.toast("🧪 試験モードは記録に保存されません", "good");
+      return true;
+    }
     if (!this.profile) return false;
     const ok = S.saveProfile(this.collectSave());
     if (showToast) {
@@ -1333,10 +1339,31 @@ class Game {
     this.refreshHiddenChars(false);
   }
 
+  // 試験用のタブだけに、全ステージ・全キャラ・全道具をそろえる。
+  // 通常の記録とクラウドには書かないため、確認後に元の進み具合へ戻れる。
+  applyAdminPreview() {
+    this.kicked = 9999;
+    this.chars = Object.fromEntries(Object.keys(CHARS).map((id) => [id, 1]));
+    this.inv = Object.fromEntries(Object.keys(MATERIALS).map((id) => [id, 9999]));
+    this.built = Object.fromEntries(Object.keys(TRAPS).map((id) => [id, 99]));
+    this.shards = Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((id) => [id, 9999]));
+    this.paints = Object.fromEntries(PAINTS.map((p) => [p.id, 1]));
+    this.upg = Object.fromEntries(Object.keys(CHARS).map((id) => [
+      id, Object.fromEntries(Object.keys(UPGRADES).map((key) => [key, UPG_MAX])),
+    ]));
+    this.player.setUpgrades(this.upg[this.charId]);
+    this.ui.setRank(this.kicked);
+    this.ui.setBag(this.inv);
+    this.ui.setHotbar(this.built, this.selTrap);
+    this.ui.setShards(this.shards);
+    this.ui.setCharChip(CHARS[this.charId]);
+  }
+
   startGame(cont) {
     this.profile = this.ensureProfile();
     this.resetSession();
     if (cont && this.profile.hasSave) this.applySave(this.profile);
+    if (this.adminPreview) this.applyAdminPreview();
 
     this.started = true;
     this.setPaused(false);
@@ -1346,7 +1373,10 @@ class Game {
     this._last = performance.now();
     this._autosaveT = 0;
 
-    if (cont && this.profile.hasSave) {
+    if (this.adminPreview) {
+      this.ui.toast("🧪 全ステージ・全17キャラを試せます", "gold");
+      setTimeout(() => this.spawnWave(), 1500);
+    } else if (cont && this.profile.hasSave) {
       this.ui.toast("おかえり、" + this.profile.name + "。つづきから始めます", "good");
       setTimeout(() => this.spawnWave(), 3000);
     } else {
@@ -1511,10 +1541,10 @@ class Game {
     const roomStage = stageById((r.data.room && r.data.room.stage) || "school");
     if (roomStage.id !== this.stageId) {
       await this.net.leave();
-      if (!stageUnlocked(roomStage, this.profile ? this.profile.kicked : 0))
+      if (!stageUnlocked(roomStage, this.profile ? this.profile.kicked : 0, this.adminPreview))
         return { ok: false, why: "おやは「" + roomStage.name + "」にいます。まだ このステージは開いていません。" };
       try { sessionStorage.setItem("haikou-obake:rejoin", JSON.stringify({ code, name })); } catch (e) { /* 保存不可 */ }
-      location.href = new URL("?stage=" + roomStage.id, location.href).toString();
+      location.href = stageUrl(roomStage.id);
       return { ok: true, reloading: true };
     }
     this.netReseed(r.data.seed);
@@ -1788,7 +1818,8 @@ class Game {
 }
 
 // ============================================================
-const game = new Game();
+const adminPreview = await verifyAdminPreview();
+const game = new Game(adminPreview);
 window.game = game;
 game.build();
 game.loop(performance.now());

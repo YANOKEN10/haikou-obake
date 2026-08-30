@@ -10,9 +10,9 @@ export const STAGES = [
 export const stageById = (id) => STAGES.find((s) => s.id === id) || STAGES[0];
 
 // 「1000人を超えたら」なので、ちょうど1000人ではまだ開かない。
-export const stageUnlocked = (stage, kicked) => Number(kicked || 0) > stage.unlock || stage.unlock === 0;
+export const stageUnlocked = (stage, kicked, adminPreview = false) => adminPreview || Number(kicked || 0) > stage.unlock || stage.unlock === 0;
 
-export function requestedStage(kicked) {
+export function requestedStage(kicked, adminPreview = false) {
   let id = "";
   let preview = false;
   try {
@@ -22,7 +22,7 @@ export function requestedStage(kicked) {
     preview = (location.hostname === "localhost" || location.hostname === "127.0.0.1") && q.get("preview") === "1";
   } catch (e) { /* テスト環境 */ }
   const s = stageById(id);
-  return preview || stageUnlocked(s, kicked) ? s.id : "school";
+  return preview || stageUnlocked(s, kicked, adminPreview) ? s.id : "school";
 }
 
 export function stageUrl(id) {

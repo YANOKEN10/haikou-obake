@@ -9,7 +9,8 @@
     "test:paint": "node tools/painttest.mjs",
     "test:hidden": "node tools/hiddentest.mjs",
     "test:floors": "node tools/floortest.mjs",
-    "test:stage": "node tools/stagetest.mjs"
+    "test:stage": "node tools/stagetest.mjs",
+    "test:admin": "node tools/adminpreviewtest.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.0.0"
