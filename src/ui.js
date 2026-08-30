@@ -253,7 +253,8 @@ export class UI {
     if (!this.pntPart || !PARTS[this.pntPart]) this.pntPart = "body";
     const cid = this.pntChar, part = this.pntPart;
 
-    const chars = Object.entries(CHARS).sort((a, b) => a[1].order - b[1].order)
+    const chars = Object.entries(CHARS).filter(([id, c]) => !c.hidden || g.chars[id])
+      .sort((a, b) => a[1].order - b[1].order)
       .map(([id, c]) => "<div class='uchar" + (id === cid ? " on" : "") + (g.chars[id] ? "" : " lock") +
         "' data-c='" + id + "'>" + c.icon + " " + c.name + (g.chars[id] ? "" : " 🔒") + "</div>").join("");
 
@@ -322,7 +323,7 @@ export class UI {
     if (!this.upgChar || !g.chars[this.upgChar]) this.upgChar = g.charId;
     const cid = this.upgChar;
 
-    const tabs = Object.entries(CHARS)
+    const tabs = Object.entries(CHARS).filter(([id, c]) => !c.hidden || g.chars[id])
       .sort((a, b) => a[1].order - b[1].order)
       .map(([id, c]) => {
         const has = !!g.chars[id];
@@ -393,7 +394,8 @@ export class UI {
 
     // すがた
     html += "<div class='shead'>🎭 すがたを かえる</div><div class='cgrid2'>";
-    html += Object.entries(CHARS).sort((a, b) => a[1].order - b[1].order).map(([id, c]) => {
+    html += Object.entries(CHARS).filter(([id, c]) => !c.hidden || g.chars[id])
+      .sort((a, b) => a[1].order - b[1].order).map(([id, c]) => {
       const owned = !!g.chars[id];
       const now = g.charId === id;
       const can = owned || g.canPayShards(c.cost);

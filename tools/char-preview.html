@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>隠しキャラ見た目確認</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101729;color:#fff;font-family:sans-serif}
+#labels{position:fixed;inset:0;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(2,1fr);pointer-events:none}
+#labels div{display:flex;align-items:flex-end;justify-content:center;padding:18px;font-weight:800;font-size:18px;text-shadow:0 2px 4px #000}
+canvas{display:block;width:100%;height:100%}
+</style></head><body><div id="labels"></div>
+<script type="module">
+import * as THREE from "../lib/three.module.js";
+import { buildGhostLook } from "../src/player.js";
+import { CHARS } from "../src/data.js";
+const ids=Object.keys(CHARS).filter(id=>CHARS[id].hidden);
+const renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight); renderer.setClearColor(0x101729); document.body.prepend(renderer.domElement);
+const scene=new THREE.Scene(); scene.fog=new THREE.Fog(0x101729,15,30);
+scene.add(new THREE.HemisphereLight(0xddeeff,0x252038,2.2));
+const sun=new THREE.DirectionalLight(0xffe5c0,2.2); sun.position.set(5,8,7); scene.add(sun);
+const camera=new THREE.PerspectiveCamera(36,innerWidth/innerHeight,.1,100); camera.position.set(0,4.5,20); camera.lookAt(0,1.8,0);
+const looks=[];
+ids.forEach((id,i)=>{const ghost=buildGhostLook(id),g=ghost.group; const col=i%5,row=Math.floor(i/5); g.position.set((col-2)*3.1,2.8-row*5.0,0); g.rotation.y=-.2; scene.add(g); looks.push(g);});
+document.querySelector("#labels").innerHTML=ids.map(id=>`<div>${CHARS[id].icon} ${CHARS[id].name}</div>`).join("");
+function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}
+addEventListener("resize",resize); let t=0;
+function frame(){t+=.012; looks.forEach((g,i)=>g.rotation.y=-.25+Math.sin(t+i*.35)*.18);renderer.render(scene,camera);requestAnimationFrame(frame)} frame();
+</script></body></html>

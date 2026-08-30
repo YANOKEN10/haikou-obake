@@ -557,6 +557,210 @@ export class Player {
         tip.rotation.set(-0.95, 0, -a2 * 0.95);
         this.tails.push({ m: tip, a: a2, base: tip.rotation.z });
       }
+    } else if (id === "kaiju") {
+      this.headScale = 1.18; this.mouth.visible = false;
+      this.eyeL.visible = false; this.eyeR.visible = false; this.skirt.visible = false;
+      const torso = add(new THREE.Mesh(new THREE.SphereGeometry(0.7, 14, 11), M(C.body)), "body");
+      torso.position.y = 0.62; torso.scale.set(1.12, 1.28, 0.78);
+      for (const sx of [-1, 1]) {
+        const eye = add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), B(0xffe04a)), "eye");
+        eye.position.set(sx * 0.22, 1.34, 0.45); eye.scale.set(1.3, 0.55, 0.5);
+        const pupil = add(new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), B(0x111722)), "fixed");
+        pupil.position.set(sx * 0.22, 1.34, 0.51); pupil.scale.y = 1.8;
+        const leg = add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 0.72, 8), M(C.body)), "body");
+        leg.position.set(sx * 0.35, -0.1, 0);
+      }
+      for (let i = 0; i < 6; i++) {
+        const plate = add(new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.48, 4), M(0xa9db58)), "deco");
+        plate.position.set(0, 1.5 - i * 0.32, -0.5); plate.rotation.x = -Math.PI / 2;
+      }
+      const snout = add(new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.28, 0.45), M(C.body)), "body");
+      snout.position.set(0, 1.08, 0.52);
+      for (const sx of [-0.2, 0, 0.2]) {
+        const tooth = add(new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.16, 4), B(0xf8eed2)), "fixed");
+        tooth.position.set(sx, 0.96, 0.76); tooth.rotation.x = Math.PI;
+      }
+      const tail = add(new THREE.Mesh(new THREE.ConeGeometry(0.25, 1.65, 9), M(C.body)), "body");
+      tail.position.set(0, 0.5, -0.95); tail.rotation.x = -1.22;
+
+    } else if (id === "oni") {
+      this.headScale = 1.12; this.skirt.visible = false; this.mouth.visible = false;
+      this.eyeL.visible = false; this.eyeR.visible = false;
+      const chest = add(new THREE.Mesh(new THREE.SphereGeometry(0.63, 14, 11), M(C.body)), "body");
+      chest.position.y = 0.68; chest.scale.set(1.18, 1.18, 0.74);
+      for (const sx of [-1, 1]) {
+        const horn = add(new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.52, 7), M(0xf4d264)), "deco");
+        horn.position.set(sx * 0.28, 1.8, 0); horn.rotation.z = sx * -0.18;
+        const eye = add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), B(0xffdc44)), "eye");
+        eye.position.set(sx * 0.2, 1.31, 0.43); eye.scale.set(1.25, 0.65, 0.5);
+        const leg = add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 0.72, 9), M(C.body)), "body");
+        leg.position.set(sx * 0.3, -0.12, 0);
+      }
+      const belt = add(new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.64, 0.28, 12), M(0xe3b42d)), "deco");
+      belt.position.y = 0.33;
+      for (let i = 0; i < 5; i++) {
+        const stripe = add(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.3, 0.06), B(0x33251c)), "fixed");
+        stripe.position.set((i - 2) * 0.2, 0.34, 0.55); stripe.rotation.z = 0.35;
+      }
+      const club = add(new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.12, 1.55, 8), M(0x4b3428)), "deco");
+      club.position.set(0.72, 0.85, 0); club.rotation.z = -0.35;
+      for (let i = 0; i < 5; i++) {
+        const stud = add(new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.16, 5), B(0xe7c26a)), "fixed");
+        stud.position.set(0.62 + (i % 2) * 0.18, 1.15 + i * 0.13, 0.08); stud.rotation.z = -1;
+      }
+
+    } else if (id === "yukionna") {
+      this.headScale = 1.04; this.skirt.scale.set(0.88, 1.35, 0.88);
+      this.eyeL.visible = false; this.eyeR.visible = false; this.mouth.visible = false;
+      for (const sx of [-1, 1]) bigEye(sx * 0.19, 1.32, 0.41, 0.13, sx * 0.2);
+      for (let i = 0; i < 13; i++) {
+        const a2 = i / 13 * Math.PI * 2;
+        const hair = add(new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.85, 5), M(0x18283e)), "deco");
+        hair.position.set(Math.cos(a2) * 0.42, 1.38, Math.sin(a2) * 0.38 - 0.08);
+        hair.rotation.z = Math.cos(a2) * 0.26; hair.rotation.x = Math.sin(a2) * 0.25 + Math.PI;
+      }
+      for (const sx of [-1, 1]) {
+        const sleeve = add(new THREE.Mesh(new THREE.ConeGeometry(0.38, 1.0, 8), M(0xd7eaff)), "body");
+        sleeve.position.set(sx * 0.68, 0.78, 0); sleeve.rotation.z = sx * 1.18;
+      }
+      for (let i = 0; i < 6; i++) {
+        const crystal = add(new THREE.Mesh(new THREE.OctahedronGeometry(0.12), M(0x9de5ff)), "deco");
+        const a2 = i / 6 * Math.PI * 2; crystal.position.set(Math.cos(a2) * 0.78, 1.05 + Math.sin(a2) * 0.55, -0.1);
+      }
+
+    } else if (id === "zashiki") {
+      this.headScale = 1.22; this.group.scale.multiplyScalar(0.86);
+      this.eyeL.visible = false; this.eyeR.visible = false; this.mouth.visible = false;
+      bigEye(-0.19, 1.3, 0.42, 0.14); bigEye(0.19, 1.3, 0.42, 0.14);
+      cheeks(1.12, 0.43, 0xf08b91);
+      const kimono = add(new THREE.Mesh(new THREE.CylinderGeometry(0.43, 0.63, 1.02, 12), M(0xb83245)), "deco");
+      kimono.position.y = 0.62;
+      const obi = add(new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.18, 0.66), M(0xf1c34d)), "deco");
+      obi.position.y = 0.78;
+      const cap = add(new THREE.Mesh(new THREE.SphereGeometry(0.54, 14, 10), M(0x25202b)), "deco");
+      cap.position.y = 1.55; cap.scale.y = 0.62;
+      for (const sx of [-1, 1]) {
+        const side = add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.54, 0.2), M(0x25202b)), "deco");
+        side.position.set(sx * 0.43, 1.35, -0.03);
+      }
+      const ball = add(new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 10), M(0xf2c84b)), "deco");
+      ball.position.set(0.65, 0.35, 0.32);
+
+    } else if (id === "rokuro") {
+      this.head.visible = false; this.eyeL.visible = false; this.eyeR.visible = false; this.mouth.visible = false;
+      const neck = add(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, 1.55, 10), M(C.body)), "body");
+      neck.position.set(0.15, 1.62, 0); neck.rotation.z = -0.12;
+      const head = add(new THREE.Mesh(new THREE.SphereGeometry(0.48, 15, 12), M(C.body)), "body");
+      head.position.set(0.25, 2.35, 0); head.scale.set(1, 1.08, 0.9);
+      for (const sx of [-1, 1]) bigEye(0.25 + sx * 0.18, 2.36, 0.39, 0.12, sx * 0.2);
+      const hair = add(new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 10), M(0x24202e)), "deco");
+      hair.position.set(0.25, 2.53, -0.12); hair.scale.set(1.08, 0.78, 0.82);
+      const kimono = add(new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.67, 1.05, 12), M(0x73529d)), "deco");
+      kimono.position.y = 0.64;
+      const obi = add(new THREE.Mesh(new THREE.CylinderGeometry(0.51, 0.51, 0.17, 12), M(0xe5b94a)), "deco");
+      obi.position.y = 0.81;
+
+    } else if (id === "tekeke") {
+      this.skirt.visible = false; this.eyeL.visible = false; this.eyeR.visible = false; this.mouth.visible = false;
+      this.headScale = 1.08;
+      for (const sx of [-1, 1]) {
+        const eye = add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), B(0xff4058)), "eye");
+        eye.position.set(sx * 0.2, 1.31, 0.43); eye.scale.set(1.2, 0.65, 0.5);
+        const arm = add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, 0.85, 8), M(C.body)), "body");
+        arm.position.set(sx * 0.62, 0.62, 0.26); arm.rotation.z = sx * 1.1;
+        const palm = add(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.09, 0.32), M(C.body)), "body");
+        palm.position.set(sx * 0.98, 0.32, 0.34);
+      }
+      const torso = add(new THREE.Mesh(new THREE.ConeGeometry(0.62, 1.1, 10), M(0x405a83)), "deco");
+      torso.position.y = 0.67;
+      for (let i = 0; i < 9; i++) {
+        const lock = add(new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.75, 5), M(0x19243c)), "deco");
+        lock.position.set((i - 4) * 0.1, 1.47, -0.16); lock.rotation.x = Math.PI;
+      }
+      this.smoke = [];
+      for (let i = 0; i < 4; i++) {
+        const puff = add(new THREE.Mesh(new THREE.SphereGeometry(0.24 - i * 0.03, 9, 7), M(0x526f9d)), "deco");
+        puff.position.set((i - 1.5) * 0.2, 0.1 - i * 0.04, -0.15); this.smoke.push(puff);
+      }
+
+    } else if (id === "nurikabe") {
+      this.head.visible = false; this.skirt.visible = false; this.handL.visible = false; this.handR.visible = false;
+      this.eyeL.visible = false; this.eyeR.visible = false; this.mouth.visible = false;
+      const wall = add(new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.25, 0.48, 2, 3, 1), M(C.body)), "body");
+      wall.position.y = 0.75;
+      for (const sx of [-1, 1]) {
+        const eye = add(new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), B(0xe9de83)), "eye");
+        eye.position.set(sx * 0.34, 1.17, 0.29); eye.scale.set(1.2, 0.72, 0.5);
+        const arm = add(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.16, 0.82, 7), M(C.body)), "body");
+        arm.position.set(sx * 0.92, 0.78, 0); arm.rotation.z = sx * -0.7;
+      }
+      for (let i = 0; i < 8; i++) {
+        const crack = add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.46, 0.035), M(0x4e5960)), "deco");
+        crack.position.set(((i * 37) % 11 - 5) * 0.12, 0.1 + (i % 4) * 0.48, 0.265); crack.rotation.z = (i % 3 - 1) * 0.55;
+      }
+
+    } else if (id === "pumpkin") {
+      this.head.visible = false; this.eyeL.visible = false; this.eyeR.visible = false; this.mouth.visible = false;
+      const pumpkin = add(new THREE.Mesh(new THREE.SphereGeometry(0.72, 14, 10), M(C.body)), "body");
+      pumpkin.position.y = 1.23; pumpkin.scale.set(1.12, 0.88, 0.96);
+      for (let i = 0; i < 7; i++) {
+        const groove = add(new THREE.Mesh(new THREE.TorusGeometry(0.54, 0.025, 5, 18), M(0x8e3b17)), "deco");
+        groove.position.y = 1.23; groove.rotation.set(Math.PI / 2, i / 7 * Math.PI, 0);
+      }
+      for (const sx of [-1, 1]) {
+        const eye = add(new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.32, 3), B(0xffe15a)), "eye");
+        eye.position.set(sx * 0.25, 1.35, 0.66); eye.rotation.x = Math.PI / 2;
+      }
+      const grin = add(new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.065, 6, 12, Math.PI), B(0xffe15a)), "eye");
+      grin.position.set(0, 1.12, 0.68); grin.rotation.z = Math.PI;
+      const stem = add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.42, 7), M(0x4a7b35)), "deco");
+      stem.position.y = 1.92; stem.rotation.z = 0.18;
+      const cape = add(new THREE.Mesh(new THREE.ConeGeometry(0.78, 1.25, 10, 1, true), M(0x392750)), "deco");
+      cape.position.set(0, 0.55, -0.22); cape.rotation.x = Math.PI;
+
+    } else if (id === "kuchisake") {
+      this.eyeL.visible = false; this.eyeR.visible = false; this.mouth.visible = false;
+      this.skirt.scale.set(0.86, 1.25, 0.86);
+      for (const sx of [-1, 1]) bigEye(sx * 0.19, 1.34, 0.42, 0.13, sx * 0.15);
+      for (let i = 0; i < 15; i++) {
+        const a2 = i / 15 * Math.PI * 2;
+        const lock = add(new THREE.Mesh(new THREE.ConeGeometry(0.1, 1.02, 5), M(0x251f2b)), "deco");
+        lock.position.set(Math.cos(a2) * 0.45, 1.42, Math.sin(a2) * 0.4 - 0.08);
+        lock.rotation.set(Math.PI + Math.sin(a2) * 0.25, 0, Math.cos(a2) * 0.25);
+      }
+      const mask = add(new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.28, 0.12), M(0xf4f0e8)), "deco");
+      mask.position.set(0, 1.12, 0.47);
+      for (let i = -2; i <= 2; i++) {
+        const pleat = add(new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.018, 0.03), M(0xb9c6ce)), "deco");
+        pleat.position.set(0, 1.12 + i * 0.045, 0.54);
+      }
+      const coat = add(new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.66, 1.15, 12), M(0xa83f64)), "deco");
+      coat.position.y = 0.58;
+      const scissors = add(new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.035, 6, 12), M(0xbac7d2)), "deco");
+      scissors.position.set(0.68, 0.84, 0.24); scissors.rotation.y = Math.PI / 2;
+
+    } else if (id === "jinmenken") {
+      this.skirt.visible = false; this.eyeL.visible = false; this.eyeR.visible = false; this.mouth.visible = false;
+      this.head.position.set(0, 1.2, 0.52); this.headScale = 0.9;
+      const dogBody = add(new THREE.Mesh(new THREE.SphereGeometry(0.58, 14, 10), M(C.body)), "body");
+      dogBody.position.set(0, 0.55, -0.25); dogBody.scale.set(0.9, 0.78, 1.45);
+      for (const sx of [-1, 1]) for (const zz of [-0.56, 0.12]) {
+        const leg = add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.62, 8), M(C.body)), "body");
+        leg.position.set(sx * 0.34, 0.08, zz);
+        const paw = add(new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), M(C.body)), "body");
+        paw.position.set(sx * 0.34, -0.25, zz + 0.08); paw.scale.z = 1.4;
+      }
+      for (const sx of [-1, 1]) {
+        bigEye(sx * 0.18, 1.25, 0.88, 0.13, sx * 0.15);
+        const ear = add(new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.48, 5), M(0x5a392b)), "deco");
+        ear.position.set(sx * 0.36, 1.55, 0.48); ear.rotation.z = sx * 0.55;
+      }
+      const muzzle = add(new THREE.Mesh(new THREE.SphereGeometry(0.19, 10, 8), M(0xd5b58d)), "deco");
+      muzzle.position.set(0, 1.05, 0.96); muzzle.scale.set(1.35, 0.72, 0.65);
+      const nose = add(new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), B(0x201a19)), "fixed");
+      nose.position.set(0, 1.11, 1.08);
+      const tail = add(new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.82, 7), M(C.body)), "body");
+      tail.position.set(0, 0.78, -1.0); tail.rotation.x = -1.15;
     }
   }
 

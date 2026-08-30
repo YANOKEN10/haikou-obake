@@ -15,7 +15,7 @@ import { Battle } from "./battle.js";
 import { checkReturn } from "./support.js";
 import { UI } from "./ui.js";
 import { Audio } from "./audio.js";
-import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, pickRarity, CHARS, EXCHANGE, HUMAN_DROPS,
+import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, pickRarity, CHARS, EXCHANGE, HUMAN_DROPS, hiddenUnlockReady,
   UPGRADES, UPG_MAX, UPG_STEP, upgCost, PARTS, PAINTS, paintById } from "./data.js";
 import { Roster } from "./people.js";
 import { clamp, rand, randi, choice, dist, makeRng } from "./util.js";
@@ -378,7 +378,7 @@ class Game {
 
   exchange(kind, id) {
     const cost = kind === "char" ? (CHARS[id] || {}).cost : (EXCHANGE[kind === "trap" ? "traps" : "ghosts"] || {})[id];
-    if (!cost) { this.audio.deny(); return; }
+    if (!cost || (kind === "char" && CHARS[id] && CHARS[id].hidden)) { this.audio.deny(); return; }
     if (kind === "char" && this.chars[id]) { this.setChar(id); return; }
     if (!this.canPayShards(cost)) {
       this.audio.deny();
@@ -842,6 +842,8 @@ class Game {
     // 遊んだ時間と自動セーブ
     if (this.profile) {
       this.profile.playSeconds = (this.profile.playSeconds || 0) + dt;
+      this._hiddenT = (this._hiddenT || 0) + dt;
+      if (this._hiddenT >= 1) { this._hiddenT = 0; this.refreshHiddenChars(true); }
       this._autosaveT = (this._autosaveT || 0) + dt;
       if (this._autosaveT > 45) this.saveNow(false);
     }
@@ -1258,6 +1260,7 @@ class Game {
     this.kicked = p.kicked || 0;
     this.shards = { ...(p.shards || {}) };
     this.chars = { obake: 1, ...(p.chars || {}) };
+    this.refreshHiddenChars(false);
     this.upg = JSON.parse(JSON.stringify(p.upg || {}));
     this.paints = { base: 1, snow: 1, sumi: 1, ...(p.paints || {}) };
     this.paint = JSON.parse(JSON.stringify(p.paint || {}));
@@ -1318,6 +1321,7 @@ class Game {
     this.ui.setCharChip(CHARS[this.charId] || CHARS.obake);
     this.ui.setHumans(this.humans);
     this.ui.vignette(0);
+    this.refreshHiddenChars(false);
   }
 
   startGame(cont) {
@@ -1741,6 +1745,24 @@ class Game {
   bump(key, n) {
     if (!this.profile || !this.profile.stats) return;
     this.profile.stats[key] = (this.profile.stats[key] || 0) + (n === undefined ? 1 : n);
+    this.refreshHiddenChars(true);
+  }
+
+  refreshHiddenChars(show) {
+    if (!this.profile || !this.chars) return false;
+    let changed = false;
+    for (const [id, c] of Object.entries(CHARS)) {
+      if (!c.hidden || this.chars[id] || !hiddenUnlockReady(c, this.profile)) continue;
+      this.chars[id] = 1;
+      changed = true;
+      if (show && this.ui) this.ui.toast("✨ ひみつのすがた「" + c.name + "」を見つけた！", "gold", 4200);
+    }
+    if (changed && show) {
+      if (this.audio) this.audio.rankUp();
+      if (this.ui && this.ui.craftOpen) this.ui.renderCraft();
+      this.saveNow(false);
+    }
+    return changed;
   }
   bumpIn(bucket, key) {
     if (!this.profile || !this.profile.stats) return;

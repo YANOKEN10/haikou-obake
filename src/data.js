@@ -115,7 +115,98 @@ export const CHARS = {
     desc: "九つの尾を もつ 大妖怪。すべてが ずばぬけている。",
     tip: "廃校の ぬしにふさわしい すがた。ここまで来たら 無敵。",
   },
+  kaiju: {
+    name: "怪獣", icon: "🦖", order: 7, hidden: true,
+    unlock: { key: "scares", at: 1000, label: "おどろかした回数 1000回" },
+    speed: 0.92, dash: 1.08, phase: 0.82, scare: 1.55, reach: 1.35, size: 1.22,
+    body: 0x437f62, glow: 0x214f3a,
+    desc: "校舎よりも大きくなりそうな、岩のよろいと背びれをもつ怪獣。",
+    tip: "動きは重いが、こわさと とどく はんいは ばつぐん。",
+  },
+  oni: {
+    name: "鬼", icon: "👹", order: 8, hidden: true,
+    unlock: { key: "behind", at: 1000, label: "ふいうち成功 1000回" },
+    speed: 1.08, dash: 1.12, phase: 0.82, scare: 1.48, reach: 1.18, size: 1.16,
+    body: 0xc8493f, glow: 0x78231f,
+    desc: "二本づのと金棒をもつ、山からやってきた力じまんの鬼。",
+    tip: "ふいうちで きたえた力を、一気に たたきこめる。",
+  },
+  yukionna: {
+    name: "雪女", icon: "❄️", order: 9, hidden: true,
+    unlock: { key: "playSeconds", at: 86400, label: "遊んだ時間 24時間" },
+    speed: 1.18, dash: 1.05, phase: 1.42, scare: 1.28, reach: 1.34, size: 1.08,
+    body: 0xddeeff, glow: 0x80bfe8,
+    desc: "雪の結晶をまとい、音もなく廊下をすべる白い妖怪。",
+    tip: "すりぬけが長く、はなれた相手にも冷気が とどく。",
+  },
+  zashiki: {
+    name: "座敷童", icon: "🧒", order: 10, hidden: true,
+    unlock: { key: "combos", at: 500, label: "たたみかけ 500回" },
+    speed: 1.27, dash: 1.24, phase: 1.18, scare: 1.04, reach: 0.94, size: 0.84,
+    body: 0xf4d3c2, glow: 0xbd6370,
+    desc: "赤い着物で、まりをつきながら遊ぶ小さな座敷童。",
+    tip: "小さくて とてもすばやい。つづけて おどかすのが とくい。",
+  },
+  rokuro: {
+    name: "ろくろ首", icon: "🪭", order: 11, hidden: true,
+    unlock: { key: "ghostsSummoned", at: 200, label: "生み出したおばけ 200体" },
+    speed: 1.04, dash: 0.98, phase: 1.32, scare: 1.26, reach: 1.62, size: 1.12,
+    body: 0xf0d2c0, glow: 0x755099,
+    desc: "着物のえりから首がぐんぐん伸びる、夜ふかし好きの妖怪。",
+    tip: "長い首のおかげで、とどく はんいは いちばん。",
+  },
+  tekeke: {
+    name: "テケテケ", icon: "🌙", order: 12, hidden: true,
+    unlock: { key: "materials", at: 10000, label: "集めた材料 10000個" },
+    speed: 1.42, dash: 1.38, phase: 1.22, scare: 1.30, reach: 1.02, size: 0.96,
+    body: 0xabc3df, glow: 0x536f9b,
+    desc: "両手で床をテケテケ走る、青い影につつまれた学校妖怪。",
+    tip: "だれにも追いつかれない速さで、廊下をかけぬける。",
+  },
+  nurikabe: {
+    name: "ぬりかべ", icon: "🧱", order: 13, hidden: true,
+    unlock: { key: "trapsFired", at: 1000, label: "仕掛けを発動 1000回" },
+    speed: 0.84, dash: 0.92, phase: 1.48, scare: 1.38, reach: 1.42, size: 1.28,
+    body: 0x87929a, glow: 0x48535c,
+    desc: "行く手にぬっと立ちはだかる、ひび割れた大きな壁の妖怪。",
+    tip: "ゆっくりだが、すりぬけと広い おどかしが とくい。",
+  },
+  pumpkin: {
+    name: "ハロウィンかぼちゃ", icon: "🎃", order: 14, hidden: true,
+    unlock: { key: "trapsBuilt", at: 500, label: "作った仕掛け 500個" },
+    speed: 1.12, dash: 1.18, phase: 1.10, scare: 1.36, reach: 1.16, size: 1.04,
+    body: 0xe87922, glow: 0x9a3e12,
+    desc: "ろうそくの光で笑う、つるとマントのハロウィンかぼちゃ。",
+    tip: "どんな場所でも使いやすく、だっしゅも おどかしも強い。",
+  },
+  kuchisake: {
+    name: "口裂け女", icon: "😷", order: 15, hidden: true,
+    unlock: { key: "laughed", at: 500, label: "笑わせた回数 500回" },
+    speed: 1.24, dash: 1.28, phase: 1.16, scare: 1.42, reach: 1.28, size: 1.08,
+    body: 0xead5cf, glow: 0x9b3655,
+    desc: "白いマスクと長い髪で、放課後の曲がり角に現れる妖怪。",
+    tip: "すばやく近づき、ふりむいたところを おどかせる。",
+  },
+  jinmenken: {
+    name: "人面犬", icon: "🐕", order: 16, hidden: true,
+    unlock: { key: "pincer", at: 250, label: "はさみうち成功 250回" },
+    speed: 1.36, dash: 1.44, phase: 0.92, scare: 1.20, reach: 1.00, size: 0.92,
+    body: 0x9a6b43, glow: 0x563a28,
+    desc: "犬の体に人のような顔をもつ、校庭を走りまわる不思議な妖怪。",
+    tip: "四本足のだっしゅは最速。広いマップの探索にぴったり。",
+  },
 };
+
+export function hiddenUnlockValue(c, profile) {
+  if (!c || !c.unlock || !profile) return 0;
+  return c.unlock.key === "playSeconds"
+    ? Number(profile.playSeconds || 0)
+    : Number((profile.stats && profile.stats[c.unlock.key]) || 0);
+}
+
+export function hiddenUnlockReady(c, profile) {
+  return !!(c && c.hidden && c.unlock && hiddenUnlockValue(c, profile) >= c.unlock.at);
+}
 
 // 交換所で、かけらと ひきかえられるもの
 //  cost は { レア度の番号: 数 }
