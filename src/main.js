@@ -17,7 +17,7 @@ import { checkReturn } from "./support.js";
 import { UI } from "./ui.js";
 import { Audio } from "./audio.js";
 import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, pickRarity, CHARS, EXCHANGE, HUMAN_DROPS, hiddenUnlockReady,
-  UPGRADES, UPG_MAX, UPG_STEP, upgCost, PARTS, PAINTS, paintById } from "./data.js";
+  validOwnedChars, UPGRADES, UPG_MAX, UPG_STEP, upgCost, PARTS, PAINTS, paintById } from "./data.js";
 import { Roster } from "./people.js";
 import { clamp, rand, randi, choice, dist, nearOnFloor, makeRng } from "./util.js";
 const FLOOR_HEIGHT_HALF = 3.2;
@@ -1274,7 +1274,7 @@ class Game {
     const sameStage = (p.stageId || "school") === this.stageId;
     this.kicked = p.kicked || 0;
     this.shards = { ...(p.shards || {}) };
-    this.chars = { obake: 1, ...(p.chars || {}) };
+    this.chars = validOwnedChars(p.chars, p);
     this.refreshHiddenChars(false);
     this.upg = JSON.parse(JSON.stringify(p.upg || {}));
     this.paints = { base: 1, snow: 1, sumi: 1, ...(p.paints || {}) };

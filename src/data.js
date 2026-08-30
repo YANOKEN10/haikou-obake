@@ -208,6 +208,19 @@ export function hiddenUnlockReady(c, profile) {
   return !!(c && c.hidden && c.unlock && hiddenUnlockValue(c, profile) >= c.unlock.at);
 }
 
+// 古い記録や試験データに隠しキャラの印が混ざっていても、
+// 現在の実績が条件未達なら通常プレイへ持ち込ませない。
+export function validOwnedChars(saved, profile) {
+  const owned = { obake: 1 };
+  for (const [id, value] of Object.entries(saved || {})) {
+    const c = CHARS[id];
+    if (!value || !c || id === "obake") continue;
+    if (c.hidden && !hiddenUnlockReady(c, profile)) continue;
+    owned[id] = 1;
+  }
+  return owned;
+}
+
 // 交換所で、かけらと ひきかえられるもの
 //  cost は { レア度の番号: 数 }
 export const EXCHANGE = {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { CHARS, hiddenUnlockReady, hiddenUnlockValue } from "../src/data.js";
+import { CHARS, hiddenUnlockReady, hiddenUnlockValue, validOwnedChars } from "../src/data.js";
 
 const hidden = Object.entries(CHARS).filter(([, c]) => c.hidden);
 assert.equal(Object.keys(CHARS).length, 17, "既存7体と隠し10体が登録されている");
@@ -19,4 +19,14 @@ for (const [id, c] of hidden) {
   assert.equal(hiddenUnlockReady(c, ready), true, `${id}: ちょうど達成で解放`);
 }
 
-console.log(`hidden character test: ${hidden.length} unlock conditions passed`);
+const stale = { obake: 1, kyubi: 1, nurikabe: 1 };
+const below = { stats: { trapsFired: CHARS.nurikabe.unlock.at - 1 } };
+const cleaned = validOwnedChars(stale, below);
+assert.equal(cleaned.obake, 1, "最初のキャラは残す");
+assert.equal(cleaned.kyubi, 1, "交換で入手した通常キャラは残す");
+assert.equal(cleaned.nurikabe, undefined, "条件未達のぬりかべは古い印を除去");
+
+const ready = { stats: { trapsFired: CHARS.nurikabe.unlock.at } };
+assert.equal(validOwnedChars(stale, ready).nurikabe, 1, "条件達成済みのぬりかべは残す");
+
+console.log(`hidden character test: ${hidden.length} unlock conditions + stale save cleanup passed`);
