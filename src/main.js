@@ -17,7 +17,7 @@ import { checkReturn } from "./support.js";
 import { UI } from "./ui.js";
 import { Audio } from "./audio.js";
 import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, pickRarity, CHARS, EXCHANGE, HUMAN_DROPS, hiddenUnlockReady,
-  validOwnedChars, UPGRADES, UPG_MAX, UPG_STEP, upgCost, PARTS, PAINTS, paintById } from "./data.js";
+  validOwnedChars, charExchangeMode, UPGRADES, UPG_MAX, UPG_STEP, upgCost, PARTS, PAINTS, paintById } from "./data.js";
 import { Roster } from "./people.js";
 import { clamp, rand, randi, choice, dist, nearOnFloor, makeRng } from "./util.js";
 const FLOOR_HEIGHT_HALF = 3.2;
@@ -379,9 +379,13 @@ class Game {
   }
 
   exchange(kind, id) {
+    if (kind === "char") {
+      const mode = charExchangeMode(id, Boolean(this.chars[id]));
+      if (mode === "select") { this.setChar(id); return; }
+      if (mode === "deny") { this.audio.deny(); return; }
+    }
     const cost = kind === "char" ? (CHARS[id] || {}).cost : (EXCHANGE[kind === "trap" ? "traps" : "ghosts"] || {})[id];
-    if (!cost || (kind === "char" && CHARS[id] && CHARS[id].hidden)) { this.audio.deny(); return; }
-    if (kind === "char" && this.chars[id]) { this.setChar(id); return; }
+    if (!cost) { this.audio.deny(); return; }
     if (!this.canPayShards(cost)) {
       this.audio.deny();
       this.ui.toast("かけらが 足りない（" + this.shardCostText(cost) + "）", "bad");

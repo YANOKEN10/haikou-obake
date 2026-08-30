@@ -221,6 +221,14 @@ export function validOwnedChars(saved, profile) {
   return owned;
 }
 
+// 隠しキャラは交換では手に入らないが、条件達成後の所有済みキャラなら選択できる。
+export function charExchangeMode(id, owned) {
+  const c = CHARS[id];
+  if (!c) return "deny";
+  if (owned) return "select";
+  return c.hidden ? "deny" : "buy";
+}
+
 // 交換所で、かけらと ひきかえられるもの
 //  cost は { レア度の番号: 数 }
 export const EXCHANGE = {
