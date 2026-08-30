@@ -37,11 +37,20 @@ export class Home {
     $("#btnCreate").addEventListener("click", () => this.create());
     $("#newName").addEventListener("keydown", (e) => { if (e.key === "Enter") this.create(); });
 
-    $("#btnHome").addEventListener("click", () => this.game.goHome());
+    // スマホでは画面をなぞる操作が click を消すことがあるため、
+    // 上の2ボタンは指を離した時点で直接実行する。
+    const bindPress = (el, fn) => {
+      el.addEventListener("pointerup", (e) => { e.preventDefault(); e.stopPropagation(); fn(); });
+      el.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault(); fn();
+      });
+    };
+    bindPress($("#btnHome"), () => this.game.goHome());
     $("#pResume").addEventListener("click", () => this.game.setPaused(false));
     $("#pSave").addEventListener("click", () => this.game.saveNow(true));
     $("#pHome").addEventListener("click", () => this.game.goHome());
-    $("#btnSave").addEventListener("click", () => this.game.saveNow(true));
+    bindPress($("#btnSave"), () => this.game.saveNow(true));
 
     // 違うステージの部屋へ入ったときは、そのマップだけを読み直して自動で戻る。
     setTimeout(async () => {

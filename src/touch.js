@@ -109,7 +109,7 @@ export class TouchControls {
 
   // --- 画面をなぞって視点を回す ------------------------------
   bindLook() {
-    const isControl = (el) => el && el.closest && el.closest("#stick,.tbtn,#craft,#screen,#rotate");
+    const isControl = (el) => el && el.closest && el.closest("#stick,.tbtn,#sysbar,#pause,#room,#craft,#screen,#rotate");
     addEventListener("touchstart", (e) => {
       if (this.lookId !== null) return;
       for (const t of e.changedTouches) {
