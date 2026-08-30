@@ -112,7 +112,7 @@ function view(room, me) {
   }
   return {
     code: room.code, host: room.host, youAreHost: room.host === me, seed: room.seed || 1,
-    others, world: null, born: room.born,
+    others, world: null, born: room.born, stage: room.stage || "school",
   };
 }
 
@@ -139,6 +139,7 @@ module.exports = async function handler(req, res) {
       const pid = newPid();
       const room = {
         code, host: pid, born: now, seed: crypto.randomBytes(4).readUInt32BE(0),
+        stage: ["school", "branch", "park"].includes(b.stage) ? b.stage : "school",
         players: { [pid]: { name, joined: now, t: now, g: null, placed: [], acts: [], sigIn: [] } },
       };
       await writeRoom(room);

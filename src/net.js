@@ -84,8 +84,8 @@ export class Net {
     return { ok: true, data: d };
   }
 
-  async create(name) {
-    const r = await this.call({ action: "create", name });
+  async create(name, stage) {
+    const r = await this.call({ action: "create", name, stage: stage || "school" });
     if (!r.ok) return r;
     this.code = r.data.code; this.pid = r.data.pid; this.name = r.data.name;
     this.isHost = true; this.on = true; this.fails = 0;

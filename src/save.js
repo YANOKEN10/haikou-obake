@@ -85,6 +85,7 @@ export function blank(name) {
     playSeconds: 0,
     hasSave: false,
     kicked: 0,
+    stageId: "school",
     wave: 0,
     rank: "見習い地縛霊",
     inv: {},

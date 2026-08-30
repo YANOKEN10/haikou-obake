@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node serve.js",
     "test:rtc": "node tools/rtctest.mjs",
-    "test:paint": "node tools/painttest.mjs"
+    "test:paint": "node tools/painttest.mjs",
+    "test:stage": "node tools/stagetest.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.0.0"

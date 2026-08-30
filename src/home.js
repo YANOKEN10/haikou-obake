@@ -4,6 +4,7 @@
 import * as S from "./save.js";
 import { mountSupport } from "./support.js";
 import { TRAPS, GHOSTS, MATERIALS, RANKS } from "./data.js";
+import { STAGES, stageUnlocked, stageUrl } from "./stages.js";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -27,6 +28,11 @@ export class Home {
       if (p && p.hasSave && !confirm("いまの記録は消えます。さいしょから始めますか？")) return;
       this.game.startGame(false);
     });
+    $("#stageList").addEventListener("click", (e) => {
+      const b = e.target.closest && e.target.closest("button[data-stage]");
+      if (!b || b.disabled || b.dataset.stage === this.game.stageId) return;
+      location.href = stageUrl(b.dataset.stage);
+    });
 
     $("#btnCreate").addEventListener("click", () => this.create());
     $("#newName").addEventListener("keydown", (e) => { if (e.key === "Enter") this.create(); });
@@ -36,6 +42,15 @@ export class Home {
     $("#pSave").addEventListener("click", () => this.game.saveNow(true));
     $("#pHome").addEventListener("click", () => this.game.goHome());
     $("#btnSave").addEventListener("click", () => this.game.saveNow(true));
+
+    // 違うステージの部屋へ入ったときは、そのマップだけを読み直して自動で戻る。
+    setTimeout(async () => {
+      let q = null;
+      try { q = JSON.parse(sessionStorage.getItem("haikou-obake:rejoin") || "null"); sessionStorage.removeItem("haikou-obake:rejoin"); } catch (e) { /* 保存不可 */ }
+      if (!q || !q.code) return;
+      if (!this.game.started) this.game.startGame(true);
+      await this.game.roomJoin(q.code, q.name);
+    }, 0);
 
     // --- ともだちと あそぶ ---------------------------------
     const g = this.game;
@@ -483,6 +498,15 @@ export class Home {
       : "なまえを決めると記録が残ります。<b>ゲスト</b>のままでも遊べます。";
 
     const card = $("#saveCard");
+    const kicked = p ? Number(p.kicked || 0) : 0;
+    $("#stageList").innerHTML = STAGES.map((s) => {
+      const open = stageUnlocked(s, kicked);
+      const on = s.id === this.game.stageId;
+      const need = s.unlock ? (s.unlock + 1) + "人 追い出すと解放" : "はじめから遊べる";
+      return "<button class='stagecard" + (on ? " on" : "") + "' data-stage='" + s.id + "' " + (open ? "" : "disabled") + ">" +
+        "<span class='stageicon'>" + s.icon + "</span><span><b>" + esc(s.name) + "</b><small>" + esc(open ? s.desc : "🔒 " + need) + "</small></span>" +
+        (on ? "<em>えらんでいます</em>" : "") + "</button>";
+    }).join("");
     const cont = $("#btnContinue"), fresh = $("#btnNew");
     if (p && p.hasSave) {
       card.innerHTML =

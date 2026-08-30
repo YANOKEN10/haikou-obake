@@ -622,6 +622,14 @@ body.touch #craftClose{display:block}
 
 /* ============ ホーム画面 ============ */
 .hometabs{display:flex;gap:8px;justify-content:center;margin:16px 0 14px;flex-wrap:wrap}
+.stagetitle{font-family:var(--px);font-size:11px;color:var(--gold);margin:10px 0 7px;text-align:left}
+.stagelist{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px}
+.stagecard{position:relative;display:flex;gap:8px;align-items:center;text-align:left;min-width:0;padding:9px 8px;color:var(--ink);background:#100d22;border:1px solid var(--edge);border-radius:10px;cursor:pointer}
+.stagecard.on{border-color:var(--gold);box-shadow:0 0 13px #ffd45e26;background:#1c1424}
+.stagecard:disabled{opacity:.48;cursor:not-allowed;filter:grayscale(.65)}
+.stagecard .stageicon{font-size:25px;flex:none}.stagecard b{display:block;font-size:12px}.stagecard small{display:block;color:var(--muted);font-size:9px;line-height:1.45;margin-top:3px}
+.stagecard em{position:absolute;right:5px;top:4px;color:var(--gold);font-size:8px;font-style:normal}
+@media (max-width:600px){.stagelist{grid-template-columns:1fr}.stagecard{padding:7px 9px}.stagecard .stageicon{font-size:22px}}
 .htab{pointer-events:auto;cursor:pointer;padding:9px 20px;border:2px solid var(--edge);border-radius:11px;
   font-size:15px;background:rgba(255,255,255,.04);color:var(--muted);transition:.15s;font-family:var(--jp)}
 .htab:hover{border-color:var(--edge2);color:var(--ink)}
@@ -993,6 +1001,8 @@ body.touch #craftClose{display:block}
     <div class="hpanel on" id="hpPlay">
       <div class="who" id="whoPlay"></div>
       <div id="saveCard"></div>
+      <div class="stagetitle">あそぶ ステージを えらぶ</div>
+      <div class="stagelist" id="stageList"></div>
       <button class="bigbtn" id="btnContinue">▶ つづきから始める</button>
       <button class="bigbtn sub" id="btnNew">さいしょから始める</button>
       <div class="keys" id="keysBox"></div>

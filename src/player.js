@@ -1,6 +1,5 @@
 import * as THREE from "../lib/three.module.js";
 import { clamp, lerp, angleLerp } from "./util.js";
-import { FLOOR_H, FLOORS, stairSurface } from "./world.js";
 import { CHARS, UPG_STEP, paintById } from "./data.js";
 
 // ============================================================
@@ -614,18 +613,20 @@ export class Player {
     const indoors = w.isIndoors(this.x, this.z, this.y);
     const inShaft = indoors && w.inStairShaft(this.x, this.z);
     // いま何階にいるか（階段の途中では、近いほうの階に落ち着く）
-    this.floor = clamp(Math.round((this.y - 1.02) / FLOOR_H), 0, FLOORS);
-    const base = indoors ? Math.min(this.floor, FLOORS) * FLOOR_H : 0;
+    const floorH = w.floorHeight || 3.6;
+    const floors = w.floors === undefined ? 4 : w.floors;
+    this.floor = clamp(Math.round((this.y - 1.02) / floorH), 0, floors);
+    const base = indoors ? Math.min(this.floor, floors) * floorH : 0;
     let hover = base + 1.02 + Math.sin(t * 1.9) * 0.05;
     if (inShaft) {
       // 階段では、段の高さに沿って自然に上り下りする（奥へ進むと上へ）
-      const rel = stairSurface(this.x, this.z, w.stairCenterX(this.x));
+      const rel = w.stairSurface(this.x, this.z, w.stairCenterX(this.x));
       let best = null;
-      for (let f = 0; f <= FLOORS; f++) {
-        const cand = f * FLOOR_H + rel + 1.02;
+      for (let f = 0; f <= floors; f++) {
+        const cand = f * floorH + rel + 1.02;
         if (best === null || Math.abs(cand - this.y) < Math.abs(best - this.y)) best = cand;
       }
-      hover = clamp(best, 1.02, FLOORS * FLOOR_H + 1.02);
+      hover = clamp(best, 1.02, floors * floorH + 1.02);
     }
     // 空のたかさ。屋根より ずっと上まで 行ける
     const skyTop = w.roofY + SKY_UP;
@@ -652,7 +653,7 @@ export class Player {
       lo = w.roofY + 0.38; hi = skyTop;     // 屋根からも そのまま 上に行ける
     } else if (indoors) {
       lo = inShaft ? 0.38 : base + 0.38;
-      hi = inShaft ? FLOORS * FLOOR_H + 2.4 : base + 2.55;
+      hi = inShaft ? floors * floorH + 2.4 : base + 2.55;
     } else if (w.inGym && w.inGym(this.x, this.z)) {
       hi = w.gymCeil;                       // 体育館は天井が高い
     }

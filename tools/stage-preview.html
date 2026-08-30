@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><title>ステージ確認</title>
+<style>html,body{margin:0;overflow:hidden;background:#090812;color:#fff;font-family:sans-serif}#info{position:fixed;z-index:2;left:14px;top:12px;background:#090812cc;padding:9px 12px;border-radius:8px}</style>
+<div id="info"></div>
+<script type="module">
+import * as THREE from "../lib/three.module.js";
+import { buildStageWorld } from "../src/stageworld.js";
+import { stageById } from "../src/stages.js";
+const id = new URLSearchParams(location.search).get("stage") === "park" ? "park" : "branch";
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(id === "branch" ? 0x26343a : 0x171123);
+scene.fog = new THREE.FogExp2(scene.background, id === "branch" ? 0.009 : 0.006);
+const world = buildStageWorld(scene, id, { grass: 0.4 });
+scene.add(new THREE.HemisphereLight(0xc9b8d8, 0x303038, 3.2));
+const sun = new THREE.DirectionalLight(0xffd8b0, 2.5); sun.position.set(-30, 70, 50); scene.add(sun);
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 300);
+camera.position.set(id === "branch" ? 78 : 88, id === "branch" ? 55 : 62, 105);
+camera.lookAt(0, 2, 14);
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); renderer.setSize(innerWidth, innerHeight); document.body.append(renderer.domElement);
+document.querySelector("#info").textContent = stageById(id).icon + " " + stageById(id).name + "　" + world.triangles.toLocaleString() + " 面 / 静的1メッシュ";
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+renderer.render(scene, camera);
+</script>

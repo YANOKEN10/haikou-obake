@@ -1,5 +1,7 @@
 import * as THREE from "../lib/three.module.js";
 import { buildWorld, clampPlay, inPlay } from "./world.js";
+import { buildStageWorld } from "./stageworld.js";
+import { STAGES, stageById, stageUnlocked, requestedStage } from "./stages.js";
 import { buildSky } from "./sky.js";
 import { TouchControls, isTouchDevice, goFullscreen } from "./touch.js";
 import { Home } from "./home.js";
@@ -87,6 +89,10 @@ const NET_STATES = ["wander", "investigate", "spooked", "panic", "flee"];
 
 class Game {
   constructor() {
+    const savedName = S.currentName();
+    const savedProfile = savedName ? S.getProfile(savedName) : null;
+    this.stageId = requestedStage(savedProfile ? savedProfile.kicked : 0);
+    this.stage = stageById(this.stageId);
     this.q = pickQuality();
     this.renderer = new THREE.WebGLRenderer({ antialias: this.q.aa, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.q.pixelRatio));
@@ -97,7 +103,8 @@ class Game {
     document.getElementById("app").appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x131a2e, 0.0145);
+    const fog = this.stageId === "branch" ? 0x26343a : this.stageId === "park" ? 0x171123 : 0x131a2e;
+    this.scene.fog = new THREE.FogExp2(fog, this.stageId === "branch" ? 0.019 : 0.0145);
     this.camera = new THREE.PerspectiveCamera(this.q.fov, Math.max(1, innerWidth || 1) / Math.max(1, innerHeight || 1), 0.08, this.q.far);
 
     this.input = new Input(this.renderer.domElement);
@@ -161,7 +168,9 @@ class Game {
     // 隠し要素：全階のトイレから、毎回ランダムにひとつ選ぶ
     const toilets = [];
     for (let f = 1; f <= 4; f++) { toilets.push("wc_m" + f, "wc_f" + f); }
-    this.world = buildWorld(this.scene, { dust: this.q.dust, grass: this.q.grass, poopRoom: choice(toilets) });
+    const worldOpts = { dust: this.q.dust, grass: this.q.grass, poopRoom: choice(toilets) };
+    // 3マップを同時に置くと重くなる。選んだ1つだけを生成する。
+    this.world = this.stageId === "school" ? buildWorld(this.scene, worldOpts) : buildStageWorld(this.scene, this.stageId, worldOpts);
 
     this.sky = buildSky(this.scene);
 
@@ -200,12 +209,13 @@ class Game {
       this.torchPool.push(l);
     }
 
-    this.redLady = new RedLady(this.scene);
-    this.cat = new Cat(this.scene);
-    this.confession = new Confession(this.scene);
+    this.redLady = this.stageId === "school" ? new RedLady(this.scene) : null;
+    this.cat = this.stageId === "school" ? new Cat(this.scene) : null;
+    this.confession = this.stageId === "school" ? new Confession(this.scene) : null;
 
     this.player = new Player(this.scene, this.world);
-    this.player.x = 0; this.player.z = 16;
+    this.player.x = this.world.start ? this.world.start.x : 0;
+    this.player.z = this.world.start ? this.world.start.z : 16;
 
     // 材料をばらまく
     for (let i = 0; i < this.q.pickups; i++) this.spawnPickup();
@@ -214,7 +224,7 @@ class Game {
     this.ui.setBag(this.inv);
     this.ui.setHotbar(this.built, this.selTrap);
     this.buildMs = Math.round(performance.now() - t0);
-    console.log("[廃校] built in", this.buildMs, "ms /", this.world.triangles, "tris /",
+    console.log("[" + this.stage.name + "] built in", this.buildMs, "ms /", this.world.triangles, "tris /",
       this.world.colliders.boxes.length, "colliders /", this.world.nav.nodes.length, "nav nodes");
   }
 
@@ -243,9 +253,10 @@ class Game {
     const yy = y || 0;
     // 門のそとなど、おばけが 行けない所には 落とさない。
     //  ずらしたあと・かべから 押しだされたあとも、もう一度 見る
-    let c = clampPlay(x, z);
+    const keepIn = this.world.clampPlay || clampPlay;
+    let c = keepIn(x, z);
     const r = this.world.colliders.resolve(c.x + rand(-0.6, 0.6), c.z + rand(-0.6, 0.6), 0.3, yy + 0.6);
-    c = clampPlay(r.x, r.z);
+    c = keepIn(r.x, r.z);
     const t = tier === undefined ? pickRarity(this.remoteAt(c.x, c.z, yy) * 0.7) : tier;
     this.pickups.push(new Pickup(this.scene, kind, c.x, c.z, yy + 0.55, t));
     this.trimPickups();
@@ -730,9 +741,14 @@ class Game {
     this.audio.escape();
     // 逃げきった人の 落としものは、門の うちがわに まとめて 置く。
     //  門のそとに 置くと、おばけが 取りに行けない
-    const gi = (!inPlay(h.x, h.z) && h.gateIn) ? h.gateIn : { x: h.x, z: h.z };
+    const inside = this.world.inPlay || inPlay;
+    const gi = (!inside(h.x, h.z) && h.gateIn) ? h.gateIn : { x: h.x, z: h.z };
     for (let i = 0; i < 3; i++) this.dropAt("onnen", gi.x + rand(-3, 3), gi.z + rand(-3, 3), 0);
     this.dropAt("onnen", gi.x, gi.z, 0);
+    for (const s of STAGES) {
+      if (s.unlock && this.kicked === s.unlock + 1)
+        this.ui.toast("🔓 新しいステージ「" + s.name + "」が えらべるようになった！", "gold", 7000);
+    }
     if (r.name !== before) {
       this.rankName = r.name;
       this.audio.rankUp();
@@ -1204,6 +1220,7 @@ class Game {
     if (!p) return null;
     p.hasSave = true;
     p.kicked = this.kicked;
+    p.stageId = this.stageId;
     p.wave = this.wave;
     p.rank = this.rankName;
     p.inv = { ...this.inv };
@@ -1237,6 +1254,7 @@ class Game {
 
   // セーブデータを読みこんで反映する
   applySave(p) {
+    const sameStage = (p.stageId || "school") === this.stageId;
     this.kicked = p.kicked || 0;
     this.shards = { ...(p.shards || {}) };
     this.chars = { obake: 1, ...(p.chars || {}) };
@@ -1252,13 +1270,13 @@ class Game {
     this.inv = { ...(p.inv || {}) };
     this.built = { ...(p.built || {}) };
     this.selTrap = p.selTrap || 0;
-    for (const t of p.traps || []) {
+    for (const t of sameStage ? (p.traps || []) : []) {
       if (!TRAPS[t.id]) continue;
       const tr = new Trap(this.scene, t.id, t.x, t.z, 0);
       tr.uses = t.uses || 0;
       this.traps.push(tr);
     }
-    if (p.pos) { this.player.x = p.pos.x; this.player.z = p.pos.z; }
+    if (sameStage && p.pos) { this.player.x = p.pos.x; this.player.z = p.pos.z; }
     this.rankName = this.ui.setRank(this.kicked).name;
     this.ui.setBag(this.inv);
     this.ui.setHotbar(this.built, this.selTrap);
@@ -1288,7 +1306,9 @@ class Game {
     this.rankName = RANKS[0].name;
     this.paused = false;
     this.ui.closeCraft();
-    this.player.x = 0; this.player.z = 16; this.player.y = 1.5;
+    this.player.x = this.world.start ? this.world.start.x : 0;
+    this.player.z = this.world.start ? this.world.start.z : 16;
+    this.player.y = 1.5;
     this.player.vx = 0; this.player.vz = 0; this.player.camYaw = Math.PI;
     for (let i = 0; i < this.q.pickups; i++) this.spawnPickup();
     this.ui.setRank(0);
@@ -1462,7 +1482,7 @@ class Game {
   }
 
   async roomCreate(name) {
-    const r = await this.net.create(name || (this.home && this.home.playerName ? this.home.playerName() : "おばけ"));
+    const r = await this.net.create(name || (this.home && this.home.playerName ? this.home.playerName() : "おばけ"), this.stageId);
     if (!r.ok) return r;
     this.netReseed(r.data.seed);
     this.ui.toast("🚪 あいことば「" + this.net.code + "」でともだちを呼ぼう！", "gold", 30000);
@@ -1473,6 +1493,15 @@ class Game {
   async roomJoin(code, name) {
     const r = await this.net.join(code, name || (this.home && this.home.playerName ? this.home.playerName() : "おばけ"));
     if (!r.ok) return r;
+    const roomStage = stageById((r.data.room && r.data.room.stage) || "school");
+    if (roomStage.id !== this.stageId) {
+      await this.net.leave();
+      if (!stageUnlocked(roomStage, this.profile ? this.profile.kicked : 0))
+        return { ok: false, why: "おやは「" + roomStage.name + "」にいます。まだ このステージは開いていません。" };
+      try { sessionStorage.setItem("haikou-obake:rejoin", JSON.stringify({ code, name })); } catch (e) { /* 保存不可 */ }
+      location.href = new URL("?stage=" + roomStage.id, location.href).toString();
+      return { ok: true, reloading: true };
+    }
     this.netReseed(r.data.seed);
     this.ui.toast("🚪 部屋「" + this.net.code + "」に入りました", "gold", 30000);
     this.audio.rankUp();
@@ -1583,6 +1612,7 @@ class Game {
       //  とどく間かくが ゆらいでも なめらかに 動く
       vx: +p.vx.toFixed(2), vy: +(p.vy || 0).toFixed(2), vz: +p.vz.toFixed(2),
       c: this.charId || "obake",                   // どの すがたで 遊んでいるか
+      st: this.stageId,                             // みんなが同じマップにいるか確認する
       sc: this.battle.score,                       // おどかし勝負で おどかした人数
       h: this.net.isHost ? 1 : 0,                  // この人が おや か
       bt: this.net.isHost ? this.battle.netState() : undefined,
@@ -1740,7 +1770,7 @@ setInterval(() => {
   if (!game.started && game.cloud.signedIn && !document.hidden) game.home.pollFriends(game.home.tab !== "friends");
 }, 20000);
 document.getElementById("loading").textContent =
-  "廃校の準備完了（" + game.world.triangles.toLocaleString() + " 面 / " + game.buildMs + "ms）";
+  game.stage.name + "の準備完了（" + game.world.triangles.toLocaleString() + " 面 / " + game.buildMs + "ms）";
 game.home.show("play");
 // 応援から もどってきたら、お礼を出す
 checkReturn(game.ui);

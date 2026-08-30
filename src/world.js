@@ -130,13 +130,14 @@ export function buildWorld(scene, opts = {}) {
     exit: EXIT_POINT, entry: HUMAN_ENTRY, gates: GATES, ways: WAYS, staticMesh, triangles: mb.triangles,
     bounds: { x1: -52, x2: 52, z1: -36, z2: 82 },
     northOutsideZ: RZ1 - 1.6,
-    floors: FLOORS,
+    floors: FLOORS, floorHeight: FLOOR_H,
     roofY: floorY(FLOORS),
     secret: SECRET,
     inSecret(x, z, y) { return x > SECRET.x1 && x < SECRET.x2 && z > SECRET.z1 && z < SECRET.z2 && Math.abs(y - SECRET.y) < 4; },
     floorOf(y) { return Math.max(0, Math.min(FLOORS - 1, Math.round(y / FLOOR_H))); },
     // その位置が階段の吹き抜けの中か（おばけはここで上下に移動できる）
     stairCenterX(x) { return (x < 0 ? (ST_W.x1 + ST_W.x2) : (ST_E.x1 + ST_E.x2)) / 2; },
+    stairSurface,
     inStairShaft(x, z) {
       if (z < RZ1 - 0.3 || z > RZ2 + 0.3) return false;
       return (x > ST_W.x1 && x < ST_W.x2) || (x > ST_E.x1 && x < ST_E.x2);
@@ -170,6 +171,7 @@ export function buildWorld(scene, opts = {}) {
     inGym(x, z) { return x > GYM.x1 && x < GYM.x2 && z > GYM.z1 && z < GYM.z2; },
     gymCeil: GYM.h - 1.0,
     gym: { x1: GYM.x1, x2: GYM.x2, z1: GYM.z1, z2: GYM.z2 },
+    inPlay, clampPlay,
     update(dt, t) { for (const p of props) if (p.update) p.update(dt, t); },
   };
 }
