@@ -147,11 +147,29 @@ function buildPark(scene, opts) {
     { id: "ghost", name: "お化け屋敷の裏口", out: { x: -45, z: 1 }, in: { x: -35, z: 1 } },
     { id: "maze", name: "鏡の迷路", out: { x: 45, z: 2 }, in: { x: 35, z: 2 } },
   ];
-  mb.slab(bounds.x1, bounds.z1, bounds.x2, bounds.z2, 0, 0.28, 0x30343b);
-  // 中央広場の放射状の色あせた舗装。
-  for (let i = 0; i < 16; i++) {
-    const a = i / 16 * Math.PI * 2;
-    mb.wall(0, 24, Math.sin(a) * 25, 24 + Math.cos(a) * 25, 0.02, 0.08, 1.2, i % 2 ? 0x55424f : 0x4a5260);
+  mb.slab(bounds.x1, bounds.z1, bounds.x2, bounds.z2, 0, 0.28, 0x171b25);
+  // 添付写真の夜景を参考にした、雨上がりのネオン大通り。
+  mb.slab(-17, -30, 17, 72, 0.04, 0.08, 0x242733);
+  for (let z = -25; z < 70; z += 10) mb.box(0, 0.09, z, 0.28, 0.06, 5.5, 0xd7c56b);
+  // 青・紫・赤の光を映す水たまり。透明材質を増やさず色面だけで軽く表す。
+  const puddles = [[-8,61,7,2.3,0x214b72],[7,51,5,1.5,0x692d73],[-5,37,8,1.6,0x244f65],
+    [6,22,6,2.1,0x713547],[-8,5,5,1.4,0x2b4c77],[5,-16,7,1.7,0x5f315e]];
+  for (const [x,z,w,d,c] of puddles) mb.slab(x-w/2,z-d/2,x+w/2,z+d/2,0.095,0.025,c);
+
+  // 両側に映画街のような古い商店。形は独自、看板は読めない光の板にする。
+  for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) {
+    const z = 21 + i * 14.5, x = sx * (49 - (i % 2) * 2.0);
+    const w = 12, d = 9, h = 5.5 + (i % 3) * 1.6;
+    const wall = i % 2 ? 0x34313e : 0x3b3037;
+    mb.box(x, h/2, z, w, h, d, wall, { jitter: 0.04 });
+    col.add(x-w/2,z-d/2,x+w/2,z+d/2,0,h,"wall");
+    // 窓・ひさし・縦看板。明るい色面を細くしてネオンらしく見せる。
+    const faceX = x - sx * (w/2 + 0.06);
+    for (let k = -1; k <= 1; k++) mb.box(faceX, 2.2, z+k*2.25, 0.12, 2.5, 1.45, 0x315672);
+    mb.box(faceX - sx*0.15, 4.5, z, 0.16, 0.24, 6.6, i%3===0?0xf04488:i%3===1?0x21d4d8:0xf0b83c);
+    mb.box(faceX - sx*0.28, 3.4, z+3.7, 0.22, 2.7, 1.15, i%2?0x2bd6c8:0xe34986);
+    for (let b = -2; b <= 2; b++) mb.box(faceX - sx*0.18, 5.05, z+b*1.25, 0.16, 0.16, 0.65,
+      b%2?0x58d5ff:0xffcf55);
   }
   const indoorRects = [
     { x1: -50, x2: -24, z1: -18, z2: 12 },
@@ -174,33 +192,81 @@ function buildPark(scene, opts) {
     mb.box(x, 1.4, gapZ, 0.18, 2.8, 12, 0x829aa8);
     col.add(x - 0.12, gapZ - 6, x + 0.12, gapZ + 6, 0, 2.8, "wall");
   }
-  // 観覧車。すべて静的メッシュへまとめ、車輪のためにドローコールを増やさない。
-  const wx = 25, wz = 39, wy = 10, rr = 10;
-  for (let i = 0; i < 24; i++) {
-    const a = i / 24 * Math.PI * 2;
-    mb.box(wx + Math.cos(a) * rr, wy + Math.sin(a) * rr, wz, 0.7, 0.7, 0.45, i % 3 ? 0x785564 : 0xb68a4c);
-    if (i % 3 === 0) mb.box(wx + Math.cos(a) * rr, wy + Math.sin(a) * rr - 0.8, wz, 1.5, 1.1, 1.1, 0x514a66);
+  // 大観覧車。外輪・内輪・放射状の電飾・ゴンドラをすべて静的メッシュに統合。
+  const wx = 29, wz = 30, wy = 12, rr = 12;
+  for (let i = 0; i < 36; i++) {
+    const a = i / 36 * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+    const neon = i%3===0 ? 0xf044b4 : i%3===1 ? 0x38cfff : 0x7c55ff;
+    mb.box(wx+ca*rr,wy+sa*rr,wz,0.48,0.48,0.55,neon);
+    mb.box(wx+ca*(rr-1.0),wy+sa*(rr-1.0),wz,0.28,0.28,0.5,0x8554bc);
+    // 8本のスポークを点灯した小さな節でつなぐ。斜め箱を使わず軽量に見せる。
+    if (i%4===0) for (let j=1;j<9;j++) mb.box(wx+ca*j*1.25,wy+sa*j*1.25,wz,0.22,0.22,0.35,
+      j%2?0x35bfe8:0xb73fc8);
+    if (i%3===0) {
+      mb.box(wx+ca*rr,wy+sa*rr-0.72,wz,1.45,1.05,1.2,i%2?0x3c6f87:0x71456f);
+      mb.box(wx+ca*rr,wy+sa*rr-0.55,wz+0.63,0.95,0.38,0.08,0xf3c452);
+    }
   }
-  mb.wall(wx - 9, wz, wx, wz, 0, 10, 0.45, 0x4a4248);
-  mb.wall(wx + 9, wz, wx, wz, 0, 10, 0.45, 0x4a4248);
-  // メリーゴーラウンドと止まったティーカップ。
-  for (let i = 0; i < 12; i++) {
-    const a = i / 12 * Math.PI * 2;
-    mb.box(Math.cos(a) * 8, 0.5, 24 + Math.sin(a) * 8, 3.3, 0.6, 2.2, i % 2 ? 0x6a4262 : 0x395b68, { rotY: -a });
-    if (i % 2 === 0) mb.box(Math.cos(a) * 5.4, 1.6, 24 + Math.sin(a) * 5.4, 0.2, 3, 0.2, 0xc4a45a);
+  mb.box(wx, wy, wz, 1.2, 1.2, 1.4, 0xffd75a);
+  mb.wall(wx-10,wz,wx,wz,0,wy,0.55,0x5d4968);
+  mb.wall(wx+10,wz,wx,wz,0,wy,0.55,0x5d4968);
+  mb.box(wx,0.55,wz,22,1.1,7,0x342d3e);
+  col.add(wx-11,wz-3.5,wx+11,wz+3.5,0,1.2,"furn");
+
+  // 二層メリーゴーラウンド。屋根、電球、上下の木馬まで形を読めるようにする。
+  const cx=-22, cz=25, cr=9;
+  mb.box(cx,0.35,cz,19,0.7,19,0x4a2d46,{rotY:Math.PI/4});
+  mb.box(cx,4.0,cz,19.5,0.35,19.5,0x7b2f43,{rotY:Math.PI/4});
+  mb.box(cx,2.1,cz,0.9,4.2,0.9,0xd6a84d);
+  for(let i=0;i<16;i++){
+    const a=i/16*Math.PI*2, x=cx+Math.cos(a)*cr, z=cz+Math.sin(a)*cr;
+    mb.box(x,3.82,z,0.45,0.35,0.45,i%2?0xffdc65:0xff6f9f);
+    if(i%2===0){
+      const hx=cx+Math.cos(a)*5.7,hz=cz+Math.sin(a)*5.7, hy=i%4===0?1.35:1.05;
+      mb.box(hx,1.8,hz,0.15,3.2,0.15,0xbc8b47);
+      mb.box(hx,hy,hz,1.35,0.55,0.48,i%4===0?0xe5e1cd:0xc5a9a5,{rotY:-a});
+      mb.box(hx+Math.sin(a)*0.52,hy+0.15,hz-Math.cos(a)*0.52,0.48,0.72,0.42,0xd9c6ad,{rotY:-a});
+      for(const q of [-0.42,0.42]) mb.box(hx+Math.cos(a)*q,hy-0.48,hz+Math.sin(a)*q,0.14,0.72,0.14,0x8e765e);
+    }
   }
-  mb.box(0, 4.0, 24, 18, 0.4, 18, 0x49334c, { rotY: Math.PI / 4 });
-  mb.box(0, 2.0, 24, 0.8, 4, 0.8, 0xc6a65c);
-  for (let i = 0; i < 6; i++) {
-    const x = -22 + i * 8.5;
-    mb.box(x, 1.3, 56, 5.5, 2.6, 3.5, i % 2 ? 0x4a596a : 0x68454d);
-    col.add(x - 2.75, 54.25, x + 2.75, 57.75, 0, 2.6, "furn");
+  col.add(cx-cr,cz-cr,cx+cr,cz+cr,0,0.9,"furn");
+  // 大通りの端で止まったパレード車。電飾の台、巨大な仮面、風船を抽象化。
+  for (const z of [48, 61]) {
+    const x = z===48 ? 7 : -7, rot = z===48 ? 0.08 : -0.08;
+    mb.box(x,0.75,z,9.5,1.35,4.2,0x3b3762,{rotY:rot});
+    for(let k=-4;k<=4;k++) mb.box(x+k,1.4,z+2.0,0.42,0.28,0.24,k%3===0?0xffd55c:k%3===1?0x45d9e8:0xf052a2);
+    mb.box(x,2.55,z,4.2,2.5,2.2,z===48?0x5d66b6:0xb04d78,{rotY:rot});
+    mb.box(x,4.15,z,1.2,1.1,1.2,0xe3b54d);
+    for(const sx of [-1,1]) mb.box(x+sx*1.1,3.1,z+1.15,0.5,0.5,0.2,0x45d8e2);
+    col.add(x-4.8,z-2.2,x+4.8,z+2.2,0,2.1,"furn");
+  }
+
+  // 山側の朽ちたジェットコースター。起伏する軌道を短い節で表現する。
+  for (const sx of [-1,1]) for(let i=0;i<28;i++){
+    const t=i/27, x=-50+t*100, z=-37+Math.sin(t*Math.PI*3)*5+sx*0.55;
+    const y=2.2+Math.sin(t*Math.PI)*9+Math.sin(t*Math.PI*4)*1.5;
+    mb.box(x,y,z,3.8,0.22,0.22,i%5===0?0xb84b73:0x52455f);
+    if(i%4===0) mb.box(x,y/2,z,0.25,y,0.25,0x353440);
+  }
+  // 入園アーチと切れかけた電飾。
+  for(const sx of [-1,1]) mb.box(sx*7,4.2,68,1.0,8.4,1.0,0x463952);
+  mb.box(0,8.0,68,15,1.1,1.0,0x52385d);
+  for(let i=-6;i<=6;i++) mb.box(i*1.05,8.05,67.4,0.32,0.32,0.18,i%4===0?0x32263b:i%2?0xff4ca5:0x47d5ff);
+
+  // 古い街灯と、幹だけ残った並木。ライト数は増やさず静的な光色で描く。
+  for(const sx of [-1,1]) for(let z=-24;z<=66;z+=10){
+    const x=sx*20;
+    mb.box(x,2.0,z,0.18,4,0.18,0x41414b);
+    mb.box(x,4.05,z,0.68,0.42,0.68,z%20?0xffce68:0x55d8ff);
+    mb.box(x+sx*3.0,2.2,z+2,0.45,4.4,0.45,0x40362f);
+    for(let q=0;q<4;q++) mb.box(x+sx*(3+q*.55),4.1+q*.2,z+2+(q%2?.5:-.5),1.4,.16,.16,0x315242);
   }
   addRoom(rooms, spawnSpots, "ghosthouse", "泣くお化け屋敷", "class", gh.x1, gh.z1, gh.x2, gh.z2, 0.9);
   addRoom(rooms, spawnSpots, "mirror", "くもった鏡の迷路", "art", mz.x1, mz.z1, mz.x2, mz.z2, 0.82);
-  addRoom(rooms, spawnSpots, "wheel", "止まった観覧車", "music", 13, 27, 38, 52, 0.72);
-  addRoom(rooms, spawnSpots, "carousel", "夜の回転木馬", "home", -12, 12, 12, 36, 0.55);
-  addRoom(rooms, spawnSpots, "plaza", "色あせた中央広場", "yard", -22, 37, 22, 63, 0.38);
+  addRoom(rooms, spawnSpots, "wheel", "月色の大観覧車", "music", 18, 20, 40, 40, 0.72);
+  addRoom(rooms, spawnSpots, "carousel", "二階建て回転木馬", "home", -32, 15, -12, 35, 0.55);
+  addRoom(rooms, spawnSpots, "plaza", "雨のネオン大通り", "yard", -16, 38, 16, 67, 0.38);
+  addRoom(rooms, spawnSpots, "coaster", "きしむ廃コースター", "yard", -44, -43, 44, -30, 0.68);
   fence(mb, col, bounds, gates, 0x443d48);
   for (let i = 0; i < 70 * (opts.grass || 1); i++) mb.tuft(rand(-55, 55), rand(-40, 70), 0.08, rand(0.3, 0.7), 0x2a3330, 0x45463d, 2);
   for (const x of [-40, -20, 0, 20, 40]) for (const z of [-25, 20, 55]) lightSpots.push({ x, y: 3.2, z, floor: 0 });

@@ -13,7 +13,8 @@ for (const id of ["branch", "park"]) {
   const scene = new THREE.Scene();
   const world = buildStageWorld(scene, id, { grass: 0.4 });
   assert.equal(scene.children.length, 1, `${id}: 静的マップは1メッシュだけ`);
-  assert.ok(world.triangles < 5000, `${id}: 軽量な三角形数`);
+  // 遊園地は観覧車の電飾と木馬を増やしても、校舎（約44万面）より十分軽い。
+  assert.ok(world.triangles < 12000, `${id}: 軽量な三角形数`);
   assert.ok(world.spawnSpots.length >= 40, `${id}: 拾いものの場所`);
   assert.ok(world.gates.length >= 4, `${id}: 人間の出入口`);
   const start = world.nav.nearest(world.entry.x, world.entry.z, 0, world.colliders, 99, 0);
@@ -31,4 +32,4 @@ for (const id of ["branch", "park"]) {
   assert.ok(world.inPlay(player.x, player.z), `${id}: プレイヤーがマップ内にいる`);
 }
 
-console.log("stage test: 解放境界4件・別マップ2件・全11エリアの経路を確認");
+console.log("stage test: 解放境界4件・別マップ2件・全12エリアの経路を確認");
