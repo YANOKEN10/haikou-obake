@@ -5,7 +5,8 @@
   "description": "廃校おばけサバイバル - 3人称オープンワールド",
   "scripts": {
     "start": "node serve.js",
-    "test:rtc": "node tools/rtctest.mjs"
+    "test:rtc": "node tools/rtctest.mjs",
+    "test:paint": "node tools/painttest.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.0.0"

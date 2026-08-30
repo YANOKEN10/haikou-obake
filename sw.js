@@ -3,7 +3,7 @@
 //   ・通信できるときは必ず新しいものを取りに行く（更新が届かない事故を防ぐ）
 //   ・通信できないときだけ、しまってあるものを出す
 // ============================================================
-const CACHE = "haikou-obake-v11";
+const CACHE = "haikou-obake-v12";
 const CORE = [
   "./", "./index.html", "./manifest.webmanifest",
   "./lib/three.module.js",

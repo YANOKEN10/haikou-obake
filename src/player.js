@@ -273,7 +273,8 @@ export class Player {
     const bigEye = (x, y, z, r, look) => {
       const white = add(new THREE.Mesh(new THREE.SphereGeometry(r, 16, 14), B(0xfdfbf4)), "eye");
       white.position.set(x, y, z); white.scale.set(1, 1, 0.55); white.renderOrder = 2;
-      const pup = add(new THREE.Mesh(new THREE.SphereGeometry(r * 0.5, 12, 10), B(0x1a1418)), "eye");
+      // 黒目は選んだ色の上でも目の形が分かるよう、黒いまま残す。
+      const pup = add(new THREE.Mesh(new THREE.SphereGeometry(r * 0.5, 12, 10), B(0x1a1418)), "fixed");
       pup.position.set(x + (look || 0) * r * 0.25, y, z + r * 0.42); pup.scale.set(1, 1, 0.6); pup.renderOrder = 3;
       return { white, pup };
     };
@@ -497,7 +498,7 @@ export class Player {
       this.eyeL.scale.set(1.2, 0.8, 0.6); this.eyeR.scale.set(1.2, 0.8, 0.6);
       this.eyeL.position.set(-0.19, 1.3, 0.42); this.eyeR.position.set(0.19, 1.3, 0.42);
       for (const sx of [-1, 1]) {
-        const y = add(new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), B(0xffd23a)));
+        const y = add(new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), B(0xffd23a)), "eye");
         y.position.set(sx * 0.19, 1.3, 0.4); y.scale.set(1.2, 0.85, 0.45); y.renderOrder = 1;
         const brow = add(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.07, 0.06), B(0xf2efe6)));
         brow.position.set(sx * 0.2, 1.45, 0.44); brow.rotation.z = sx * -0.3;
@@ -532,7 +533,7 @@ export class Player {
       this.mouth.visible = false;
       this.eyeL.visible = false; this.eyeR.visible = false;
       for (const sx of [-1, 1]) {                      // 赤い切れ長の目
-        const e = add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10), B(0xe0323c)));
+        const e = add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10), B(0xe0323c)), "eye");
         e.position.set(sx * 0.2, 1.32, 0.42); e.scale.set(1.35, 0.55, 0.5); e.renderOrder = 2;
       }
       const snout = add(new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.5, 10), M(0xfaf6f2, { i: 0.25 })));
