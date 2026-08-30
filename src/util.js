@@ -24,6 +24,12 @@ export const choice = (arr) => arr[Math.floor(_rng() * arr.length)];
 export const dist2 = (ax, az, bx, bz) => { const dx = ax - bx, dz = az - bz; return dx * dx + dz * dz; };
 export const dist = (ax, az, bx, bz) => Math.sqrt(dist2(ax, az, bx, bz));
 
+// 上下に重なる場所でも、別の階なら「近い」と判定しない。
+// ay/by は床の高さ（1階=0）を渡す。
+export function nearOnFloor(ax, az, ay, bx, bz, by, radius, floorGap = 1.8) {
+  return Math.abs((ay || 0) - (by || 0)) < floorGap && dist(ax, az, bx, bz) < radius;
+}
+
 export function angleLerp(a, b, t) {
   let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
   if (d < -Math.PI) d += Math.PI * 2;

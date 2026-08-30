@@ -18,7 +18,7 @@ import { Audio } from "./audio.js";
 import { MATERIALS, TRAPS, GHOSTS, RANKS, RARITY, pickRarity, CHARS, EXCHANGE, HUMAN_DROPS, hiddenUnlockReady,
   UPGRADES, UPG_MAX, UPG_STEP, upgCost, PARTS, PAINTS, paintById } from "./data.js";
 import { Roster } from "./people.js";
-import { clamp, rand, randi, choice, dist, makeRng } from "./util.js";
+import { clamp, rand, randi, choice, dist, nearOnFloor, makeRng } from "./util.js";
 const FLOOR_HEIGHT_HALF = 3.2;
 
 // ============================================================
@@ -542,9 +542,12 @@ class Game {
     if (!this.built[id]) { this.audio.deny(); this.ui.toast("その仕掛けの在庫がない（Tabで作る）", "bad"); return; }
     const p = this.player;
     const fx = p.x + Math.sin(p.yaw) * 1.7, fz = p.z + Math.cos(p.yaw) * 1.7;
-    const r = this.world.colliders.resolve(fx, fz, 0.55, 1.0);
-    for (const t of this.traps) if (dist(t.x, t.z, r.x, r.z) < 1.6) { this.audio.deny(); this.ui.toast("近すぎる！", "bad"); return; }
-    this.traps.push(new Trap(this.scene, id, r.x, r.z, p.yaw));
+    const floorY = this.summonFloorY();
+    const r = this.world.colliders.resolve(fx, fz, 0.55, p.y);
+    for (const t of this.traps) if (nearOnFloor(t.x, t.z, t.baseY, r.x, r.z, floorY, 1.6)) {
+      this.audio.deny(); this.ui.toast("近すぎる！", "bad"); return;
+    }
+    this.traps.push(new Trap(this.scene, id, r.x, r.z, p.yaw, floorY));
     this.built[id]--;
     this.ui.setHotbar(this.built, this.selTrap);
     this.audio.place();
@@ -556,14 +559,15 @@ class Game {
   //  持ちなおして置きなおせるので、配置を何度でもやりなおせる。
   retrieve() {
     const p = this.player;
+    const floorY = this.summonFloorY();
     let best = null, bd = 3.4, kind = null;
     for (const tr of this.traps) {
       const d = dist(tr.x, tr.z, p.x, p.z);
-      if (d < bd) { bd = d; best = tr; kind = "trap"; }
+      if (nearOnFloor(tr.x, tr.z, tr.baseY, p.x, p.z, floorY, bd)) { bd = d; best = tr; kind = "trap"; }
     }
     for (const s of this.summons) {
       const d = dist(s.x, s.z, p.x, p.z);
-      if (d < bd) { bd = d; best = s; kind = "ghost"; }
+      if (nearOnFloor(s.x, s.z, s.baseY, p.x, p.z, floorY, bd)) { bd = d; best = s; kind = "ghost"; }
     }
     if (!best) {
       this.audio.deny();
@@ -574,7 +578,7 @@ class Game {
       this.built[best.id] = (this.built[best.id] || 0) + 1;
       this.selTrap = Object.keys(TRAPS).indexOf(best.id);
       this.ui.setHotbar(this.built, this.selTrap);
-      this.texts.push(new FloatText(this.scene, "回収", best.x, 1.8, best.z, "#b6ffd0", 1.5));
+      this.texts.push(new FloatText(this.scene, "回収", best.x, best.baseY + 1.8, best.z, "#b6ffd0", 1.5));
       this.ui.toast(best.def.name + " を回収した（F でまた置ける）", "good");
       best.dispose();
       this.traps.splice(this.traps.indexOf(best), 1);
@@ -958,8 +962,9 @@ class Game {
     // --- 回収の案内 -----------------------------------------
     {
       let near = false;
-      for (const tr of this.traps) if (dist(tr.x, tr.z, p.x, p.z) < 3.4) { near = true; break; }
-      if (!near) for (const s of this.summons) if (dist(s.x, s.z, p.x, p.z) < 3.4) { near = true; break; }
+      const floorY = this.summonFloorY();
+      for (const tr of this.traps) if (nearOnFloor(tr.x, tr.z, tr.baseY, p.x, p.z, floorY, 3.4)) { near = true; break; }
+      if (!near) for (const s of this.summons) if (nearOnFloor(s.x, s.z, s.baseY, p.x, p.z, floorY, 3.4)) { near = true; break; }
       if (near !== this.nearPlaced) {
         this.nearPlaced = near;
         const el = document.getElementById("bTake");
@@ -974,6 +979,7 @@ class Game {
       if (tr.def.slip) {
         for (const h of this.humans) {
           if (h.out || h.slipCool > 0) continue;
+          if (Math.abs(h.y - tr.baseY) >= 2.4) continue;
           if (dist(tr.x, tr.z, h.x, h.z) > tr.def.radius) continue;
           const line = h.slip();
           if (!line) continue;
@@ -992,15 +998,17 @@ class Game {
       if (tr.cool > 0) continue;
       for (const h of this.humans) {
         if (h.out) continue;
+        if (Math.abs(h.y - tr.baseY) >= 2.4) continue;
         const d = dist(tr.x, tr.z, h.x, h.z);
         if (d > tr.def.radius) continue;
-        if (!w.colliders.lineOfSight(tr.x, tr.z, h.x, h.z, 1.2, 0.7)) continue;
+        if (!w.colliders.lineOfSight(tr.x, tr.z, h.x, h.z, tr.baseY + 1.2, 0.7)) continue;
         const eff = h.addFear(tr.def.fear, tr.x, tr.z, "trap:" + tr.id, tr.def.name);
         if (this.net.on) { this.net.reportScare(h.hid, tr.def.fear, "trap:" + tr.id); this.myScareT.set(h.hid, Date.now()); }
         tr.fire();
         this.bump("trapsFired");
         if (dist(tr.x, tr.z, p.x, p.z) < 34) this.audio.trapSound(tr.id);
-        this.texts.push(new FloatText(this.scene, tr.def.line, tr.x, 2.4, tr.z, eff > 0 ? "#ffb3e0" : "#8fa8c8", 1.9));
+        this.texts.push(new FloatText(this.scene, tr.def.line, tr.x, tr.baseY + 2.4, tr.z,
+          eff > 0 ? "#ffb3e0" : "#8fa8c8", 1.9));
         if (eff > 0) {
           this.audio.scream(h.type.courage < 90 ? 1.3 : 1);
           this.battle.countScare();              // 仕掛けの ぶんも かぞえる
@@ -1234,7 +1242,8 @@ class Game {
     p.upg = JSON.parse(JSON.stringify(this.upg || {}));   // すがたごとの きょうか
     p.paints = { ...this.paints };                        // 手に入れた色
     p.paint = JSON.parse(JSON.stringify(this.paint || {}));  // すがたごとの 色
-    p.traps = this.traps.map((t) => ({ id: t.id, x: +t.x.toFixed(2), z: +t.z.toFixed(2), uses: t.uses }));
+    p.traps = this.traps.map((t) => ({ id: t.id, x: +t.x.toFixed(2), z: +t.z.toFixed(2),
+      y: +(t.baseY || 0).toFixed(2), uses: t.uses }));
     p.pos = { x: +this.player.x.toFixed(2), z: +this.player.z.toFixed(2) };
     p.playSeconds = Math.round(p.playSeconds || 0);
     p.stats = p.stats || S.blank(p.name).stats;
@@ -1275,7 +1284,7 @@ class Game {
     this.selTrap = p.selTrap || 0;
     for (const t of sameStage ? (p.traps || []) : []) {
       if (!TRAPS[t.id]) continue;
-      const tr = new Trap(this.scene, t.id, t.x, t.z, 0);
+      const tr = new Trap(this.scene, t.id, t.x, t.z, 0, t.y || 0);
       tr.uses = t.uses || 0;
       this.traps.push(tr);
     }
@@ -1398,8 +1407,10 @@ class Game {
   // 召喚おばけを 置く 階の、床の 高さ。
   //  これを わたさないと、4階で 出しても 1階に あらわれてしまう
   summonFloorY() {
-    const f = clamp(Math.round((this.player.y - 1.02) / 3.6), 0, 4);   // 1階が0、屋上が4
-    return f * 3.6;
+    const h = this.world.floorHeight || 3.6;
+    const floors = this.world.floors === undefined ? 4 : this.world.floors;
+    const f = clamp(Math.round((this.player.y - 1.02) / h), 0, floors);   // 1階が0
+    return f * h;
   }
 
   // ============================================================
@@ -1550,7 +1561,7 @@ class Game {
     for (const [key, q] of want) {
       let obj = this.peerPlaced.get(key);
       if (!obj) {
-        if (q.k === "t" && TRAPS[q.id]) obj = new Trap(this.scene, q.id, q.x, q.z, 0);
+        if (q.k === "t" && TRAPS[q.id]) obj = new Trap(this.scene, q.id, q.x, q.z, 0, q.y || 0);
         else if (q.k === "g" && GHOSTS[q.id]) obj = new Summon(this.scene, this.world, q.id, q.x, q.z, q.y || 0);
         if (!obj) continue;
         obj.isPeer = true;                    // 見た目だけ。発動は 置いた人の画面で
@@ -1558,7 +1569,7 @@ class Game {
       }
       // とどいた 場所へ なめらかに 寄せる（ワープに 見えないように）
       obj.x = q.x; obj.z = q.z;
-      const gy = q.k === "g" ? (q.y || 0) + 1.15 : 0;
+      const gy = q.k === "g" ? (q.y || 0) + 1.15 : (q.y || 0);
       const gp = obj.group.position;
       gp.x += (q.x - gp.x) * 0.25;
       gp.z += (q.z - gp.z) * 0.25;
@@ -1623,7 +1634,8 @@ class Game {
       got: this.gotOut.slice(),                    // 拾ったものの 番号
     };
     const placed = [];
-    for (const tr of this.traps) placed.push({ k: "t", id: tr.id, x: +tr.x.toFixed(1), z: +tr.z.toFixed(1) });
+    for (const tr of this.traps) placed.push({ k: "t", id: tr.id, x: +tr.x.toFixed(1), z: +tr.z.toFixed(1),
+      y: +(tr.baseY || 0).toFixed(1) });
     for (const s of this.summons) placed.push({ k: "g", id: s.id, x: +s.x.toFixed(1), z: +s.z.toFixed(1), y: +(s.baseY || 0).toFixed(1) });
 
     this.net.update(dt, me, placed, this.net.isHost ? this.hostSnapshot() : null);

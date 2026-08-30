@@ -106,12 +106,13 @@ const TRAP_COLOR = {
 };
 
 export class Trap {
-  constructor(scene, id, x, z, yaw = 0) {
+  constructor(scene, id, x, z, yaw = 0, baseY = 0) {
     this.id = id; this.def = TRAPS[id];
     this.x = x; this.z = z;
+    this.baseY = baseY || 0;
     this.cool = 0; this.fireT = 0; this.uses = 0;
     this.group = new THREE.Group();
-    this.group.position.set(x, 0, z);
+    this.group.position.set(x, this.baseY, z);
     this.group.rotation.y = yaw;
 
     const col = TRAP_COLOR[id] || 0x88ccaa;

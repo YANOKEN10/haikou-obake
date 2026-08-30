@@ -8,6 +8,7 @@
     "test:rtc": "node tools/rtctest.mjs",
     "test:paint": "node tools/painttest.mjs",
     "test:hidden": "node tools/hiddentest.mjs",
+    "test:floors": "node tools/floortest.mjs",
     "test:stage": "node tools/stagetest.mjs"
   },
   "dependencies": {
