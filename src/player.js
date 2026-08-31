@@ -910,12 +910,8 @@ export class Player {
         s2.position.z = Math.cos(ph * 0.85) * 0.13 * k;
       }
     }
-    if (this.mane) {                                   // あまのじゃく：長い髪が たなびく
-      for (const h of this.mane) {
-        h.m.rotation.x = h.rx + Math.sin(t * 2.2 + h.phase) * 0.1;
-        h.m.rotation.z = h.rz + Math.sin(t * 2.8 + h.phase) * 0.08;
-      }
-    }
+    this.animateMane(t, moving);
+
     if (this.wings) {                                  // 天狗：はばたく
       for (let i = 0; i < this.wings.length; i++) {
         const s = i ? 1 : -1;
@@ -935,6 +931,14 @@ export class Player {
     this.updateCamera(dt, camera);
   }
 
+  animateMane(t, moving) {
+    if (!this.mane) return;
+    const wind = 0.1 + Math.min(1, moving / 8) * (this.dashing ? 0.34 : 0.2);
+    for (const h of this.mane) {
+      h.m.rotation.x = h.rx + Math.sin(t * (2.2 + moving * 0.18) + h.phase) * wind;
+      h.m.rotation.z = h.rz + Math.sin(t * 2.8 + h.phase) * wind * 0.8;
+    }
+  }
   applyPose(dt, t, moving) {
     this.group.position.set(this.x, this.y - 1.1 * GHOST_SCALE, this.z);
     this.group.rotation.y = this.yaw;
@@ -945,6 +949,23 @@ export class Player {
     this.head.scale.set(sc * hs, (sc * 1.05 + p * 0.1) * hs, sc * 0.96 * hs);
     this.handL.position.set(-0.55 - p * 0.22, 1.0 + p * 0.75, 0.1 + p * 0.15);
     this.handR.position.set(0.55 + p * 0.22, 1.0 + p * 0.75, 0.1 + p * 0.15);
+    if(this.charId==="amanojaku"){
+      const walk=Math.min(1,moving/5.4),step=Math.sin(this.bob*1.6);
+      const counter=Math.cos(this.bob*1.6),run=this.dashing?1:0;
+      const power=walk*(.24+run*.2),breath=Math.sin(t*2.15);
+      this.group.position.y+=breath*.025+Math.abs(step)*walk*.06;
+      this.group.rotation.z=step*walk*.045;
+      this.head.rotation.x=-p*.16+step*walk*.04;
+      this.head.scale.x*=1+breath*.012;
+      this.head.scale.y*=1+breath*.018;
+      this.handL.position.set(-.63-p*.34,.78+p*.92,.4+counter*power-p*.1);
+      this.handR.position.set(.63+p*.34,.78+p*.92,.4-counter*power-p*.1);
+      this.handL.rotation.x=-step*power-p*.6;
+      this.handR.rotation.x=step*power-p*.6;
+    }else{
+      this.group.rotation.z=0; this.head.rotation.x=0;
+      this.handL.rotation.x=0; this.handR.rotation.x=0;
+    }
     if (this.mouth.visible) this.mouth.scale.set(0.85 + p * 0.5, 0.5 + p * 2.2, 0.4);
     if (this.eyeL.visible) this.eyeL.scale.set(1 + p * 0.5, 1.25 + p * 0.5, 0.6);
     if (this.eyeR.visible) this.eyeR.scale.set(1 + p * 0.5, 1.25 + p * 0.5, 0.6);

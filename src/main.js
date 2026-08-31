@@ -1681,6 +1681,7 @@ class Game {
       //  とどく間かくが ゆらいでも なめらかに 動く
       vx: +p.vx.toFixed(2), vy: +(p.vy || 0).toFixed(2), vz: +p.vz.toFixed(2),
       c: this.charId || "obake",                   // どの すがたで 遊んでいるか
+      pt: { ...(this.paint[this.charId] || {}) },    // からだ・かざり・ひかり・目の色
       st: this.stageId,                             // みんなが同じマップにいるか確認する
       sc: this.battle.score,                       // おどかし勝負で おどかした人数
       h: this.net.isHost ? 1 : 0,                  // この人が おや か
@@ -1750,6 +1751,7 @@ class Game {
       if (!g) { g = new PeerGhost(this.scene, this.peerGhosts.size, pr.name, pr.charId); this.peerGhosts.set(pid, g); }
       g.setName(pr.name);
       g.setChar(pr.charId || "obake");
+      g.setPaint(pr.paint || {});
       g.update(dt, t, pr);
     }
     for (const [pid, g] of this.peerGhosts) {

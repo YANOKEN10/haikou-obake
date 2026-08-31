@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import * as THREE from "../lib/three.module.js";
 import { Player } from "../src/player.js";
-import { CHARS, paintById } from "../src/data.js";
+import { CHARS, PAINTS, paintById } from "../src/data.js";
 
 const choice = { body: "ai", deco: "momo", glow: "hisui", eye: "kin" };
 const expected = Object.fromEntries(
@@ -60,4 +60,45 @@ assert.equal(
   "九尾の左右の目が色がえ対象に登録されている",
 );
 
-console.log(`paint test: ${Object.keys(CHARS).length} characters x 4 parts = ${checks} checks passed`);
+let allColorChecks = 0;
+for (const charId of Object.keys(CHARS)) {
+  const player = new Player(new THREE.Scene(), {}, charId);
+  for (const paint of PAINTS.filter((p)=>p.hex !== null)) {
+    for (const part of ["body","deco","glow","eye"]) {
+      player.setPaint({ [part]:paint.id });
+      if (part === "body") {
+        assert.equal(colorHex(player.bodyMat),paint.hex,`${charId}: ${paint.name}を体へ反映`);
+        for(const m of player.extras.filter((q)=>q.userData.part==="body"))
+          assert.equal(colorHex(m.material),paint.hex,`${charId}: ${paint.name}を追加体パーツへ反映`);
+      } else if(part === "deco") {
+        for(const m of player.extras.filter((q)=>(q.userData.part||"deco")==="deco"))
+          assert.equal(colorHex(m.material),paint.hex,`${charId}: ${paint.name}を飾りへ反映`);
+      } else if(part === "eye") {
+        assert.equal(colorHex(player.eyeMat),paint.hex,`${charId}: ${paint.name}を基本目へ反映`);
+        for(const m of player.extras.filter((q)=>q.userData.part==="eye"))
+          assert.equal(colorHex(m.material),paint.hex,`${charId}: ${paint.name}を追加目へ反映`);
+      } else {
+        assert.equal(player.xrayMat.color.getHex(),paint.hex,`${charId}: ${paint.name}を輪郭光へ反映`);
+      }
+      allColorChecks++;
+    }
+  }
+}
+
+const amano=new Player(new THREE.Scene(),{},"amanojaku");
+amano.bob=.25;
+amano.applyPose(1/60,.2,0);
+const idleHand=amano.handL.position.clone();
+amano.animateMane(.2,0);
+const idleHair=amano.mane[0].m.rotation.x;
+amano.bob=1.1; amano.dashing=true;
+amano.applyPose(1/60,1.2,9);
+amano.animateMane(1.2,9);
+assert.notDeepEqual(amano.handL.position.toArray(),idleHand.toArray(),"あまのじゃく: 走ると腕を振る");
+assert.notEqual(amano.mane[0].m.rotation.x,idleHair,"あまのじゃく: 走ると長髪がたなびく");
+amano.scarePose=1;
+amano.applyPose(1/60,1.4,0);
+assert.ok(amano.handL.position.y>1.2,"あまのじゃく: おどかす時に両腕を上げる");
+assert.notEqual(amano.group.rotation.z,undefined,"あまのじゃく: 全身の重心を動かす");
+
+console.log(`paint test: ${checks} basic + ${allColorChecks} all-color checks passed`);

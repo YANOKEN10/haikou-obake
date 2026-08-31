@@ -24,6 +24,15 @@ net.takeDirect("mate", { g: { x: 21, y: 1, z: 3, yaw: 1, vx: 2, vz: 0 } });
 assert.equal(net.peers.get("mate").tx, 21);
 ok("番号がない以前の版とも遊べる");
 
+// キャラだけでなく4種類の色も届き、古い版のパケットで消えない。
+const matePaint={body:"ai",deco:"momo",glow:"hisui",eye:"kin"};
+net.takeDirect("mate",{q:3,g:{x:22,y:1,z:3,yaw:1,c:"kyubi",pt:matePaint}});
+assert.equal(net.peers.get("mate").charId,"kyubi");
+assert.deepEqual(net.peers.get("mate").paint,matePaint);
+net.takeDirect("mate",{q:4,g:{x:23,y:1,z:3,yaw:1,c:"kyubi"}});
+assert.deepEqual(net.peers.get("mate").paint,matePaint);
+ok("ともだちのキャラと4種類の色を保つ");
+
 // 送信待ちが積み上がった相手には古い画面を追加せず、空いている相手には送る。
 const rtc = new Rtc({ pid: "me", sigOut: [] });
 let sent = 0;

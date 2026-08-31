@@ -296,7 +296,7 @@ export class Net {
               tx: g.x || 0, ty: g.y || 1.2, tz: g.z || 0, tyaw: g.yaw || 0,
               vx: 0, vy: 0, vz: 0, age: 0, last: 0, charId: g.c || "obake",
               score: 0, isHost: false, got: [],
-              placed: [], phasing: false, scaring: 0 };
+              placed: [], phasing: false, scaring: 0, paint: g.pt || {} };
         this.peers.set(o.pid, p);
         if (this.onEvent) this.onEvent("join", o.name);
       }
@@ -314,6 +314,7 @@ export class Net {
         if (p.first === undefined) { p.first = 1; p.x = p.tx; p.y = p.ty; p.z = p.tz; p.yaw = p.tyaw; }
         p.phasing = !!o.g.p; p.scaring = o.g.s || 0;
         p.charId = o.g.c || "obake";           // ともだちの すがた
+        if (o.g.pt) p.paint = { ...o.g.pt };     // 以前の版から来た時は、今の色を消さない
         p.score = o.g.sc || 0;                 // おどかし勝負の 人数
         p.got = o.g.got || [];                 // その人が 拾った 拾いものの 番号
         p.isHost = !!o.g.h;                    // この人が おや か
@@ -360,6 +361,7 @@ export class Net {
       if (p.first === undefined) { p.first = 1; p.x = p.tx; p.y = p.ty; p.z = p.tz; p.yaw = p.tyaw; }
       p.phasing = !!g.p; p.scaring = g.s || 0;
       p.charId = g.c || "obake";
+      if (g.pt) p.paint = { ...g.pt };
       p.score = g.sc || 0;
       p.got = g.got || [];
       p.isHost = !!g.h;

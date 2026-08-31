@@ -831,6 +831,7 @@ export class PeerGhost {
     const tint = PEER_COLORS[index % PEER_COLORS.length];
     this.tint = tint;
     this.charId = null;
+    this.paint = {};
     this.g = new THREE.Group();
     this.g.scale.setScalar(PEER_SCALE);
     scene.add(this.g);
@@ -857,19 +858,26 @@ export class PeerGhost {
       });
     }
     const shell = buildGhostLook(id);
+    this.shell = shell;
     this.look = shell.group;
-    // ともだちごとに 色みを つけて、だれか 見分けられるようにする
+    // 色は本人の設定をそのまま表示し、名前札の色で友だちを見分ける
     this.bodyMat = shell.bodyMat;
     this.skirtMat = shell.skirtMat;
-    for (const m of [shell.bodyMat, shell.skirtMat]) {
-      if (m) { m.emissive = new THREE.Color(this.tint); m.emissiveIntensity = 0.5; }
-    }
-    if (shell.xrayMat) { shell.xrayMat.color = new THREE.Color(this.tint); shell.xrayMat.opacity = 0.3; }
+    shell.setPaint(this.paint);
+    if (shell.xrayMat) shell.xrayMat.opacity = 0.3;
     if (shell.xray) shell.xray.visible = true;      // かべごしでも どこにいるか 分かる
     // すがたごとの 大きさに 合わせる
     this.charSize = (CHARS[id] && CHARS[id].size) || 1;
     this.g.add(this.look);
     if (this.plate) { this.g.remove(this.plate); this.g.add(this.plate); }
+  }
+
+  setPaint(paint) {
+    const next = paint || {};
+    const key = ["body","deco","glow","eye"].map((k)=>next[k] || "base").join("|");
+    if (key === this.paintKey) return;
+    this.paintKey = key; this.paint = { ...next };
+    if (this.shell) this.shell.setPaint(this.paint);
   }
 
   setName(name) {
