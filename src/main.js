@@ -453,6 +453,10 @@ class Game {
       r.kind === "music" || r.kind === "library" || r.kind === "home" || r.kind === "art");
     const toilets = w.rooms.filter((r) => r.kind === "toilet");
     const gym = w.rooms.find((r) => r.kind === "gym");
+    const stageStops = w.id === "park"
+      ? w.rooms.filter((r) => ["art","home","music","gym","yard"].includes(r.kind))
+      : w.id === "branch"
+        ? w.rooms.filter((r) => ["class","library","home","gym","yard"].includes(r.kind)) : [];
 
     // ぜんいん 共通の 道すじ：門 → 入りくちの外 → 中 → どこかの部屋
     const common = [
@@ -496,6 +500,22 @@ class Game {
         const t2 = choice(toilets);
         steps.push({ x: t2.cx, z: t2.cz, floor: t2.floor || 0, hold: rand(3, 6),
           say: choice(["ごめん、トイレ", "先 行ってて。すぐ 追いつく", "うわ…ここ 使えるの？"]) });
+      }
+      // 別マップでは「一部屋へ直行」だけにせず、見物・休憩・周回を混ぜる。
+      if (stageStops.length > 1 && Math.random() < 0.78) {
+        const first = choice(stageStops);
+        const second = choice(stageStops.filter((r) => r !== first));
+        steps.push({ x:first.cx+rand(-1.5,1.5), z:first.cz+rand(-1.2,1.2), floor:0,
+          hold:rand(1.5,4.5), say:w.id==="park"
+            ? choice(["あの乗り物、止まってるのに音がした", "ゲーム館も見ていこう", "写真だけ撮ったら帰ろう"])
+            : choice(["受付の記録を探そう", "食堂から音がしたよ", "体育室まで見てみよう"]) });
+        if (second) steps.push({ x:second.cx+rand(-1.5,1.5), z:second.cz+rand(-1.2,1.2), floor:0,
+          hold:rand(1.0,3.5) });
+        // 同じ班でも立ち止まる人、先回りする人、二施設を巡る人が分かれる。
+        if (i % 3 === 2) {
+          h.role = "straggler";
+          h.type = { ...h.type, speed:h.type.speed * .78 };
+        }
       }
       // さいごに どこかの部屋へ
       const r2 = choice(rooms);

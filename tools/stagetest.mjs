@@ -14,14 +14,21 @@ for (const id of ["branch", "park"]) {
   const world = buildStageWorld(scene, id, { grass: 0.4 });
   assert.equal(scene.children.length, 1, `${id}: 静的マップは1メッシュだけ`);
   // 遊園地は観覧車の電飾と木馬を増やしても、校舎（約44万面）より十分軽い。
-  assert.ok(world.triangles < 12000, `${id}: 軽量な三角形数`);
+  assert.ok(world.triangles < 18000, `${id}: 軽量な三角形数`);
   assert.ok(world.spawnSpots.length >= 40, `${id}: 拾いものの場所`);
-  assert.ok(world.gates.length >= 4, `${id}: 人間の出入口`);
+  assert.equal(world.gates.length, 4, `${id}: 人間の出入口は4か所`);
+  assert.ok(world.rooms.length >= 8, `${id}: 内部を含む8エリア以上`);
   const start = world.nav.nearest(world.entry.x, world.entry.z, 0, world.colliders, 99, 0);
   assert.ok(start >= 0, `${id}: 開始地点に道がある`);
   for (const room of world.rooms) {
     const goal = world.nav.nearest(room.cx, room.cz, 0, world.colliders, 99, 0);
     assert.ok(world.nav.path(start, goal), `${id}: ${room.name}へ人間が歩ける`);
+    // 正門だけでなく、四方向のどの入口を選んでも全施設へ到達できる。
+    for (const gate of world.gates) {
+      const from = world.nav.nearest(gate.in.x, gate.in.z, 0, world.colliders, 99, 0);
+      assert.ok(from >= 0 && world.nav.path(from, goal),
+        `${id}: ${gate.name}から${room.name}へ歩ける`);
+    }
   }
   const player = new Player(scene, world, "obake");
   player.x = world.start.x; player.z = world.start.z;
@@ -32,4 +39,4 @@ for (const id of ["branch", "park"]) {
   assert.ok(world.inPlay(player.x, player.z), `${id}: プレイヤーがマップ内にいる`);
 }
 
-console.log("stage test: 解放境界4件・別マップ2件・全12エリアの経路を確認");
+console.log("stage test: 解放境界4件・別マップ2件・4入口から全エリアへの経路を確認");

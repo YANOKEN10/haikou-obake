@@ -49,6 +49,25 @@ function roomName(rooms, x, z) {
   return r ? r.name : "そと";
 }
 
+// 歩いて中を見られる小施設。静的メッシュへ統合するので描画は1回のまま。
+function openHall(mb, col, x1, z1, x2, z2, doorSide, color, roof = 4.2) {
+  mb.slab(x1, z1, x2, z2, 0.12, 0.22, 0x30373b);
+  mb.slab(x1, z1, x2, z2, roof, 0.24, 0x20262b);
+  const sides = [["x", z1, x1, x2, "n"], ["x", z2, x1, x2, "s"],
+    ["z", x1, z1, z2, "w"], ["z", x2, z1, z2, "e"]];
+  for (const [axis, fixed, from, to, side] of sides) {
+    const mid = (from + to) / 2;
+    wallWithHoles(mb, col, { axis, fixed, from, to, y1: 0, y2: roof, thick: 0.24, color,
+      holes: side === doorSide ? [{ a: mid - 2.1, b: mid + 2.1, y1: 0, y2: 2.8 }] : [] });
+  }
+}
+
+function tableSet(mb, x, z, color = 0x655544, rotY = 0) {
+  mb.box(x, 0.78, z, 2.4, 0.14, 1.15, color, { rotY });
+  for (const sx of [-0.9, 0.9]) for (const sz of [-0.35, 0.35])
+    mb.box(x + sx, 0.39, z + sz, 0.12, 0.78, 0.12, 0x34383b);
+}
+
 function gridNav(nav, col, bounds, rooms, step = 10) {
   for (let x = bounds.x1 + 5; x <= bounds.x2 - 5; x += step)
     for (let z = bounds.z1 + 5; z <= bounds.z2 - 5; z += step)
@@ -118,6 +137,37 @@ function buildBranch(scene, opts) {
   addRoom(rooms, spawnSpots, "candles", "ろうそくの特別教室", "music", 12, -5, 36, 15, 0.58);
   addRoom(rooms, spawnSpots, "archive", "明かりの消えた資料室", "library", -8, -26, 8, -14, 0.9);
   addRoom(rooms, spawnSpots, "court", "雨だまりの中庭", "yard", -9, -10, 9, 30, 0.35);
+
+  // 米英の学校に共通する管理・食事・体育のゾーンを、古い分校向けに縮尺化。
+  // 正面の車寄せから受付、左右に食堂と体育室、裏へサービス道がつながる。
+  mb.slab(-8, 30, 8, 69, 0.07, 0.07, 0x3e4649);
+  mb.slab(-52, 27, 52, 32, 0.07, 0.06, 0x343c40);
+  for (const x of [-3.2, 3.2]) mb.box(x, 0.08, 49, 0.16, 0.04, 34, 0xb7aa72);
+  openHall(mb, col, -48, 35, -18, 61, "e", 0x48585b, 5.2);
+  openHall(mb, col, 18, 35, 48, 61, "w", 0x4d5652, 4.5);
+  addRoom(rooms, spawnSpots, "gym", "古い集会体育室", "gym", -47, 36, -19, 60, 0.55);
+  addRoom(rooms, spawnSpots, "dining", "配膳台のある食堂", "home", 19, 36, 47, 60, 0.55);
+  indoorRects.push({ x1:-48,x2:-18,z1:35,z2:61 }, { x1:18,x2:48,z1:35,z2:61 });
+  // 体育室：コート線、舞台、畳まれた観客席。
+  mb.slab(-44, 39, -22, 57, .2, .035, 0x6b614e);
+  for (const x of [-42,-34,-26]) mb.box(x,.235,48,.08,.025,16,0xd6c987);
+  for (const z of [41,55]) mb.box(-33,.235,z,20,.025,.08,0xd6c987);
+  mb.box(-45,1.0,48,3.2,2.0,13,0x3d4141);
+  for(let i=0;i<5;i++) mb.box(-20.2,.35+i*.28,39+i*3.7,2.2,.18,3.0,0x4d5658);
+  // 食堂：配膳カウンター、トレー棚、長机、厨房の作業台。
+  mb.box(43.8,1.02,48,1.3,2.05,18,0x59666a);
+  mb.box(42.9,1.18,48,1.05,.18,18,0x9ba49b);
+  for(let z=40;z<=56;z+=4) mb.box(43.0,1.65,z,.12,.85,2.7,0x26383c);
+  for(const x of [23,29,35,40]) for(const z of [41,48,55]) tableSet(mb,x,z,0x6c5b45);
+  // 外構：スクールバスの車寄せ、歩道、駐輪場所、裏の搬入路。
+  mb.slab(-15, 62, 15, 72, .06, .05, 0x292f33);
+  mb.slab(-52, -38, 52, -33, .06, .05, 0x343b3d);
+  for(let x=-46;x<=46;x+=8) mb.box(x,.12,-35.5,4.5,.04,.16,0xb5a85e);
+  for(let i=0;i<9;i++){
+    const x=20+i*2.8;
+    mb.wall(x,66,x+1.1,64.5,.1,1.25,.08,0x596166);
+    mb.box(x+1.1,.52,64.5,.08,.9,.65,0x596166);
+  }
 
   // 長廊下の錆びたロッカーとベンチ。扉の濃淡を変えて放置感を出す。
   for (const sx of [-1,1]) for (let i=0;i<7;i++) {
@@ -290,6 +340,35 @@ function buildPark(scene, opts) {
     }
   }
   col.add(cx-cr,cz-cr,cx+cr,cz+cr,0,0.9,"furn");
+  // 回転木馬の待合・整備室：柵、切符窓口、工具棚まで歩いて見られる。
+  for(let i=0;i<10;i++) mb.box(-35+i*1.6,.62,10.5+(i%2)*1.4,1.2,1.05,.16,0x6b5262);
+  mb.box(-43,1.25,14,4.8,2.5,2.6,0x413444);
+  mb.box(-41.7,1.45,12.65,1.25,.72,.08,0xe8b75a);
+  for(let q=0;q<5;q++) mb.box(-45+q*.9,1.05,15.25,.18,1.8,.65,q%2?0x6f4d49:0x365c62);
+
+  // 観覧車側の飲食広場と、内部を歩けるバンパーカー館。
+  for(const x of [17,23,29,35,41]) for(const z of [47,53]) tableSet(mb,x,z,0x514b56);
+  openHall(mb,col,20,-25,49,-8,"s",0x3f3d50,4.8);
+  addRoom(rooms,spawnSpots,"bumper","火花の消えた電気自動車場","gym",21,-24,48,-9,.62);
+  indoorRects.push({x1:20,x2:49,z1:-25,z2:-8});
+  for(let x=24;x<=45;x+=7) for(let z=-21;z<=-13;z+=8){
+    mb.box(x,.48,z,3.2,.65,2.0,(x+z)%2?0x4e6690:0x8d435f);
+    mb.box(x,.92,z,1.0,.55,1.0,0x343641);
+  }
+  // 景品ゲーム館。筐体、景品棚、交換カウンターが残る。
+  openHall(mb,col,-49,-25,-20,-8,"s",0x493846,4.8);
+  addRoom(rooms,spawnSpots,"arcade","景品が残るゲーム館","art",-48,-24,-21,-9,.62);
+  indoorRects.push({x1:-49,x2:-20,z1:-25,z2:-8});
+  for(let x=-45;x<=-24;x+=5) for(const z of [-21,-16,-11]){
+    mb.box(x,1.05,z,1.35,2.1,.9,(x+z)%2?0x344f72:0x673e69);
+    mb.box(x,1.36,z+.48,.8,.5,.08,0x51c9d5);
+  }
+  mb.box(-46,1.0,-9.2,8,2,.7,0x5c4759);
+  // 園内を一周する遊歩道と、四つの入口へ分岐する案内帯。
+  mb.slab(-53,-29,53,-25,.055,.045,0x303541);
+  mb.slab(-53,66,53,70,.055,.045,0x303541);
+  mb.slab(-54,-29,-50,70,.055,.045,0x303541);
+  mb.slab(50,-29,54,70,.055,.045,0x303541);
   // 大通りの端で止まったパレード車。電飾の台、巨大な仮面、風船を抽象化。
   for (const z of [48, 61]) {
     const x = z===48 ? 7 : -7, rot = z===48 ? 0.08 : -0.08;
