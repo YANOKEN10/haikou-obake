@@ -479,17 +479,20 @@ export class Home {
       return "<option value=\"" + k + "\">" + m.icon + " " + esc(m.name) + "（" + (inv[k] || 0) + "こ）</option>";
     }).join("");
     box.innerHTML = "<div class='tradeform'><b>" + esc(display) + " さんとの材料交換</b>" +
-      "<label>あなたが わたす材料<select id='trGive'>" + options + "</select></label>" +
-      "<label>数（1〜99）<input id='trGiveN' type='number' min='1' max='99' value='1'></label>" +
-      "<label>かわりに もらう材料<select id='trWant'>" + options + "</select></label>" +
-      "<label>数（1〜99）<input id='trWantN' type='number' min='1' max='99' value='1'></label>" +
-      "<button class='yes' id='trSend'>この内容で 申しこむ</button><div class='frmsg' id='trMsg'></div></div>";
-    $("#trSend").addEventListener("click", async () => {
-      const btn = $("#trSend");
+      "<label>あなたが わたす材料<select class='trGive'>" + options + "</select></label>" +
+      "<label>数（1〜99）<input class='trGiveN' type='number' min='1' max='99' value='1'></label>" +
+      "<label>かわりに もらう材料<select class='trWant'>" + options + "</select></label>" +
+      "<label>数（1〜99）<input class='trWantN' type='number' min='1' max='99' value='1'></label>" +
+      "<button class='yes trSend'>この内容で 申しこむ</button><div class='frmsg trMsg'></div></div>";
+    // 友だちごとのフォーム内を参照する。複数人のフォームを開いても別の入力欄を送らない。
+    const btn = box.querySelector(".trSend");
+    btn.addEventListener("click", async () => {
       if (!confirm(display + " さんに、この内容で交換を申しこみますか？")) return;
       btn.disabled = true;
-      const r = await this.game.cloud.createTrade(id, $("#trGive").value, Number($("#trGiveN").value), $("#trWant").value, Number($("#trWantN").value));
-      if (!r.ok) { btn.disabled = false; $("#trMsg").textContent = r.why; return; }
+      const r = await this.game.cloud.createTrade(id,
+        box.querySelector(".trGive").value, Number(box.querySelector(".trGiveN").value),
+        box.querySelector(".trWant").value, Number(box.querySelector(".trWantN").value));
+      if (!r.ok) { btn.disabled = false; box.querySelector(".trMsg").textContent = r.why; return; }
       this.fr = r.data;
       await this.game.pullFromCloud();
       this.drawFriends();
