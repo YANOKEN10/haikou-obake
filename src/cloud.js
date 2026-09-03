@@ -111,4 +111,8 @@ export class Cloud {
   async friendProfile(id) { return await this.friendAct({ action: "profile", id }); }
   async inviteFriend(id, code) { return await this.friendAct({ action: "invite", id, code }); }
   async clearInvite() { return await this.friendAct({ action: "clearInvite" }); }
+  async createTrade(id, giveKind, giveN, wantKind, wantN) {
+    return await this.friendAct({ action: "tradeCreate", id, giveKind, giveN, wantKind, wantN });
+  }
+  async answerTrade(action, tradeId) { return await this.friendAct({ action, tradeId }); }
 }

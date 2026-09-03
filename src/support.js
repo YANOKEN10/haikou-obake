@@ -15,7 +15,7 @@
 //    → 「支払いリンクを作成」
 //    → 完了後のリダイレクト先に
 //       https://haikou-obake-daisakusen.vercel.app/?support=thanks
-export const SUPPORT_URL = "";
+export const SUPPORT_URL = "https://buy.stripe.com/bJe6oHbMYg37dsx5w96g800";
 
 // 連絡さき。
 //  ふだんは 空のままで かまいません。
@@ -110,9 +110,52 @@ export function mountSupport(ui) {
         "応援は まったくの任意で、ゲームの内容は 一切変わりません。") +
     "</div>";
   const a = document.getElementById("supLink");
-  if (a) a.href = SUPPORT_URL;
+  if (a) {
+    a.href = SUPPORT_URL;
+    // 子どもが主な遊び手なので、直接決済画面へ飛ばさず、おとなの確認を必ずはさむ。
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (done) return;
+      openSupportConfirm();
+    });
+  }
   const more = document.getElementById("supMore");
   if (more) more.addEventListener("click", () => openSupportInfo());
+}
+
+// Stripeへ移動する前に、おとなが操作していることを確認する。
+// ゲーム側では氏名やカード情報を入力させず、確認後も決済はStripeの画面だけで行う。
+export function openSupportConfirm() {
+  const box = document.getElementById("supInfo");
+  if (!box || !SUPPORT_URL) return;
+  box.innerHTML =
+    '<div class="sibox"><h3>☕ 応援する前に</h3>' +
+    '<p class="supwarn"><b>おとなの方が 操作してください。</b><br>' +
+    'お子さんが この画面を開いたときは、おうちの おとなの方に かわってください。</p>' +
+    '<h4>応援について</h4><p>これは商品を買うものではなく、1回かぎりの任意の応援です。' +
+    '応援しなくても、ゲームは すべて無料で あそべます。' +
+    '応援しても、強さ・アイテム・すがた・遊べる内容は <b>一切 変わりません</b>。</p>' +
+    '<h4>お支払いについて</h4><p>このあと Stripe の画面が開きます。' +
+    'カード番号などの支払い情報を、このゲームが受け取ることはありません。</p>' +
+    '<label class="supcheck"><input type="checkbox" id="supAdult"> ' +
+    '私は おとなです。または、おとなの方に かわってもらいました。</label>' +
+    '<button class="pbtn" id="supGo" disabled>Stripeの画面へ進む</button>' +
+    '<button class="pbtn sub" id="supCancel">やめる</button></div>';
+  box.classList.add("on");
+
+  const check = document.getElementById("supAdult");
+  const go = document.getElementById("supGo");
+  const close = () => box.classList.remove("on");
+  if (check && go) check.addEventListener("change", () => { go.disabled = !check.checked; });
+  if (go) go.addEventListener("click", () => {
+    if (!check || !check.checked) return;
+    // noopener を指定し、決済画面からゲーム画面を操作されないようにする。
+    window.open(SUPPORT_URL, "_blank", "noopener,noreferrer");
+    close();
+  });
+  const cancel = document.getElementById("supCancel");
+  if (cancel) cancel.addEventListener("click", close);
+  box.addEventListener("click", (e) => { if (e.target === box) close(); });
 }
 
 // 「応援について」を ひらく

@@ -234,7 +234,7 @@ export class Home {
   updateBadge() {
     const el = $("#frBadge");
     if (!el) return;
-    const n = this.fr ? (this.fr.reqIn || []).length + (this.fr.invite ? 1 : 0) : 0;
+    const n = this.fr ? (this.fr.reqIn || []).length + (this.fr.tradesIn || []).length + (this.fr.invite ? 1 : 0) : 0;
     el.hidden = n === 0;
     el.textContent = String(n);
   }
@@ -256,6 +256,7 @@ export class Home {
       let btns = "";
       if (kind === "friend") {
         btns = "<button class='go' data-act='invite' data-id=\"" + esc(c.id) + "\">🎮 いっしょに あそぶ</button>" +
+               "<button class='yes' data-act='trade' data-id=\"" + esc(c.id) + "\" data-name=\"" + esc(c.display) + "\">🔄 材料を交換</button>" +
                "<button data-act='detail' data-id=\"" + esc(c.id) + "\">📋 くわしく</button>" +
                "<button class='no' data-act='remove' data-id=\"" + esc(c.id) + "\">やめる</button>";
       } else if (kind === "in") {
@@ -315,6 +316,24 @@ export class Home {
     html += d.friends.length
       ? d.friends.map((c) => row(c, "friend")).join("")
       : "<div class='frempty'>まだ ともだちがいません。うえの まどで さがしてみよう。</div>";
+
+    const matText = (x) => {
+      const m = x && MATERIALS[x.kind];
+      return m ? m.icon + " " + m.name + " ×" + x.n : "?";
+    };
+    if ((d.tradesIn || []).length) {
+      html += "<div class='frsec'>🔄 とどいた材料交換（" + d.tradesIn.length + "）</div>";
+      html += d.tradesIn.map((t) => "<div class='frrow trade'><div class='top'><span class='nm'>" + esc(t.fromName) + " さんから</span></div>" +
+        "<div class='tradeflow'>もらう：<b>" + matText(t.give) + "</b><br>わたす：<b>" + matText(t.want) + "</b></div>" +
+        "<div class='btns'><button class='yes' data-trade='tradeAccept' data-tid=\"" + esc(t.id) + "\">うける</button>" +
+        "<button class='no' data-trade='tradeReject' data-tid=\"" + esc(t.id) + "\">ことわる</button></div></div>").join("");
+    }
+    if ((d.tradesOut || []).length) {
+      html += "<div class='frsec'>⏳ 返事まちの材料交換（" + d.tradesOut.length + "）</div>";
+      html += d.tradesOut.map((t) => "<div class='frrow trade'><div class='top'><span class='nm'>" + esc(t.toName) + " さんへ</span></div>" +
+        "<div class='tradeflow'>わたす：<b>" + matText(t.give) + "</b><br>もらう：<b>" + matText(t.want) + "</b></div>" +
+        "<div class='btns'><button class='no' data-trade='tradeCancel' data-tid=\"" + esc(t.id) + "\">とりけす</button></div></div>").join("");
+    }
 
     if (d.reqIn.length) {
       html += "<div class='frsec'>📨 とどいた申請（" + d.reqIn.length + "）</div>";
@@ -418,6 +437,7 @@ export class Home {
       b.addEventListener("click", async () => {
         const act = b.dataset.act, id = b.dataset.id;
         if (act === "detail") { this.showDetail(id); return; }
+        if (act === "trade") { this.showTrade(id, b.dataset.name); return; }
         if (act === "invite") { this.inviteTo(id); return; }
         if (act === "remove" && !confirm("ともだちを やめますか？")) return;
         b.disabled = true;
@@ -428,6 +448,52 @@ export class Home {
         this.drawFriends();
         if (act === "accept") this.frMsg("ともだちに なりました！", true);
       });
+    });
+
+    $("#frBody").querySelectorAll("button[data-trade]").forEach((b) => {
+      b.addEventListener("click", async () => {
+        const act = b.dataset.trade;
+        const verb = act === "tradeAccept" ? "この内容で交換しますか？" : act === "tradeReject" ? "この交換を ことわりますか？" : "この交換を とりけしますか？";
+        if (!confirm(verb)) return;
+        b.disabled = true;
+        const r = await cloud.answerTrade(act, b.dataset.tid);
+        if (!r.ok) { b.disabled = false; this.frMsg(r.why); return; }
+        this.fr = r.data;
+        await this.game.pullFromCloud();
+        this.drawFriends();
+        this.frMsg(act === "tradeAccept" ? "材料を交換しました！" : "交換を かたづけました", true);
+      });
+    });
+  }
+
+  showTrade(id, display) {
+    const rows = $("#frBody").querySelectorAll(".frrow");
+    let box = null;
+    for (const r of rows) if (r.getAttribute("data-row") === id) box = r.querySelector(".detail");
+    if (!box) return;
+    box.hidden = false;
+    const p = this.profile() || {};
+    const inv = p.inv || {};
+    const options = Object.keys(MATERIALS).map((k) => {
+      const m = MATERIALS[k];
+      return "<option value=\"" + k + "\">" + m.icon + " " + esc(m.name) + "（" + (inv[k] || 0) + "こ）</option>";
+    }).join("");
+    box.innerHTML = "<div class='tradeform'><b>" + esc(display) + " さんとの材料交換</b>" +
+      "<label>あなたが わたす材料<select id='trGive'>" + options + "</select></label>" +
+      "<label>数（1〜99）<input id='trGiveN' type='number' min='1' max='99' value='1'></label>" +
+      "<label>かわりに もらう材料<select id='trWant'>" + options + "</select></label>" +
+      "<label>数（1〜99）<input id='trWantN' type='number' min='1' max='99' value='1'></label>" +
+      "<button class='yes' id='trSend'>この内容で 申しこむ</button><div class='frmsg' id='trMsg'></div></div>";
+    $("#trSend").addEventListener("click", async () => {
+      const btn = $("#trSend");
+      if (!confirm(display + " さんに、この内容で交換を申しこみますか？")) return;
+      btn.disabled = true;
+      const r = await this.game.cloud.createTrade(id, $("#trGive").value, Number($("#trGiveN").value), $("#trWant").value, Number($("#trWantN").value));
+      if (!r.ok) { btn.disabled = false; $("#trMsg").textContent = r.why; return; }
+      this.fr = r.data;
+      await this.game.pullFromCloud();
+      this.drawFriends();
+      this.frMsg(display + " さんに 材料交換を申しこみました", true);
     });
   }
 

@@ -7,13 +7,33 @@
 //   ・申請は、相手が「うける」を押すまで、ともだちにならない。
 //   ・「さそう」は、あいことばを相手のところに置いておくだけ。
 // ============================================================
+const crypto = require("crypto");
 const L = require("./_lib");
+const TradeDb = require("./_trade-db");
 
 const MAX_FRIENDS = 30;
 const MAX_REQ = 20;
+const MAX_TRADES = 20;
 const INVITE_MS = 5 * 60 * 1000;      // さそいは5分で消える
+const MATERIAL_IDS = ["hokori", "chalk", "uwabaki", "pan", "onnen", "denchi", "nurunuru", "wax", "kami"];
 
 const arr = (v) => (Array.isArray(v) ? v : []);
+
+function invOf(u) {
+  const p = u && u.payload && u.payload.profile;
+  if (!p) return null;
+  if (!p.inv || typeof p.inv !== "object") p.inv = {};
+  return p.inv;
+}
+function material(v) { return MATERIAL_IDS.indexOf(String(v || "")) >= 0 ? String(v) : ""; }
+function amount(v) {
+  const n = Number(v);
+  return Number.isSafeInteger(n) && n >= 1 && n <= 99 ? n : 0;
+}
+function tradeCard(t) {
+  return { id: t.id, from: t.from, fromName: t.fromName, to: t.to, toName: t.toName,
+    give: t.give, want: t.want, t: t.t };
+}
 
 // ともだちの一覧に出す、さしさわりのない範囲の記録
 function cardOf(u) {
@@ -57,6 +77,8 @@ async function mine(user) {
     reqIn: arr(user.reqIn).map((r) => ({ id: r.id, display: r.display, t: r.t })),
     reqOut: arr(user.reqOut).map((r) => ({ id: r.id, display: r.display, t: r.t })),
     invite: liveInvite(user),
+    tradesIn: arr(user.tradesIn).slice(0, MAX_TRADES).map(tradeCard),
+    tradesOut: arr(user.tradesOut).slice(0, MAX_TRADES).map(tradeCard),
   };
 }
 
@@ -68,8 +90,9 @@ module.exports = async function handler(req, res) {
   const claim = L.readToken(L.bearer(req));
   if (!claim) { res.status(401).json({ error: "auth", message: "ログインしなおしてください。" }); return; }
 
+  let unlockTrade = null;
   try {
-    const me = await L.readUser(claim.id);
+    let me = await L.readUser(claim.id);
     if (!me) { res.status(404).json({ error: "gone", message: "データが見つかりませんでした。" }); return; }
 
     if (req.method === "GET") { res.status(200).json(await mine(me)); return; }
@@ -78,6 +101,94 @@ module.exports = async function handler(req, res) {
     const b = L.body(req);
     const act = String(b.action || "");
     const otherId = L.normId(b.id);
+
+    // 材料交換はNeonの排他ロックで直列化し、ロック後の在庫を確認する。
+    if (act.indexOf("trade") === 0) {
+      if (!TradeDb.configured()) {
+        res.status(503).json({ error: "setup", message: "材料交換は ただいま準備中です。" }); return;
+      }
+      let partnerId = otherId;
+      if (!partnerId && act !== "tradeCreate") {
+        const tradeId = String(b.tradeId || "");
+        const t = arr(me.tradesIn).concat(arr(me.tradesOut)).find((x) => x && x.id === tradeId);
+        partnerId = t && (t.from === me.id ? t.to : t.from);
+      }
+      unlockTrade = await TradeDb.lock([me.id, partnerId]);
+      const fresh = await L.readUser(claim.id);
+      if (!fresh) { await unlockTrade(); res.status(404).json({ error: "gone" }); return; }
+      me = fresh;
+    }
+
+    // --- 材料の交換 ------------------------------------------
+    // 申し込んだ材料は先に預かる。交換IDを双方から消してから反映することで、
+    // 同じボタンを二度押しても材料が二重に増えないようにする。
+    if (act === "tradeCreate") {
+      if (!otherId || arr(me.friends).indexOf(otherId) < 0) {
+        res.status(403).json({ error: "notfriend", message: "ともだちとだけ 交換できます。" }); return;
+      }
+      if (arr(me.tradesOut).length >= MAX_TRADES) {
+        res.status(409).json({ error: "full", message: "交換の申し込みが いっぱいです。" }); return;
+      }
+      const other = await L.readUser(otherId);
+      if (!other || arr(other.friends).indexOf(me.id) < 0) {
+        res.status(404).json({ error: "none", message: "そのともだちが 見つかりませんでした。" }); return;
+      }
+      if (arr(other.tradesIn).length >= MAX_TRADES) {
+        res.status(409).json({ error: "full", message: "その人に届いた交換が いっぱいです。" }); return;
+      }
+      const giveKind = material(b.giveKind), wantKind = material(b.wantKind);
+      const giveN = amount(b.giveN), wantN = amount(b.wantN);
+      if (!giveKind || !wantKind || !giveN || !wantN) {
+        res.status(400).json({ error: "trade", message: "材料と数を たしかめてください。" }); return;
+      }
+      const myInv = invOf(me), otherInv = invOf(other);
+      if (!myInv || !otherInv) {
+        res.status(409).json({ error: "nosave", message: "ふたりとも先に 記録をあずけてください。" }); return;
+      }
+      if ((myInv[giveKind] || 0) < giveN) {
+        res.status(409).json({ error: "short", message: "わたす材料が 足りません。" }); return;
+      }
+      myInv[giveKind] = (myInv[giveKind] || 0) - giveN;
+      const t = { id: crypto.randomUUID(), from: me.id, fromName: me.display,
+        to: other.id, toName: other.display, give: { kind: giveKind, n: giveN },
+        want: { kind: wantKind, n: wantN }, t: Date.now() };
+      me.tradesOut = arr(me.tradesOut).concat([t]);
+      other.tradesIn = arr(other.tradesIn).concat([t]);
+      await L.writeUser(other);
+      await L.writeUser(me);
+      res.status(200).json(await mine(me)); return;
+    }
+
+    if (act === "tradeAccept" || act === "tradeReject" || act === "tradeCancel") {
+      const tradeId = String(b.tradeId || "");
+      const incoming = act !== "tradeCancel";
+      const list = incoming ? arr(me.tradesIn) : arr(me.tradesOut);
+      const t = list.find((x) => x && x.id === tradeId);
+      if (!t) { res.status(409).json({ error: "done", message: "この交換は すでに終わっています。" }); return; }
+      const other = await L.readUser(incoming ? t.from : t.to);
+      if (!other) { res.status(404).json({ error: "none", message: "相手が 見つかりませんでした。" }); return; }
+      const sender = incoming ? other : me;
+      const receiver = incoming ? me : other;
+      const senderInv = invOf(sender), receiverInv = invOf(receiver);
+      if (!senderInv || !receiverInv) {
+        res.status(409).json({ error: "nosave", message: "記録が 見つかりませんでした。" }); return;
+      }
+      if (act === "tradeAccept" && (receiverInv[t.want.kind] || 0) < t.want.n) {
+        res.status(409).json({ error: "short", message: "交換に出す材料が 足りません。" }); return;
+      }
+      sender.tradesOut = arr(sender.tradesOut).filter((x) => x.id !== tradeId);
+      receiver.tradesIn = arr(receiver.tradesIn).filter((x) => x.id !== tradeId);
+      if (act === "tradeAccept") {
+        receiverInv[t.want.kind] -= t.want.n;
+        receiverInv[t.give.kind] = (receiverInv[t.give.kind] || 0) + t.give.n;
+        senderInv[t.want.kind] = (senderInv[t.want.kind] || 0) + t.want.n;
+      } else {
+        senderInv[t.give.kind] = (senderInv[t.give.kind] || 0) + t.give.n;
+      }
+      await L.writeUser(other);
+      await L.writeUser(me);
+      res.status(200).json(await mine(me)); return;
+    }
 
     // --- なまえで さがす -------------------------------------
     if (act === "search") {
@@ -170,6 +281,10 @@ module.exports = async function handler(req, res) {
           await L.writeUser(other);
         }
       } else {
+        if (arr(me.tradesIn).some((t) => t.from === otherId) || arr(me.tradesOut).some((t) => t.to === otherId)) {
+          res.status(409).json({ error: "trade", message: "材料交換を かたづけてから、ともだちをやめてください。" });
+          return;
+        }
         me.friends = arr(me.friends).filter((f) => f !== otherId);
         if (other) {
           other.friends = arr(other.friends).filter((f) => f !== me.id);
@@ -220,5 +335,7 @@ module.exports = async function handler(req, res) {
     res.status(400).json({ error: "action" });
   } catch (e) {
     res.status(500).json({ error: "server", message: "サーバーにつながりませんでした。" });
+  } finally {
+    if (unlockTrade) await unlockTrade().catch(() => {});
   }
 };

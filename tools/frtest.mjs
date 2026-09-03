@@ -21,8 +21,11 @@ ok("アカウントを3つ作れる", A.status === 200 && B.status === 200 && C.
 const tA = A.data.token, tB = B.data.token, tC = C.data.token;
 
 // 記録をあずけておく（プロフィールを見るため）
+await call("/api/save", { method: "POST", token: tA, body: { payload: { profile: {
+  name: nameA, rank: "見習いおばけ", inv: { hokori: 8, chalk: 1 }, stats: {} } } } });
 await call("/api/save", { method: "POST", token: tB, body: { payload: { profile: {
   name: nameB, rank: "見習いおばけ", kicked: 7, wave: 3, playSeconds: 1234,
+  inv: { hokori: 1, chalk: 7 },
   stats: { scares: 20, behind: 5, combos: 2, biggest: 61, trapsFired: 9, trapsBuilt: 4,
            ghostsSummoned: 3, materials: 88, laughed: 1, bestWave: 5 } } } } });
 
@@ -63,6 +66,25 @@ ok("一覧に記録のあらましが出る", card && card.kicked === 7 && card.
 r = await call("/api/friends", { method: "POST", token: tA, body: { action: "profile", id: nameB } });
 ok("ともだちの記録を くわしく見られる",
    r.status === 200 && r.data.card.stats.scares === 20 && r.data.card.wave === 5, r.data.card && r.data.card.stats);
+
+// --- 材料交換：申し込み → うける ----------------------------
+r = await call("/api/friends", { method: "POST", token: tA, body: {
+  action: "tradeCreate", id: nameB, giveKind: "hokori", giveN: 3, wantKind: "chalk", wantN: 2,
+} });
+const trade = (r.data.tradesOut || [])[0];
+ok("材料交換を申し込める", r.status === 200 && trade && trade.to === nameB.toLowerCase());
+let saveA = await call("/api/save", { token: tA });
+ok("申し込んだ材料を先に預かる", saveA.data.payload.profile.inv.hokori === 5);
+r = await call("/api/friends", { token: tB });
+ok("相手に交換が届く", (r.data.tradesIn || []).some((x) => x.id === trade.id));
+r = await call("/api/friends", { method: "POST", token: tB, body: { action: "tradeAccept", tradeId: trade.id } });
+ok("相手が交換をうけられる", r.status === 200 && (r.data.tradesIn || []).length === 0);
+saveA = await call("/api/save", { token: tA });
+const saveB = await call("/api/save", { token: tB });
+ok("双方の材料が正しく入れ替わる", saveA.data.payload.profile.inv.chalk === 3 &&
+  saveB.data.payload.profile.inv.hokori === 4 && saveB.data.payload.profile.inv.chalk === 5);
+r = await call("/api/friends", { method: "POST", token: tB, body: { action: "tradeAccept", tradeId: trade.id } });
+ok("同じ交換を二重に受け取れない", r.status === 409);
 
 // 関係ない人は見られない
 r = await call("/api/friends", { method: "POST", token: tC, body: { action: "profile", id: nameB } });

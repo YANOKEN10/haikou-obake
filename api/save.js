@@ -1,5 +1,6 @@
 // 記録の読み書き（ログインしている本人のぶんだけ）
 const L = require("./_lib");
+const TradeDb = require("./_trade-db");
 
 const MAX_BYTES = 200 * 1024;   // 記録1つの上限
 
@@ -11,7 +12,13 @@ module.exports = async function handler(req, res) {
   const claim = L.readToken(L.bearer(req));
   if (!claim) { res.status(401).json({ error: "auth", message: "ログインしなおしてください。" }); return; }
 
+  let unlockTrade = null;
   try {
+    // 保存と材料交換が同時に在庫を書き換えないよう、更新時だけ同じロックを使う。
+    if (req.method !== "GET" && TradeDb.configured()) {
+      unlockTrade = await TradeDb.lock([claim.id]);
+    }
+
     const user = await L.readUser(claim.id);
     if (!user) { res.status(404).json({ error: "gone", message: "データが見つかりませんでした。" }); return; }
 
@@ -22,6 +29,10 @@ module.exports = async function handler(req, res) {
     // アカウントごと消す（あいことばの確認が必要）
     if (req.method === "DELETE") {
       const bb = L.body(req);
+      if ((Array.isArray(user.tradesIn) && user.tradesIn.length) || (Array.isArray(user.tradesOut) && user.tradesOut.length)) {
+        res.status(409).json({ error: "trade", message: "材料交換を かたづけてから、アカウントを消してください。" });
+        return;
+      }
       if (!L.checkPw(String(bb.pw == null ? "" : bb.pw), user)) {
         await L.slowDown();
         res.status(401).json({ error: "auth", message: "あいことばが ちがいます。" });
@@ -65,5 +76,7 @@ module.exports = async function handler(req, res) {
     res.status(200).json({ user: L.publicUser(user), saved: true });
   } catch (e) {
     res.status(500).json({ error: "server", message: "サーバーにつながりませんでした。" });
+  } finally {
+    if (unlockTrade) await unlockTrade().catch(() => {});
   }
 };

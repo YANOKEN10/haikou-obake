@@ -13,6 +13,7 @@
     "test:admin": "node tools/adminpreviewtest.mjs"
   },
   "dependencies": {
-    "@vercel/blob": "^2.0.0"
+    "@vercel/blob": "^2.0.0",
+    "postgres": "^3.4.9"
   }
 }
