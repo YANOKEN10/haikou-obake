@@ -114,6 +114,14 @@ module.exports = async function handler(req, res) {
         partnerId = t && (t.from === me.id ? t.to : t.from);
       }
       unlockTrade = await TradeDb.lock([me.id, partnerId]);
+      const sendJson = res.json.bind(res);
+      res.json = (data) => {
+        const release = unlockTrade;
+        unlockTrade = null;
+        if (!release) return sendJson(data);
+        release().then(() => sendJson(data), () => sendJson(data));
+        return res;
+      };
       const fresh = await L.readUser(claim.id);
       if (!fresh) { await unlockTrade(); res.status(404).json({ error: "gone" }); return; }
       me = fresh;

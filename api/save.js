@@ -17,6 +17,14 @@ module.exports = async function handler(req, res) {
     // 保存と材料交換が同時に在庫を書き換えないよう、更新時だけ同じロックを使う。
     if (req.method !== "GET" && TradeDb.configured()) {
       unlockTrade = await TradeDb.lock([claim.id]);
+      const sendJson = res.json.bind(res);
+      res.json = (data) => {
+        const release = unlockTrade;
+        unlockTrade = null;
+        if (!release) return sendJson(data);
+        release().then(() => sendJson(data), () => sendJson(data));
+        return res;
+      };
     }
 
     const user = await L.readUser(claim.id);
