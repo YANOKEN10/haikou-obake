@@ -819,23 +819,27 @@ export class Player {
     // いま何階にいるか（階段の途中では、近いほうの階に落ち着く）
     const floorH = w.floorHeight || 3.6;
     const floors = w.floors === undefined ? 4 : w.floors;
-    this.floor = clamp(Math.round((this.y - 1.02) / floorH), 0, floors);
-    const base = indoors ? Math.min(this.floor, floors) * floorH : 0;
+    const roofHere = w.roofSurfaceAt ? w.roofSurfaceAt(this.x, this.z) : (indoors ? w.roofY : null);
+    const localFloors = indoors && roofHere !== null ? Math.max(1, Math.round(roofHere / floorH)) : floors;
+    this.floor = clamp(Math.round((this.y - 1.02) / floorH), 0, localFloors);
+    const base = indoors ? Math.min(this.floor, localFloors) * floorH : 0;
     let hover = base + 1.02 + Math.sin(t * 1.9) * 0.05;
     if (inShaft) {
       // 階段では、段の高さに沿って自然に上り下りする（奥へ進むと上へ）
       const rel = w.stairSurface(this.x, this.z, w.stairCenterX(this.x));
       let best = null;
-      for (let f = 0; f <= floors; f++) {
+      for (let f = 0; f <= localFloors; f++) {
         const cand = f * floorH + rel + 1.02;
         if (best === null || Math.abs(cand - this.y) < Math.abs(best - this.y)) best = cand;
       }
-      hover = clamp(best, 1.02, floors * floorH + 1.02);
+      hover = clamp(best, 1.02, localFloors * floorH + 1.02);
     }
     // 空のたかさ。屋根より ずっと上まで 行ける
     const skyTop = w.roofY + SKY_UP;
     // 屋根より うんと上にいる＝空をとんでいる
     const inSky = this.y > w.roofY + 3.0;
+    const onRoof = roofHere !== null && !inSky && this.y > roofHere - 1.0;
+    if (onRoof && up === 0) hover = roofHere + 1.02 + Math.sin(t * 1.9) * 0.05;
 
     if (up !== 0) {
       // 高く上がるほど、上がる速さが ゆっくりになる
@@ -850,11 +854,10 @@ export class Player {
     }
 
     let lo = 0.38, hi = skyTop;
-    const onRoof = indoors && !inSky && this.y > w.roofY - 1.0;
     if (inSky) {
       lo = 0.38; hi = skyTop;               // 空では さえぎるものが ない
     } else if (onRoof) {
-      lo = w.roofY + 0.38; hi = skyTop;     // 屋根からも そのまま 上に行ける
+      lo = roofHere + 0.38; hi = skyTop;    // 高さの違う屋根にも乗り、そのまま上へ行ける
     } else if (indoors) {
       lo = inShaft ? 0.38 : base + 0.38;
       hi = inShaft ? floors * floorH + 2.4 : base + 2.55;
@@ -871,7 +874,7 @@ export class Player {
     // 屋上に いるときは、下の階の かべ（上が 屋根で おわっている）は
     //  見えない かべに なるので、見ないことにする。
     //  屋上の さくや 塔屋は 屋根より 上まで あるので、ちゃんと ぶつかる。
-    const minTop = (this.y > w.roofY - 0.1) ? w.roofY + 0.25 : null;
+    const minTop = onRoof ? roofHere + 0.25 : ((this.y > w.roofY - 0.1) ? w.roofY + 0.25 : null);
     if (!this.phasing) {
       const r = w.colliders.resolve(nx, nz, this.radius, this.y, this.inShaft ? ["stair"] : null, minTop);
       if (r.hit) { this.vx *= 0.55; this.vz *= 0.55; }

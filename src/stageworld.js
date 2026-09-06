@@ -76,18 +76,48 @@ function gridNav(nav, col, bounds, rooms, step = 10) {
   nav.autoLink(col, step * 1.55);
 }
 
-function finalize(scene, id, mb, col, nav, rooms, spawnSpots, lightSpots, gates, ways, bounds, indoorRects, start) {
+// 分校の外周を低い尾根と高い峰の二重リングで囲む。
+// すべて静的メッシュへまとめ、遠景を増やしてもドローコールは増やさない。
+function mountainRing(mb, cx, cz) {
+  for (const [radius, count, h0, h1, color] of [
+    [76, 20, 11, 19, 0x263b38], [96, 16, 19, 34, 0x28333e],
+  ]) {
+    for (let i = 0; i < count; i++) {
+      const a = i / count * Math.PI * 2 + (i % 3 - 1) * 0.045;
+      const h = h0 + (h1 - h0) * (0.35 + 0.65 * Math.abs(Math.sin(i * 2.31)));
+      const x = cx + Math.cos(a) * radius, z = cz + Math.sin(a) * radius;
+      for (let layer = 0; layer < 3; layer++) {
+        const k = 1 - layer * 0.24;
+        mb.box(x, -2 + h * k / 2, z, 17 * k, h * k + 4, 12 * k, color,
+          { rotY: a + Math.PI / 2, jitter: 0.16 });
+      }
+    }
+  }
+}
+
+function finalize(scene, id, mb, col, nav, rooms, spawnSpots, lightSpots, gates, ways, bounds, indoorRects, start, extra = {}) {
   col.build();
   const staticMesh = mb.finish(new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 2, specular: 0x0b0d12 }));
   staticMesh.name = id;
   scene.add(staticMesh);
   const h = rectangleHelpers(bounds);
+  const roofSurfaces = extra.roofSurfaces || [];
   return {
     id, colliders: col, nav, rooms, spawnSpots, lightSpots, props: [], gates, ways,
     exit: gates[0].out, entry: start, staticMesh, triangles: mb.triangles, bounds,
-    northOutsideZ: bounds.z1 + 2, floors: 1, floorHeight: FLOOR_H, roofY: FLOOR_H,
-    start, secret: null, inSecret() { return false; }, floorOf() { return 0; },
-    stairCenterX() { return 0; }, inStairShaft() { return false; }, stairSurface() { return 0; },
+    northOutsideZ: bounds.z1 + 2, floors: extra.floors || 1, floorHeight: FLOOR_H,
+    roofY: extra.roofY || FLOOR_H, roofSurfaces,
+    roofSurfaceAt(x, z) {
+      let top = null;
+      for (const r of roofSurfaces)
+        if (x > r.x1 && x < r.x2 && z > r.z1 && z < r.z2) top = top === null ? r.y : Math.max(top, r.y);
+      return top;
+    },
+    start, secret: null, inSecret() { return false; },
+    floorOf(x, z, y = 1.02) { return Math.max(0, Math.min(extra.floors || 1, Math.round((y - 1.02) / FLOOR_H))); },
+    stairCenterX(x) { return extra.stairCenterX ? extra.stairCenterX(x) : 0; },
+    inStairShaft(x, z) { return extra.inStairShaft ? extra.inStairShaft(x, z) : false; },
+    stairSurface(x, z, cx) { return extra.stairSurface ? extra.stairSurface(x, z, cx) : 0; },
     roomAt(x, z) { return roomName(rooms, x, z); },
     isIndoors(x, z) { return indoorRects.some((r) => x > r.x1 && x < r.x2 && z > r.z1 && z < r.z2); },
     inGym() { return false; }, gymCeil: 7, inPlay: h.inPlay, clampPlay: h.clampPlay,
@@ -99,6 +129,8 @@ function buildBranch(scene, opts) {
   const mb = new MeshBuilder(), col = new Colliders(), nav = new NavGraph();
   const rooms = [], spawnSpots = [], lightSpots = [];
   const bounds = { x1: -54, x2: 54, z1: -42, z2: 74 };
+  const roofSurfaces = [];
+  const SCHOOL_TOP = FLOOR_H * 4;
   const gates = [
     { id: "s", name: "さびた正門", in: { x: 0, z: 68 }, out: { x: 0, z: 79 }, axis: "x", at: bounds.z2, w: 6 },
     { id: "e", name: "給食門", in: { x: 49, z: 18 }, out: { x: 60, z: 18 }, axis: "z", at: bounds.x2, w: 4 },
@@ -118,17 +150,28 @@ function buildBranch(scene, opts) {
     { x1: -10, x2: 10, z1: -28, z2: -12, c: 0x354a50 },
   ];
   for (const w of wings) {
-    mb.slab(w.x1, w.z1, w.x2, w.z2, 0.12, 0.24, 0x33474c);
-    mb.slab(w.x1, w.z1, w.x2, w.z2, 3.55, 0.28, 0x202b31);
-    for (const [axis, fixed, from, to] of [["x", w.z1, w.x1, w.x2], ["x", w.z2, w.x1, w.x2], ["z", w.x1, w.z1, w.z2], ["z", w.x2, w.z1, w.z2]])
-      wallWithHoles(mb, col, { axis, fixed, from, to, y1: 0, y2: 3.6, thick: 0.25, color: w.c,
-        holes: [{ a: (from + to) / 2 - 1.2, b: (from + to) / 2 + 1.2, y1: 0, y2: 2.5 }] });
-    // 冷たい月色の連続窓と、ところどころ消えた蛍光灯。
-    const n = Math.max(2, Math.floor((w.x2 - w.x1) / 5));
-    for (let i = 0; i < n; i++) {
-      mb.box(w.x1 + 2.5 + i * 5, 2.1, w.z2 + 0.15, 2.8, 1.0, 0.08, i%3===0?0x7daab8:0x456d78);
-      mb.box(w.x1 + 2.5 + i * 5, 3.32, (w.z1+w.z2)/2, 2.5, 0.08, 0.28, i%4===0?0x243237:0x9bc9c8);
+    roofSurfaces.push({ id:`school-${roofSurfaces.length}`, x1:w.x1, x2:w.x2, z1:w.z1, z2:w.z2, y:SCHOOL_TOP });
+    for (let floor = 0; floor < 4; floor++) {
+      const y1 = floor * FLOOR_H, y2 = y1 + FLOOR_H;
+      mb.slab(w.x1, w.z1, w.x2, w.z2, y1 + 0.12, 0.24, floor ? 0x27383c : 0x33474c);
+      for (const [axis, fixed, from, to] of [["x",w.z1,w.x1,w.x2],["x",w.z2,w.x1,w.x2],
+        ["z",w.x1,w.z1,w.z2],["z",w.x2,w.z1,w.z2]]) {
+        const mid = (from + to) / 2;
+        wallWithHoles(mb, col, { axis, fixed, from, to, y1, y2, thick:.25, color:w.c,
+          holes:[{ a:mid-1.2,b:mid+1.2,y1:y1+(floor?1.0:0),y2:y1+2.55 }] });
+        // 上階の開口は青白い窓。床まで開くのは1階の出入口だけ。
+        if (floor) {
+          if (axis === "x") mb.box(mid,y1+1.78,fixed+(fixed===w.z2?.14:-.14),2.15,1.35,.08,0x527d88);
+          else mb.box(fixed+(fixed===w.x2?.14:-.14),y1+1.78,mid,.08,1.35,2.15,0x527d88);
+        }
+      }
+      // 各階の窓帯・梁・傷んだ床縁で、4層の高さを遠くからも読めるようにする。
+      for (let x = w.x1 + 2.5; x < w.x2 - 1; x += 5)
+        mb.box(x,y1+2.05,w.z2+.15,2.7,1.05,.08,(floor+Math.round(x))%3===0?0x7daab8:0x456d78);
+      mb.box((w.x1+w.x2)/2,y2-.18,(w.z1+w.z2)/2,w.x2-w.x1,.14,.26,0x9a8d79);
     }
+    mb.slab(w.x1, w.z1, w.x2, w.z2, SCHOOL_TOP, 0.34, 0x202b31);
+    for (const z of [w.z1+.35,w.z2-.35]) mb.box((w.x1+w.x2)/2,SCHOOL_TOP+.42,z,w.x2-w.x1,.84,.28,0x74675a);
   }
   const indoorRects = wings;
   addRoom(rooms, spawnSpots, "toilet", "青ざめた旧トイレ", "toilet", -36, -25, -12, -7, 0.7);
@@ -141,23 +184,23 @@ function buildBranch(scene, opts) {
   // 添付された英国学校の外観を手がかりにした、赤れんがと石飾りのゴシック校舎。
   // 尖塔は段を重ねた軽い箱で表し、静的メッシュ1個のまま遠景の輪郭を豊かにする。
   for (const [tx, tz] of [[-38,-28],[38,-28],[-38,18],[38,18]]) {
-    mb.box(tx,4.6,tz,4.8,9.2,4.8,0x713c36);
-    mb.box(tx,9.5,tz,3.7,.65,3.7,0xb0a58c);
-    mb.box(tx,10.3,tz,2.7,1.1,2.7,0x654244);
-    mb.box(tx,11.15,tz,1.65,.65,1.65,0x34343b);
-    mb.box(tx,12.0,tz,.72,1.1,.72,0x282a31);
+    mb.box(tx,7.2,tz,4.8,14.4,4.8,0x713c36);
+    mb.box(tx,14.75,tz,3.7,.65,3.7,0xb0a58c);
+    mb.box(tx,15.6,tz,2.7,1.1,2.7,0x654244);
+    mb.box(tx,16.55,tz,1.65,.8,1.65,0x34343b);
+    mb.box(tx,17.7,tz,.72,1.5,.72,0x282a31);
   }
   // 正面時計塔、煙突、胸壁。夜でも校舎の入口を見失わない目印になる。
-  mb.box(0,6.4,-27.4,7.5,12.8,5.2,0x774139);
-  mb.box(0,10.4,-24.72,3.3,3.3,.12,0xd0c7a5);
-  mb.box(0,10.4,-24.62,.18,1.15,.08,0x34333a);
-  mb.box(.42,10.25,-24.61,.9,.16,.08,0x34333a,{rotY:.55});
+  mb.box(0,9,-27.4,7.5,18,5.2,0x774139);
+  mb.box(0,15.5,-24.72,3.3,3.3,.12,0xd0c7a5);
+  mb.box(0,15.5,-24.62,.18,1.15,.08,0x34333a);
+  mb.box(.42,15.35,-24.61,.9,.16,.08,0x34333a,{rotY:.55});
   for(const x of [-34,-26,-18,18,26,34]) {
-    mb.box(x,5.4,-25.5,1.15,4.2,1.15,0x5f3934);
-    mb.box(x,7.65,-25.5,.72,.45,.72,0xb4aa91);
+    mb.box(x,14.7,-25.5,1.15,4.2,1.15,0x5f3934);
+    mb.box(x,16.95,-25.5,.72,.45,.72,0xb4aa91);
   }
   for(const x of [-34,-28,-22,-16,-10,10,16,22,28,34])
-    mb.box(x,4.12,18.2,2.1,1.0,.55,0xa69d88);
+    mb.box(x,14.78,18.2,2.1,1.0,.55,0xa69d88);
 
   // 石縁の縦長窓。上部を三段に狭め、簡素な尖頭アーチに見せる。
   for(const z of [-20,-11,-2,7,14]) for(const sx of [-1,1]) {
@@ -195,9 +238,24 @@ function buildBranch(scene, opts) {
   for (const x of [-3.2, 3.2]) mb.box(x, 0.08, 49, 0.16, 0.04, 34, 0xb7aa72);
   openHall(mb, col, -48, 35, -18, 61, "e", 0x48585b, 5.2);
   openHall(mb, col, 18, 35, 48, 61, "w", 0x4d5652, 4.5);
+  roofSurfaces.push(
+    { id:"gym",x1:-48,x2:-18,z1:35,z2:61,y:5.2 },
+    { id:"dining",x1:18,x2:48,z1:35,z2:61,y:4.5 },
+  );
   addRoom(rooms, spawnSpots, "gym", "古い集会体育室", "gym", -47, 36, -19, 60, 0.55);
   addRoom(rooms, spawnSpots, "dining", "配膳台のある食堂", "home", 19, 36, 47, 60, 0.55);
   indoorRects.push({ x1:-48,x2:-18,z1:35,z2:61 }, { x1:18,x2:48,z1:35,z2:61 });
+  // 校舎から体育館・食堂へつながる屋根つき渡り廊下。
+  // 開放廊下なので視線と動線を遮らず、柱だけで古い増築部分を見せる。
+  for (const x of [-28, 28]) {
+    mb.slab(x-2.4,18,x+2.4,35,3.35,.3,0x303a3c);
+    roofSurfaces.push({ id:x<0?"west-corridor":"east-corridor",x1:x-2.4,x2:x+2.4,z1:18,z2:35,y:3.35 });
+    for (let z=19;z<=34;z+=3) {
+      mb.box(x-2.15,1.65,z,.22,3.3,.22,0x596268);
+      mb.box(x+2.15,1.65,z,.22,3.3,.22,0x596268);
+    }
+    mb.box(x,3.46,26.5,4.9,.18,17.2,0x687277);
+  }
   // 体育室：コート線、舞台、畳まれた観客席。
   mb.slab(-44, 39, -22, 57, .2, .035, 0x6b614e);
   for (const x of [-42,-34,-26]) mb.box(x,.235,48,.08,.025,16,0xd6c987);
@@ -303,13 +361,26 @@ function buildBranch(scene, opts) {
   mb.box(0, 5.5, -24, 4.6, 11, 4.6, 0x414b54);
   mb.box(0, 7.5, -21.65, 2.3, 2.3, 0.08, 0xd8d1b5);
   for (let i = 0; i < 5; i++) mb.box(-0.8 + i * 0.4, 7.5, -21.55, 0.08, 0.9 - Math.abs(i - 2) * 0.2, 0.06, 0x25252b);
+  // 校地の四方を山で囲み、正門側には石垣と杉並木を置いて山間の分校らしくする。
+  mountainRing(mb, 0, 16);
+  for (const side of [-1,1]) for (let z=-34;z<=68;z+=8) {
+    const x=side*51;
+    mb.box(x,.55,z,1.2,1.1,4.8,0x59605a,{jitter:.2});
+    mb.box(x,3.5,z,.55,5.8,.55,0x303d31);
+    for(let n=0;n<4;n++) mb.box(x,5+n*1.05,z,4.8-n*.8,1.0,4.8-n*.8,0x263a2d,{rotY:n*.38,jitter:.16});
+  }
   fence(mb, col, bounds, gates, 0x3b464b);
   for (let i = 0; i < 90 * (opts.grass || 1); i++) mb.tuft(rand(-48, 48), rand(22, 66), 0.08, rand(0.35, 0.8), 0x26382f, 0x465449, 2);
   for (const x of [-28, 0, 28]) for (const z of [-20, 8, 35, 60]) lightSpots.push({ x, y: 3.0, z, floor: 0 });
   // 奥棟の中央ドアへ正面から入る点。斜めの最短線だと壁の角をかすめる。
   nav.addNode(0, -10, 0, "地下資料庫への入口", 0);
   gridNav(nav, col, bounds, rooms, 9);
-  return finalize(scene, "branch", mb, col, nav, rooms, spawnSpots, lightSpots, gates, ways, bounds, indoorRects, { x: 0, z: 56 });
+  return finalize(scene, "branch", mb, col, nav, rooms, spawnSpots, lightSpots, gates, ways, bounds,
+    indoorRects, { x: 0, z: 56 }, {
+      floors:4, roofY:SCHOOL_TOP, roofSurfaces,
+      inStairShaft:(x,z)=>x>-4&&x<4&&z>-27&&z<-12,
+      stairSurface:(x,z)=>Math.max(0,Math.min(FLOOR_H,(z+27)/15*FLOOR_H)),
+    });
 }
 
 function buildPark(scene, opts) {

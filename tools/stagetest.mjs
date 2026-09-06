@@ -18,6 +18,14 @@ for (const id of ["branch", "park"]) {
   assert.ok(world.spawnSpots.length >= 40, `${id}: 拾いものの場所`);
   assert.equal(world.gates.length, 4, `${id}: 人間の出入口は4か所`);
   assert.ok(world.rooms.length >= 8, `${id}: 内部を含む8エリア以上`);
+  if (id === "branch") {
+    assert.equal(world.floors, 4, "branch: 大校舎は4階建て");
+    for (const roofId of ["gym","dining","west-corridor","east-corridor"])
+      assert.ok(world.roofSurfaces.some((r)=>r.id===roofId), `branch: ${roofId}の屋根を登録`);
+    assert.equal(world.roofSurfaceAt(-33,48),5.2,"branch: 体育館屋根の高さ");
+    assert.equal(world.roofSurfaceAt(-28,26),3.35,"branch: 渡り廊下屋根の高さ");
+    assert.equal(world.roofSurfaceAt(-24,-8),14.4,"branch: 4階校舎屋根の高さ");
+  }
   const start = world.nav.nearest(world.entry.x, world.entry.z, 0, world.colliders, 99, 0);
   assert.ok(start >= 0, `${id}: 開始地点に道がある`);
   for (const room of world.rooms) {
@@ -33,10 +41,23 @@ for (const id of ["branch", "park"]) {
   const player = new Player(scene, world, "obake");
   player.x = world.start.x; player.z = world.start.z;
   const input = { mouseDX: 0, mouseDY: 0, axisX: 0, axisZ: -1, dash: false, k: () => false };
+  const roofInput = { ...input, axisZ: 0 };
   const camera = new THREE.PerspectiveCamera();
   for (let i = 1; i <= 120; i++) player.update(1 / 60, input, camera, i / 60);
   assert.ok(Number.isFinite(player.x + player.y + player.z), `${id}: 2秒間の移動計算`);
   assert.ok(world.inPlay(player.x, player.z), `${id}: プレイヤーがマップ内にいる`);
+  if (id === "branch") {
+    for (const [name,x,z,roof] of [
+      ["体育館",-33,48,5.2],["食堂",33,48,4.5],
+      ["西渡り廊下",-28,26,3.35],["東渡り廊下",28,26,3.35],
+      ["西4階校舎",-24,-8,14.4],["東4階校舎",24,-8,14.4],["北4階校舎",0,-20,14.4],
+    ]) {
+      const roofPlayer = new Player(scene,world,"obake");
+      roofPlayer.x=x; roofPlayer.z=z; roofPlayer.y=roof+1.5;
+      for(let i=1;i<=150;i++) roofPlayer.update(1/60,roofInput,camera,i/60);
+      assert.ok(Math.abs(roofPlayer.y-(roof+1.02))<.2,`branch: ${name}の屋根に着地して立てる`);
+    }
+  }
 }
 
 console.log("stage test: 解放境界4件・別マップ2件・4入口から全エリアへの経路を確認");
