@@ -1,6 +1,6 @@
 import * as THREE from "../lib/three.module.js";
 import { MeshBuilder, wallWithHoles } from "./meshbuild.js";
-import { Colliders, NavGraph, rand } from "./util.js";
+import { Colliders, NavGraph, rand, roofHeightAt } from "./util.js";
 
 const FLOOR_H = 3.6;
 
@@ -108,10 +108,7 @@ function finalize(scene, id, mb, col, nav, rooms, spawnSpots, lightSpots, gates,
     northOutsideZ: bounds.z1 + 2, floors: extra.floors || 1, floorHeight: FLOOR_H,
     roofY: extra.roofY || FLOOR_H, roofSurfaces,
     roofSurfaceAt(x, z) {
-      let top = null;
-      for (const r of roofSurfaces)
-        if (x > r.x1 && x < r.x2 && z > r.z1 && z < r.z2) top = top === null ? r.y : Math.max(top, r.y);
-      return top;
+      return roofHeightAt(roofSurfaces, x, z);
     },
     start, secret: null, inSecret() { return false; },
     floorOf(x, z, y = 1.02) { return Math.max(0, Math.min(extra.floors || 1, Math.round((y - 1.02) / FLOOR_H))); },
@@ -249,7 +246,7 @@ function buildBranch(scene, opts) {
   // 開放廊下なので視線と動線を遮らず、柱だけで古い増築部分を見せる。
   for (const x of [-28, 28]) {
     mb.slab(x-2.4,18,x+2.4,35,3.35,.3,0x303a3c);
-    roofSurfaces.push({ id:x<0?"west-corridor":"east-corridor",x1:x-2.4,x2:x+2.4,z1:18,z2:35,y:3.35 });
+    roofSurfaces.push({ id:x<0?"west-corridor":"east-corridor",x1:x-2.45,x2:x+2.45,z1:17.9,z2:35.1,y:3.55 });
     for (let z=19;z<=34;z+=3) {
       mb.box(x-2.15,1.65,z,.22,3.3,.22,0x596268);
       mb.box(x+2.15,1.65,z,.22,3.3,.22,0x596268);
@@ -428,6 +425,7 @@ function buildPark(scene, opts) {
   ];
   // お化け屋敷。傾いた入口と、ぎざぎざの屋根で大きな顔に見える。
   const gh = indoorRects[0];
+  const roofSurfaces = [{ id:"ghosthouse", ...gh, y:5.0 }];
   mb.slab(gh.x1, gh.z1, gh.x2, gh.z2, 0.12, 0.24, 0x2b202a);
   mb.slab(gh.x1, gh.z1, gh.x2, gh.z2, 5.0, 0.35, 0x1c1720);
   for (const [axis, fixed, from, to] of [["x", gh.z1, gh.x1, gh.x2], ["x", gh.z2, gh.x1, gh.x2], ["z", gh.x1, gh.z1, gh.z2], ["z", gh.x2, gh.z1, gh.z2]])
@@ -468,6 +466,7 @@ function buildPark(scene, opts) {
   const cx=-22, cz=25, cr=9;
   mb.box(cx,0.35,cz,19,0.7,19,0x4a2d46,{rotY:Math.PI/4});
   mb.box(cx,4.0,cz,19.5,0.35,19.5,0x7b2f43,{rotY:Math.PI/4});
+  roofSurfaces.push({ id:"carousel", x1:cx-9.75,x2:cx+9.75,z1:cz-9.75,z2:cz+9.75,y:4.175,rotY:Math.PI/4 });
   mb.box(cx,2.1,cz,0.9,4.2,0.9,0xd6a84d);
   for(let i=0;i<16;i++){
     const a=i/16*Math.PI*2, x=cx+Math.cos(a)*cr, z=cz+Math.sin(a)*cr;
@@ -490,6 +489,7 @@ function buildPark(scene, opts) {
   // 観覧車側の飲食広場と、内部を歩けるバンパーカー館。
   for(const x of [17,23,29,35,41]) for(const z of [47,53]) tableSet(mb,x,z,0x514b56);
   openHall(mb,col,20,-25,49,-8,"s",0x3f3d50,4.8);
+  roofSurfaces.push({ id:"bumper",x1:20,x2:49,z1:-25,z2:-8,y:4.8 });
   addRoom(rooms,spawnSpots,"bumper","火花の消えた電気自動車場","gym",21,-24,48,-9,.62);
   indoorRects.push({x1:20,x2:49,z1:-25,z2:-8});
   for(let x=24;x<=45;x+=7) for(let z=-21;z<=-13;z+=8){
@@ -498,6 +498,7 @@ function buildPark(scene, opts) {
   }
   // 景品ゲーム館。筐体、景品棚、交換カウンターが残る。
   openHall(mb,col,-49,-25,-20,-8,"s",0x493846,4.8);
+  roofSurfaces.push({ id:"arcade",x1:-49,x2:-20,z1:-25,z2:-8,y:4.8 });
   addRoom(rooms,spawnSpots,"arcade","景品が残るゲーム館","art",-48,-24,-21,-9,.62);
   indoorRects.push({x1:-49,x2:-20,z1:-25,z2:-8});
   for(let x=-45;x<=-24;x+=5) for(const z of [-21,-16,-11]){
@@ -525,6 +526,7 @@ function buildPark(scene, opts) {
 
   // 屋内列車庫：ホーム、蒸気機関車、アーチ屋根の骨組み。
   openHall(mb,col,-18,-25,16,-12,"s",0x393843,6.2);
+  roofSurfaces.push({ id:"trainhall",x1:-18,x2:16,z1:-25,z2:-12,y:6.2 });
   addRoom(rooms,spawnSpots,"trainhall","夜行列車の車庫","music",-17,-24,15,-13,.65);
   indoorRects.push({x1:-18,x2:16,z1:-25,z2:-12});
   mb.box(-10,.35,-19,29,.7,2.3,0x56505a);
@@ -620,7 +622,7 @@ function buildPark(scene, opts) {
   nav.addNode(-8,2.5,0,"曲がる夜店の路地",0);
   nav.addNode(-15,19,0,"夜店の路地入口",0);
   gridNav(nav, col, bounds, rooms, 9);
-  return finalize(scene, "park", mb, col, nav, rooms, spawnSpots, lightSpots, gates, ways, bounds, indoorRects, { x: 0, z: 64 });
+  return finalize(scene, "park", mb, col, nav, rooms, spawnSpots, lightSpots, gates, ways, bounds, indoorRects, { x: 0, z: 64 }, { roofSurfaces });
 }
 
 export function buildStageWorld(scene, id, opts = {}) {

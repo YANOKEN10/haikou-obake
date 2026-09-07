@@ -768,6 +768,7 @@ export class Player {
 
   update(dt, input, camera, t) {
     const w = this.world;
+    const previousY = this.y;
 
     // --- 視点回転 ------------------------------------------
     this.camYaw -= input.mouseDX * 0.0026;
@@ -820,7 +821,7 @@ export class Player {
     const floorH = w.floorHeight || 3.6;
     const floors = w.floors === undefined ? 4 : w.floors;
     const roofHere = w.roofSurfaceAt ? w.roofSurfaceAt(this.x, this.z) : (indoors ? w.roofY : null);
-    const localFloors = indoors && roofHere !== null ? Math.max(1, Math.round(roofHere / floorH)) : floors;
+    const localFloors = indoors && roofHere !== null ? Math.min(floors, Math.max(1, Math.round(roofHere / floorH))) : floors;
     this.floor = clamp(Math.round((this.y - 1.02) / floorH), 0, localFloors);
     const base = indoors ? Math.min(this.floor, localFloors) * floorH : 0;
     let hover = base + 1.02 + Math.sin(t * 1.9) * 0.05;
@@ -838,7 +839,9 @@ export class Player {
     const skyTop = w.roofY + SKY_UP;
     // 屋根より うんと上にいる＝空をとんでいる
     const inSky = this.y > w.roofY + 3.0;
-    const onRoof = roofHere !== null && !inSky && this.y > roofHere - 1.0;
+    // 空中から降りてくるときも、足元の屋根を先に見る。
+    // マップ共通の空判定で除外すると、高い屋根を抜けたり着地が振動したりする。
+    const onRoof = roofHere !== null && this.y >= roofHere + 0.25;
     if (onRoof && up === 0) hover = roofHere + 1.02 + Math.sin(t * 1.9) * 0.05;
 
     if (up !== 0) {
@@ -854,10 +857,10 @@ export class Player {
     }
 
     let lo = 0.38, hi = skyTop;
-    if (inSky) {
-      lo = 0.38; hi = skyTop;               // 空では さえぎるものが ない
-    } else if (onRoof) {
-      lo = roofHere + 0.38; hi = skyTop;    // 高さの違う屋根にも乗り、そのまま上へ行ける
+    if (onRoof) {
+      lo = roofHere + 0.38; hi = Math.max(skyTop, lo); // 屋根から上へも浮ける
+    } else if (inSky) {
+      lo = 0.38; hi = skyTop;
     } else if (indoors) {
       lo = inShaft ? 0.38 : base + 0.38;
       hi = inShaft ? floors * floorH + 2.4 : base + 2.55;
@@ -874,7 +877,11 @@ export class Player {
     // 屋上に いるときは、下の階の かべ（上が 屋根で おわっている）は
     //  見えない かべに なるので、見ないことにする。
     //  屋上の さくや 塔屋は 屋根より 上まで あるので、ちゃんと ぶつかる。
-    const minTop = onRoof ? roofHere + 0.25 : ((this.y > w.roofY - 0.1) ? w.roofY + 0.25 : null);
+    // 進入先も調べ、軒へ渡る瞬間だけ下の壁に押し戻されるのを防ぐ。
+    const nextRoof = w.roofSurfaceAt ? w.roofSurfaceAt(nx, nz) : null;
+    const stepRoof = onRoof && nextRoof !== null && Math.abs(nextRoof - roofHere) <= 0.6;
+    const entersRoof = nextRoof !== null && (this.y >= nextRoof + 0.25 || stepRoof);
+    const minTop = entersRoof ? nextRoof + 0.25 : (onRoof ? roofHere + 0.25 : null);
     if (!this.phasing) {
       const r = w.colliders.resolve(nx, nz, this.radius, this.y, this.inShaft ? ["stair"] : null, minTop);
       if (r.hit) { this.vx *= 0.55; this.vz *= 0.55; }
@@ -891,6 +898,15 @@ export class Player {
     const B = w.bounds;
     this.x = clamp(nx, B.x1, B.x2);
     this.z = clamp(nz, B.z1, B.z2);
+    // 衝突で確定した移動先で再確認する。降下と横移動が同時でも屋根を抜けない。
+    const landedRoof = w.roofSurfaceAt ? w.roofSurfaceAt(this.x, this.z) : null;
+    if (landedRoof !== null && (previousY >= landedRoof + 0.38 ||
+        (onRoof && Math.abs(landedRoof - roofHere) <= 0.6))) {
+      if (this.y < landedRoof + 0.38) {
+        this.y = landedRoof + 0.38;
+        this.vy = Math.max(0, this.vy);
+      }
+    }
 
     const moving = Math.hypot(this.vx, this.vz);
     if (moving > 0.4) this.yaw = angleLerp(this.yaw, Math.atan2(this.vx, this.vz), clamp(dt * 9, 0, 1));

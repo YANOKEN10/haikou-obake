@@ -10,6 +10,7 @@
     "test:hidden": "node tools/hiddentest.mjs",
     "test:floors": "node tools/floortest.mjs",
     "test:stage": "node tools/stagetest.mjs",
+    "test:roof": "node tools/rooftest.mjs",
     "test:admin": "node tools/adminpreviewtest.mjs"
   },
   "dependencies": {

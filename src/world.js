@@ -1,6 +1,6 @@
 import * as THREE from "../lib/three.module.js";
 import { MeshBuilder, wallWithHoles } from "./meshbuild.js";
-import { Colliders, NavGraph, rand, choice, clamp, dist2 } from "./util.js";
+import { Colliders, NavGraph, rand, choice, clamp, dist2, roofHeightAt } from "./util.js";
 import { FLOOR_ROOMS, FLOOR_LABEL, ST_W, ST_E } from "./rooms.js";
 
 export const FLOOR_H = 3.6;
@@ -100,7 +100,12 @@ export function buildWorld(scene, opts = {}) {
   const spawnSpots = [];
   const props = [];
   const lightSpots = [];
-  const ctx = { mb, col, nav, rooms, spawnSpots, props, lightSpots, opts };
+  const roofSurfaces = [
+    { id: "school", x1: BX1, x2: BX2, z1: RZ1, z2: HZ2, y: floorY(FLOORS) },
+    { id: "corridor", x1: WR.x-WR.w-.3, x2: WR.x+WR.w+.3, z1: WR.z1, z2: WR.z2, y: 3.05 },
+    { id: "annex", x1: ANNEX.x1-.4, x2: ANNEX.x2+.4, z1: ANNEX.z1-.4, z2: ANNEX.z2+.4, y: 3.5 },
+  ];
+  const ctx = { mb, col, nav, rooms, spawnSpots, props, lightSpots, opts, roofSurfaces };
 
   buildYard(ctx, opts.dust || 700);
   buildWatariRouka(ctx);
@@ -131,7 +136,8 @@ export function buildWorld(scene, opts = {}) {
     bounds: { x1: -52, x2: 52, z1: -36, z2: 82 },
     northOutsideZ: RZ1 - 1.6,
     floors: FLOORS, floorHeight: FLOOR_H,
-    roofY: floorY(FLOORS),
+    roofY: floorY(FLOORS), roofSurfaces,
+    roofSurfaceAt(x, z) { return roofHeightAt(roofSurfaces, x, z); },
     secret: SECRET,
     inSecret(x, z, y) { return x > SECRET.x1 && x < SECRET.x2 && z > SECRET.z1 && z < SECRET.z2 && Math.abs(y - SECRET.y) < 4; },
     floorOf(y) { return Math.max(0, Math.min(FLOORS - 1, Math.round(y / FLOOR_H))); },
@@ -2030,10 +2036,16 @@ function buildGym(ctx) {
         mb.box(G.x1 - 0.7 + (G.x2 - G.x1 + 1.4) / 2, y + hh / 2, (zA + zB) / 2,
           G.x2 - G.x1 + 1.4, hh, Math.abs(zA - zB) + 0.34,
           k % 2 ? ROOF : ROOF2, { jitter: 0.14 });
+        // 描画した瓦の上面をそのまま使う。体育館の天井に引き戻さず、斜面にも立てる。
+        ctx.roofSurfaces.push({ x1:G.x1-.7, x2:G.x2+.7,
+          z1:Math.min(zA,zB)-.17, z2:Math.max(zA,zB)+.17, y:y+hh });
       }
     }
     // むね（いちばん上の かわら）
     mb.box((G.x1 + G.x2) / 2, H - 0.2 + RISE + 0.14, cz2, G.x2 - G.x1 + 1.6, 0.34, 0.7, 0x232223, { jitter: 0.1 });
+
+    ctx.roofSurfaces.push({ id:"gym-ridge", x1:G.x1-.8, x2:G.x2+.8,
+      z1:cz2-.35, z2:cz2+.35, y:H-.2+RISE+.31 });
 
     // 東と西の 妻（つま）：三角の板壁でふさぐ
     for (const [xx, side] of [[G.x1, -1], [G.x2, 1]]) {

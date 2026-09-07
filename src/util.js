@@ -30,6 +30,23 @@ export function nearOnFloor(ax, az, ay, bx, bz, by, radius, floorGap = 1.8) {
   return Math.abs((ay || 0) - (by || 0)) < floorGap && dist(ax, az, bx, bz) < radius;
 }
 
+// 見た目と同じ屋根の範囲から、足元を支えるいちばん高い面を選ぶ。
+// 回転した屋根はローカル座標に戻して判定し、四隅の空中に床を作らない。
+export function roofHeightAt(surfaces, x, z) {
+  let top = null;
+  for (const r of surfaces) {
+    let px = x, pz = z;
+    if (r.rotY) {
+      const cx = (r.x1 + r.x2) / 2, cz = (r.z1 + r.z2) / 2;
+      const dx = x - cx, dz = z - cz, c = Math.cos(r.rotY), s = Math.sin(r.rotY);
+      px = cx + dx * c + dz * s; pz = cz - dx * s + dz * c;
+    }
+    if (px >= r.x1 && px <= r.x2 && pz >= r.z1 && pz <= r.z2)
+      top = top === null ? r.y : Math.max(top, r.y);
+  }
+  return top;
+}
+
 export function angleLerp(a, b, t) {
   let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
   if (d < -Math.PI) d += Math.PI * 2;

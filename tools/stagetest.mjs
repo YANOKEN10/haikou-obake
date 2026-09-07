@@ -23,7 +23,7 @@ for (const id of ["branch", "park"]) {
     for (const roofId of ["gym","dining","west-corridor","east-corridor"])
       assert.ok(world.roofSurfaces.some((r)=>r.id===roofId), `branch: ${roofId}の屋根を登録`);
     assert.equal(world.roofSurfaceAt(-33,48),5.2,"branch: 体育館屋根の高さ");
-    assert.equal(world.roofSurfaceAt(-28,26),3.35,"branch: 渡り廊下屋根の高さ");
+    assert.equal(world.roofSurfaceAt(-28,26),3.55,"branch: 渡り廊下屋根の高さ");
     assert.equal(world.roofSurfaceAt(-24,-8),14.4,"branch: 4階校舎屋根の高さ");
   }
   const start = world.nav.nearest(world.entry.x, world.entry.z, 0, world.colliders, 99, 0);
@@ -49,7 +49,7 @@ for (const id of ["branch", "park"]) {
   if (id === "branch") {
     for (const [name,x,z,roof] of [
       ["体育館",-33,48,5.2],["食堂",33,48,4.5],
-      ["西渡り廊下",-28,26,3.35],["東渡り廊下",28,26,3.35],
+      ["西渡り廊下",-28,26,3.55],["東渡り廊下",28,26,3.55],
       ["西4階校舎",-24,-8,14.4],["東4階校舎",24,-8,14.4],["北4階校舎",0,-20,14.4],
     ]) {
       const roofPlayer = new Player(scene,world,"obake");
