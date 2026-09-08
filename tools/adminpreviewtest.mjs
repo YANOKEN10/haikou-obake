@@ -24,7 +24,7 @@ function request(method, key) {
 
 assert.equal(stageUnlocked(STAGES[1], 0, true), true, "管理者は分校を試験できる");
 assert.equal(stageUnlocked(STAGES[2], 0, true), true, "管理者は遊園地を試験できる");
-assert.equal(Object.keys(CHARS).length, 17, "試験対象は全17キャラ");
+assert.equal(Object.keys(CHARS).length, 18, "試験対象は全18キャラ");
 assert.ok(Object.keys(MATERIALS).length > 0 && Object.keys(TRAPS).length > 0, "全材料・仕掛けの表がある");
 assert.ok(PAINTS.length > 3 && Object.keys(UPGRADES).length === 5, "全色・全強化の表がある");
 const main = readFileSync(new URL("../src/main.js", import.meta.url), "utf8");
@@ -54,4 +54,4 @@ try {
   else process.env.ADMIN_PREVIEW_KEY = old;
 }
 
-console.log("admin preview test: 全17キャラ・全道具・ステージ2件・認証4件成功");
+console.log("admin preview test: 全18キャラ・全道具・ステージ2件・認証4件成功");

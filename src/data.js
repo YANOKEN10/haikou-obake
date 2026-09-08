@@ -187,6 +187,14 @@ export const CHARS = {
     desc: "白いマスクと長い髪で、放課後の曲がり角に現れる妖怪。",
     tip: "すばやく近づき、ふりむいたところを おどかせる。",
   },
+  kubinashi: {
+    name: "首無しライダー", icon: "🏍️", order: 17,
+    cost: { 4: 8, 5: 2 },
+    speed: 1.30, dash: 1.40, phase: 1.04, scare: 1.24, reach: 1.12, size: 1.00,
+    body: 0x948879, glow: 0x68675c,
+    desc: "古いバイクにまたがり、長いマントをひるがえす首のないライダー。",
+    tip: "車輪を回して すばやく走る。すりぬけで 壁の向こうへ。",
+  },
   jinmenken: {
     name: "人面犬", icon: "🐕", order: 16, hidden: true,
     unlock: { key: "pincer", at: 250, label: "はさみうち成功 250回" },

@@ -1,4 +1,5 @@
 import * as THREE from "../lib/three.module.js";
+import { buildHeadlessRider } from "./rider-model.js";
 import { buildTekeke, buildYukionna, buildAmanojakuMane, animateReferenceCharacter } from "./character-models.js";
 import { clamp, lerp, angleLerp } from "./util.js";
 import { CHARS, UPG_STEP, paintById } from "./data.js";
@@ -261,7 +262,7 @@ export class Player {
     this.tails = null;
     this.foot = null;
     this.extras = [];
-    this.tekekeRig = null; this.yukiRig = null;
+    this.tekekeRig = null; this.yukiRig = null; this.riderRig = null;
     const M = (c, opt) => new THREE.MeshLambertMaterial({ color: c, emissive: opt && opt.e !== undefined ? opt.e : c,
       emissiveIntensity: opt && opt.i !== undefined ? opt.i : 0.35 });
     const B = (c) => new THREE.MeshBasicMaterial({ color: c });
@@ -618,6 +619,9 @@ export class Player {
       const obi = add(new THREE.Mesh(new THREE.CylinderGeometry(0.51, 0.51, 0.17, 12), M(0xe5b94a)), "deco");
       obi.position.y = 0.81;
 
+    } else if (id === "kubinashi") {
+      for(const m of [this.head,this.skirt,this.handL,this.handR,this.eyeL,this.eyeR,this.mouth]) m.visible=false;
+      buildHeadlessRider(this);
     } else if (id === "tekeke") {
       this.head.visible = false; this.skirt.visible = false;
       this.handL.visible = false; this.handR.visible = false;
@@ -938,7 +942,7 @@ export class Player {
     this.light.intensity = 1.6 + p * 3.6 + Math.sin(t * 3.1) * 0.12;
 
     animateReferenceCharacter(this, t, moving, p);
-    if (this.tekekeRig || this.yukiRig || this.charId === "amanojaku") {
+    if (this.tekekeRig || this.yukiRig || this.riderRig || this.charId === "amanojaku") {
       // すりぬけ中は、新しいモデルも本体と同じ透明度にする。
       for (const mesh of this.extras) mesh.material.opacity = this.bodyMat.opacity;
     }

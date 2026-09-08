@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import * as THREE from '../lib/three.module.js';
+import {Player,buildGhostLook} from '../src/player.js';
+import {CHARS,charExchangeMode,validOwnedChars} from '../src/data.js';
+import {readFileSync} from 'node:fs';
+const p=new Player(new THREE.Scene(),{},'kubinashi');
+assert.equal(p.head.visible,false,'首のないモデルに基本の頭を表示しない');
+assert.equal(charExchangeMode('kubinashi',false),'buy');
+assert.equal(validOwnedChars({kubinashi:1},{}).kubinashi,1,'保存した所有状態を復元できる');
+assert.deepEqual(CHARS.kubinashi.cost,{4:8,5:2});
+const rig=p.riderRig;rig.update(1,0,0);
+const still=rig.wheels[0].rotation.x,cloth=Array.from(rig.cape.geometry.attributes.position.array);
+rig.update(1.1,0,0);assert.equal(rig.wheels[0].rotation.x,still,'停車中のタイヤを回さない');
+assert.notDeepEqual(Array.from(rig.cape.geometry.attributes.position.array),cloth,'停車中もマントが風で揺れる');
+rig.update(1.2,6,0);assert.ok(rig.wheels[0].rotation.x>still,'走行に合わせて車輪を回す');
+const moving=rig.wheels[0].rotation.x;rig.update(1.3,0,0);assert.equal(rig.wheels[0].rotation.x,moving,'停止時に車輪の角度を飛ばさない');
+for(let i=0;i<120;i++){rig.update(2+i/60,i<60?6:0,i>80?1:0);assert.ok(Array.from(rig.cape.geometry.attributes.position.array).every(Number.isFinite));}
+p.phasing=true;for(let i=0;i<60;i++)p.applyPose(1/60,4+i/60,6);
+assert.ok(p.extras.every(m=>Math.abs(m.material.opacity-.34)<.01),'マントとバイク全体がすり抜け中に薄くなる');
+const peer=buildGhostLook('kubinashi');assert.equal(peer.extras.length,p.extras.length,'自分と相手で同じモデルを使う');
+p.setChar('obake');assert.equal(p.riderRig,null,'着替えで古いマントを更新しない');p.applyPose(1/60,6,0);p.setChar('kubinashi');assert.notEqual(p.riderRig,rig);
+assert.ok(readFileSync(new URL('../sw.js',import.meta.url),'utf8').includes('./src/rider-model.js'),'オフライン用に新しいモデルを保存する');
+console.log('rider test: 選択・保存・車輪・布の変形・透明化・着替え・相手表示・オフライン登録 passed');

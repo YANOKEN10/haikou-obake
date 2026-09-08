@@ -899,9 +899,9 @@ export class PeerGhost {
     this.g.scale.setScalar(PEER_SCALE * s * (this.charSize || 1));
     if (this.skirtMat) this.skirtMat.opacity = p.phasing ? 0.36 : 0.9;
     if (this.shell) {
-      animateReferenceCharacter(this.shell, t, 0, p.scaring || 0);
+      animateReferenceCharacter(this.shell, t, Math.hypot(p.vx || 0, p.vz || 0), p.scaring || 0);
       this.shell.animateMane(t, 0);
-      if (this.shell.tekekeRig || this.shell.yukiRig || this.shell.charId === "amanojaku") {
+      if (this.shell.tekekeRig || this.shell.yukiRig || this.shell.riderRig || this.shell.charId === "amanojaku") {
         for (const mesh of this.shell.extras) mesh.material.opacity = p.phasing ? 0.4 : 0.9;
       }
     }

@@ -1,7 +1,7 @@
 import * as THREE from "../lib/three.module.js";
 
 // 参考画像の輪郭を立体で作る。色と動く部位ごとにまとめて、細部を増やしても描画回数を抑える。
-function modelBuilder(owner, name) {
+export function modelBuilder(owner, name) {
   const root = new THREE.Group(); root.name = name; owner.group.add(root);
   const batches = new Map();
   function put(geometry, color, part, parent = root, pos = [0,0,0], scale = [1,1,1], rotation = [0,0,0]) {
@@ -60,7 +60,7 @@ function modelBuilder(owner, name) {
     }
     return root;
   }
-  return {root,ball,box,tube,limb,shape,group,strand,finish};
+  return {root,put,ball,box,tube,limb,shape,group,strand,finish};
 }
 
 export function buildTekeke(owner) {
@@ -221,6 +221,7 @@ export function buildYukionna(owner) {
 }
 
 export function animateReferenceCharacter(owner, t, moving, scare) {
+  if(owner.riderRig) owner.riderRig.update(t,moving,scare);
   const run=Math.min(1,moving/6);
   if(owner.tekekeRig) {
     const {root,arms}=owner.tekekeRig;

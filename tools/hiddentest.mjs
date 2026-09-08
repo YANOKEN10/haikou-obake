@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { CHARS, hiddenUnlockReady, hiddenUnlockValue, validOwnedChars, charExchangeMode } from "../src/data.js";
 
 const hidden = Object.entries(CHARS).filter(([, c]) => c.hidden);
-assert.equal(Object.keys(CHARS).length, 17, "既存7体と隠し10体が登録されている");
+assert.equal(Object.keys(CHARS).length, 18, "通常8体と隠し10体が登録されている");
 assert.equal(hidden.length, 10, "隠しキャラが10体ある");
 assert.equal(new Set(hidden.map(([, c]) => c.order)).size, 10, "表示順が重複していない");
 
