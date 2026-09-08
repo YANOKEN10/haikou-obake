@@ -1,4 +1,5 @@
 import * as THREE from "../lib/three.module.js";
+import { buildTekeke, buildYukionna, buildAmanojakuMane, animateReferenceCharacter } from "./character-models.js";
 import { clamp, lerp, angleLerp } from "./util.js";
 import { CHARS, UPG_STEP, paintById } from "./data.js";
 
@@ -260,6 +261,7 @@ export class Player {
     this.tails = null;
     this.foot = null;
     this.extras = [];
+    this.tekekeRig = null; this.yukiRig = null;
     const M = (c, opt) => new THREE.MeshLambertMaterial({ color: c, emissive: opt && opt.e !== undefined ? opt.e : c,
       emissiveIntensity: opt && opt.i !== undefined ? opt.i : 0.35 });
     const B = (c) => new THREE.MeshBasicMaterial({ color: c });
@@ -346,7 +348,6 @@ export class Player {
       this.headScale = 1.12;
       this.mouth.visible = false;
       this.eyeL.visible = false; this.eyeR.visible = false;
-      const HAIR = 0xc41f28, HAIR2 = 0x8a1218;
 
       // --- 鬼らしい 大きな体 --------------------------------
       this.skirt.visible = false;
@@ -371,64 +372,34 @@ export class Player {
           wrap.rotation.set(Math.PI / 2, 0, sx * 0.22);
         }
       }
-      // 左右で色のちがう胸の文様。かざり色を選ぶと一緒に変えられる。
+      // 胸の紫の文様。かざり色を選ぶと一緒に変えられる。
       for (const sx of [-1, 1]) for (let i = 0; i < 2; i++) {
         const mark = add(new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.1, 0.045),
-          M(sx < 0 ? 0x8e5ac8 : 0x45c4d8, { i: 0.3 })), "deco");
+          M(0x8e5ac8, { i: 0.3 })), "deco");
         mark.position.set(sx * 0.25, 0.88 - i * 0.17, 0.43);
         mark.rotation.z = sx * -0.08;
       }
 
       for (const sx of [-1, 1]) {                      // つり上がった 金の目
         const e = add(new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), B(0xffd23a)), "eye");
-        e.position.set(sx * 0.2, 1.29, 0.45); e.scale.set(1.3, 0.8, 0.5); e.renderOrder = 2;
+        e.position.set(sx * 0.2, 1.29, 0.45); e.scale.set(1.15, 0.52, 0.5); e.rotation.z = sx * .3; e.renderOrder = 2;
         const pu = add(new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 8), B(0x1a1418)), "fixed");
-        pu.position.set(sx * 0.2, 1.29, 0.51); pu.scale.set(0.85, 1.3, 0.5); pu.renderOrder = 3;
-        const brow = add(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.055, 0.05), B(0x1e4a68)));
+        pu.position.set(sx * 0.2, 1.29, 0.51); pu.scale.set(0.6, 0.8, 0.5); pu.renderOrder = 3;
+        const brow = add(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.055, 0.05), B(0x243b3c)));
         brow.position.set(sx * 0.21, 1.44, 0.47); brow.rotation.z = sx * 0.5;
         const ear = add(new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.34, 4), M(this.C.body, { i: 0.2 })));
         ear.position.set(sx * 0.48, 1.36, -0.02);      // とがった 耳
         ear.rotation.set(0.2, 0, sx * -1.15);
       }
 
-      // --- ぼさぼさの 長い髪 ---------------------------------
-      //  あたまの まわりを ぐるりと おおい、うしろほど 長くして
-      //  たなびいているように 見せる
-      for (let i = 0; i < 22; i++) {
-        const a2 = (i / 22) * Math.PI * 2;
-        const back = (1 - Math.cos(a2)) / 2;                 // うしろほど 1に近い
-        const len = 0.55 + back * 1.5 + (i % 3) * 0.12;
-        const hair = add(new THREE.Mesh(new THREE.ConeGeometry(0.115, len, 5),
-          M(i % 2 ? HAIR : HAIR2, { i: 0.3 })));
-        hair.position.set(Math.cos(a2) * 0.46, 1.52 + Math.sin(i * 2.3) * 0.09, Math.sin(a2) * 0.46 - 0.05);
-        hair.rotation.set(Math.sin(a2) * 0.9, -a2, -Math.cos(a2) * 0.9);
-        hair.rotateX(-back * 1.35);                          // うしろの髪を ねかせる
-      }
-      // うしろへ 長く ながれる ひとふさ
-      this.mane = [];
-      for (let i = 0; i < 5; i++) {
-        const t2 = i / 4;
-        const st = add(new THREE.Mesh(new THREE.ConeGeometry(0.24 - t2 * 0.16, 0.9, 6),
-          M(i % 2 ? HAIR : HAIR2, { i: 0.32 })));
-        st.position.set((i - 2) * 0.12, 1.78 + t2 * 0.5, -0.55 - t2 * 0.75);
-        st.rotation.set(-1.15 - t2 * 0.5, (i - 2) * 0.14, 0);
-        this.mane.push({ m: st, rx: st.rotation.x, rz: st.rotation.z, phase: i * 0.8 });
-      }
-      // ひたいを おおう 前髪
-      for (let i = 0; i < 7; i++) {
-        const fx = -0.36 + i * 0.12;
-        const fr = add(new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.5 + (i % 2) * 0.16, 4), M(HAIR, { i: 0.3 })));
-        fr.position.set(fx, 1.62, 0.3);
-        fr.rotation.set(2.5, 0, fx * 1.2);
-      }
-      const horn = add(new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.34, 8), M(0xffc23a, { i: 0.45 })));
-      horn.position.set(0, 1.8, 0.24); horn.rotation.x = -0.35;   // ひたいの 金のつの
+      // 頭から背中を覆う密な長髪。毛先のうねりと包帯・顔の細部は専用モデルにまとめる。
+      buildAmanojakuMane(this);
 
       // --- 口と きば ----------------------------------------
-      const mouth2 = add(new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 10), B(0x3a1218)));
+      const mouth2 = add(new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 10), B(0x3a1218)), "fixed");
       mouth2.position.set(0, 1.05, 0.44); mouth2.scale.set(1.15, 0.75, 0.4); mouth2.renderOrder = 2;
       for (const sx of [-0.12, 0.12]) {
-        const f = add(new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.17, 4), B(0xfdfbf4)));
+        const f = add(new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.23, 6), B(0xe4d47c)), "fixed");
         f.position.set(sx, 1.12, 0.5); f.rotation.x = Math.PI; f.renderOrder = 3;
       }
 
@@ -610,23 +581,10 @@ export class Player {
       }
 
     } else if (id === "yukionna") {
-      this.headScale = 1.04; this.skirt.scale.set(0.88, 1.35, 0.88);
+      this.head.visible = false; this.skirt.visible = false;
+      this.handL.visible = false; this.handR.visible = false;
       this.eyeL.visible = false; this.eyeR.visible = false; this.mouth.visible = false;
-      for (const sx of [-1, 1]) bigEye(sx * 0.19, 1.32, 0.41, 0.13, sx * 0.2);
-      for (let i = 0; i < 13; i++) {
-        const a2 = i / 13 * Math.PI * 2;
-        const hair = add(new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.85, 5), M(0x18283e)), "deco");
-        hair.position.set(Math.cos(a2) * 0.42, 1.38, Math.sin(a2) * 0.38 - 0.08);
-        hair.rotation.z = Math.cos(a2) * 0.26; hair.rotation.x = Math.sin(a2) * 0.25 + Math.PI;
-      }
-      for (const sx of [-1, 1]) {
-        const sleeve = add(new THREE.Mesh(new THREE.ConeGeometry(0.38, 1.0, 8), M(0xd7eaff)), "body");
-        sleeve.position.set(sx * 0.68, 0.78, 0); sleeve.rotation.z = sx * 1.18;
-      }
-      for (let i = 0; i < 6; i++) {
-        const crystal = add(new THREE.Mesh(new THREE.OctahedronGeometry(0.12), M(0x9de5ff)), "deco");
-        const a2 = i / 6 * Math.PI * 2; crystal.position.set(Math.cos(a2) * 0.78, 1.05 + Math.sin(a2) * 0.55, -0.1);
-      }
+      buildYukionna(this);
 
     } else if (id === "zashiki") {
       this.headScale = 1.22; this.group.scale.multiplyScalar(0.86);
@@ -661,27 +619,10 @@ export class Player {
       obi.position.y = 0.81;
 
     } else if (id === "tekeke") {
-      this.skirt.visible = false; this.eyeL.visible = false; this.eyeR.visible = false; this.mouth.visible = false;
-      this.headScale = 1.08;
-      for (const sx of [-1, 1]) {
-        const eye = add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), B(0xff4058)), "eye");
-        eye.position.set(sx * 0.2, 1.31, 0.43); eye.scale.set(1.2, 0.65, 0.5);
-        const arm = add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, 0.85, 8), M(C.body)), "body");
-        arm.position.set(sx * 0.62, 0.62, 0.26); arm.rotation.z = sx * 1.1;
-        const palm = add(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.09, 0.32), M(C.body)), "body");
-        palm.position.set(sx * 0.98, 0.32, 0.34);
-      }
-      const torso = add(new THREE.Mesh(new THREE.ConeGeometry(0.62, 1.1, 10), M(0x405a83)), "deco");
-      torso.position.y = 0.67;
-      for (let i = 0; i < 9; i++) {
-        const lock = add(new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.75, 5), M(0x19243c)), "deco");
-        lock.position.set((i - 4) * 0.1, 1.47, -0.16); lock.rotation.x = Math.PI;
-      }
-      this.smoke = [];
-      for (let i = 0; i < 4; i++) {
-        const puff = add(new THREE.Mesh(new THREE.SphereGeometry(0.24 - i * 0.03, 9, 7), M(0x526f9d)), "deco");
-        puff.position.set((i - 1.5) * 0.2, 0.1 - i * 0.04, -0.15); this.smoke.push(puff);
-      }
+      this.head.visible = false; this.skirt.visible = false;
+      this.handL.visible = false; this.handR.visible = false;
+      this.eyeL.visible = false; this.eyeR.visible = false; this.mouth.visible = false;
+      buildTekeke(this);
 
     } else if (id === "nurikabe") {
       this.head.visible = false; this.skirt.visible = false; this.handL.visible = false; this.handR.visible = false;
@@ -996,6 +937,11 @@ export class Player {
     this.eyeMat.opacity = this.bodyMat.opacity;
     this.light.intensity = 1.6 + p * 3.6 + Math.sin(t * 3.1) * 0.12;
 
+    animateReferenceCharacter(this, t, moving, p);
+    if (this.tekekeRig || this.yukiRig || this.charId === "amanojaku") {
+      // すりぬけ中は、新しいモデルも本体と同じ透明度にする。
+      for (const mesh of this.extras) mesh.material.opacity = this.bodyMat.opacity;
+    }
     if (!this.skirt.visible) return;
     const a = this.skirtGeo.attributes.position;
     const base = this.skirtBase;

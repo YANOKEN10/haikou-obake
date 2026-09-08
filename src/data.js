@@ -87,7 +87,7 @@ export const CHARS = {
     name: "あまのじゃく", icon: "😈", order: 3,
     cost: { 3: 5, 2: 12 },                     // 赤5・青12
     speed: 1.10, dash: 1.05, phase: 0.9, scare: 1.15, reach: 1.05, size: 0.94,
-    body: 0x54b0ec, glow: 0x2a6a9a,
+    body: 0x405452, glow: 0x293f40,
     desc: "人の いやがることを する 小さな鬼。ふいうちが とくべつ よく効く。",
     tip: "うしろから おどかすと、ほかの子より ずっと こわがらせられる。",
   },
@@ -135,8 +135,8 @@ export const CHARS = {
     name: "雪女", icon: "❄️", order: 9, hidden: true,
     unlock: { key: "playSeconds", at: 86400, label: "遊んだ時間 24時間" },
     speed: 1.18, dash: 1.05, phase: 1.42, scare: 1.28, reach: 1.34, size: 1.08,
-    body: 0xddeeff, glow: 0x80bfe8,
-    desc: "雪の結晶をまとい、音もなく廊下をすべる白い妖怪。",
+    body: 0xfff1dc, glow: 0x80bfe8,
+    desc: "水色の長い髪と白い着物。紫の人魂を連れて、音もなく廊下をすべる妖怪。",
     tip: "すりぬけが長く、はなれた相手にも冷気が とどく。",
   },
   zashiki: {
@@ -159,8 +159,8 @@ export const CHARS = {
     name: "テケテケ", icon: "🌙", order: 12, hidden: true,
     unlock: { key: "materials", at: 10000, label: "集めた材料 10000個" },
     speed: 1.42, dash: 1.38, phase: 1.22, scare: 1.30, reach: 1.02, size: 0.96,
-    body: 0xabc3df, glow: 0x536f9b,
-    desc: "両手で床をテケテケ走る、青い影につつまれた学校妖怪。",
+    body: 0xe5a33b, glow: 0x99653d,
+    desc: "紫の髪と大きな笑い口。長い腕でテケテケ走る、金色の学校妖怪。",
     tip: "だれにも追いつかれない速さで、廊下をかけぬける。",
   },
   nurikabe: {

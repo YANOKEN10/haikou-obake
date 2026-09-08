@@ -2,6 +2,7 @@ import * as THREE from "../lib/three.module.js";
 import { clamp, lerp, rand, choice, dist } from "./util.js";
 import { MATERIALS, TRAPS, GHOSTS, RARITY, CHARS } from "./data.js";
 import { buildGhostLook } from "./player.js";
+import { animateReferenceCharacter } from "./character-models.js";
 
 // ============================================================
 //  落ちている材料
@@ -897,6 +898,13 @@ export class PeerGhost {
     const s = p.scaring ? 1 + p.scaring * 0.25 : 1;
     this.g.scale.setScalar(PEER_SCALE * s * (this.charSize || 1));
     if (this.skirtMat) this.skirtMat.opacity = p.phasing ? 0.36 : 0.9;
+    if (this.shell) {
+      animateReferenceCharacter(this.shell, t, 0, p.scaring || 0);
+      this.shell.animateMane(t, 0);
+      if (this.shell.tekekeRig || this.shell.yukiRig || this.shell.charId === "amanojaku") {
+        for (const mesh of this.shell.extras) mesh.material.opacity = p.phasing ? 0.4 : 0.9;
+      }
+    }
   }
 
   dispose() {

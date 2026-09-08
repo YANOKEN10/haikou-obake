@@ -3,13 +3,13 @@
 //   ・通信できるときは必ず新しいものを取りに行く（更新が届かない事故を防ぐ）
 //   ・通信できないときだけ、しまってあるものを出す
 // ============================================================
-const CACHE = "haikou-obake-v17";
+const CACHE = "haikou-obake-v18";
 const CORE = [
   "./", "./index.html", "./manifest.webmanifest",
   "./lib/three.module.js",
   "./src/main.js", "./src/rooms.js", "./src/world.js", "./src/stageworld.js", "./src/stages.js", "./src/sky.js", "./src/player.js", "./src/human.js",
   "./src/entities.js", "./src/ui.js", "./src/home.js", "./src/save.js", "./src/cloud.js", "./src/admin-preview.js", "./src/net.js", "./src/rtc.js",
-  "./src/audio.js", "./src/data.js", "./src/util.js", "./src/meshbuild.js", "./src/touch.js",
+  "./src/character-models.js", "./src/audio.js", "./src/data.js", "./src/util.js", "./src/meshbuild.js", "./src/touch.js",
   "./icons/icon-192.png", "./icons/icon-512.png",
 ];
 
