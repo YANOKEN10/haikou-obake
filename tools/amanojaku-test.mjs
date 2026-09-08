@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import * as THREE from '../lib/three.module.js';
+import {Player,buildGhostLook} from '../src/player.js';
+const p=new Player(new THREE.Scene(),{},'amanojaku'),r=p.amanoRig;
+assert.ok(r);assert.equal(p.head.visible,false);assert.equal(p.handL.visible,false);
+p.applyPose(1/60,.1,0);const idle=r.arms.map(a=>a.rotation.x);p.applyPose(1/60,1.2,6);assert.notDeepEqual(r.arms.map(a=>a.rotation.x),idle,'作り直した腕が走行で動く');
+p.scarePose=1;p.applyPose(1/60,1.3,0);assert.ok(r.arms.every(a=>a.rotation.x<-.4),'威嚇で両腕を持ち上げる');
+p.animateMane(1,6);const hair=p.mane.map(x=>x.m.rotation.x);p.animateMane(2,6);assert.notDeepEqual(p.mane.map(x=>x.m.rotation.x),hair);
+p.phasing=true;for(let i=0;i<60;i++)p.applyPose(1/60,2+i/60,6);assert.ok(p.extras.every(m=>Math.abs(m.material.opacity-.34)<.01));
+p.group.updateMatrixWorld(true);p.group.traverse(o=>{assert.ok(o.matrixWorld.elements.every(Number.isFinite));if(o.geometry)assert.ok(Array.from(o.geometry.attributes.position.array).every(Number.isFinite));});
+assert.equal(buildGhostLook('amanojaku').extras.length,p.extras.length,'ほかのプレイヤーも同じ全身モデル');
+p.setChar('obake');assert.equal(p.amanoRig,null);p.applyPose(1/60,5,0);p.setChar('amanojaku');assert.notEqual(p.amanoRig,r);
+console.log('amanojaku test: 全身リグ・走行・威嚇・長髪・透明化・着替え・相手表示 passed');

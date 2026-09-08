@@ -221,6 +221,7 @@ export function buildYukionna(owner) {
 }
 
 export function animateReferenceCharacter(owner, t, moving, scare) {
+  if(owner.amanoRig) owner.amanoRig.update(t,moving,scare);
   if(owner.riderRig) owner.riderRig.update(t,moving,scare);
   const run=Math.min(1,moving/6);
   if(owner.tekekeRig) {
@@ -234,55 +235,4 @@ export function animateReferenceCharacter(owner, t, moving, scare) {
     sleeves.forEach((g,i)=>g.rotation.z=(i?1:-1)*(Math.sin(t*1.8)*.025+run*.06+scare*.12));
     wisps.forEach((g,i)=>g.position.y=2.14+(i?-.12:.11)+Math.sin(t*2.3+i*2)*.08);
   }
-}
-
-
-export function buildAmanojakuMane(owner) {
-  const b=modelBuilder(owner,"amanojaku-mane"),{ball,tube,shape,strand,group}=b;
-  const red=0xb92527,bright=0xd44230,shade=0x771c25;
-  // 円錐を数本だけ並べると隙間から頭が見えるため、根元の厚い髪と三層の毛束を重ねる。
-  // 顔の正面は開け、頭頂・側頭・肩・背中をひと続きの赤いシルエットにする。
-  ball([0,1.69,-.2],[.56,.39,.4],shade,"deco");
-  ball([0,1.83,-.55],[.6,.29,.59],red,"deco");
-  for(const sx of [-1,1])ball([sx*.5,1.5,-.16],[.2,.43,.3],red,"deco");
-  for(const sx of [-1,1])for(let j=0;j<3;j++) {
-    tube([[sx*(.49+j*.1),1.23,.12],[sx*(.5+j*.1),1.2,.25],
-      [sx*(.51+j*.1),1.08,.29]],.033,0x4aafb3,"deco");
-  }
-  owner.mane=[];
-  for(let layer=0;layer<4;layer++) {
-    const g=group(`amanojaku-mane-layer-${layer}`,[0,1.56,-.22]);
-    owner.mane.push({m:g,rx:0,rz:0,phase:layer*.9});
-    for(let j=0;j<40;j++) {
-      const a=j/39*Math.PI*2,x=Math.cos(a),y=Math.sin(a),f=(j%5)/4;
-      const start=[x*(.38+layer*.03),.12+y*.29,-.04-layer*.06];
-      const end=[x*(.48+f*.38),.04+y*.26+layer*.02,-1.65-layer*.23-f*.3];
-      strand([start,[x*.63,.24+y*.27,-.53],[x*(.65+layer*.025),.16+y*.24,-1.08],end],
-        .038+(j%3)*.01,[red,shade,bright][(j+layer)%3],g);
-    }
-  }
-  // こめかみから頬・顎へ連なる長い赤毛。目と口を隠さず、獣のような輪郭を強める。
-  for(const sx of [-1,1])for(let j=0;j<26;j++) {
-    const f=j/25;
-    strand([[sx*(.42+f*.12),1.67-f*.53,.09],[sx*(.62+f*.09),1.49-f*.49,.13],
-      [sx*(.66+f*.08),1.23-f*.45,.08],[sx*(.28+f*.12),1.02-f*.38,.17]],.035+(j%3)*.013,j%3?red:shade);
-  }
-  for(let j=0;j<23;j++) {
-    const x=(j-11)*.026;
-    strand([[x,1.91,.11],[x*1.25,1.91,.3],[x*1.25,1.77,.36],[x*1.18,1.67+Math.abs(x)*.23,.31]],.029,j%3?red:bright);
-  }
-  // 額から後頭部へ細い毛流れをかぶせ、根元の丸い塊を髪として読ませる。
-  for(let j=0;j<34;j++) {
-    const x=(j-16.5)*.031,f=Math.abs(x)/.52;
-    strand([[x,1.87-f*.16,.24],[x*1.09,2.04-f*.17,-.07],
-      [x*1.07,2.03-f*.14,-.59],[x*1.22,1.83-f*.14,-1.24]],.035,j%3?red:bright);
-  }
-  // 額の金の紋と、長い紫の舌。参考画像の小さな特徴も正面から読めるように。
-  shape([[-.065,1.78],[0,1.88],[.065,1.78],[.052,1.63],[0,1.58],[-.052,1.63]],.025,0xe0b442,"deco",b.root,.415,.008);
-  for(const sx of [-1,1])tube([[0,1.8,.455],[sx*.047,1.76,.455],[sx*.015,1.7,.46],[sx*.045,1.65,.45]],.012,0x5e3b22,"fixed");
-  const tongue=group("amanojaku-tongue",[0,1.035,.51]);
-  strand([[0,0,0],[.035,-.18,.1],[-.08,-.31,.19],[-.14,-.39,.23]],.065,0x8952b0,tongue);
-  tube([[0,-.04,.072],[-.015,-.21,.17],[-.1,-.31,.232]],.008,0x4b2e72,"fixed",tongue);
-  owner.tongue=tongue;
-  b.finish();
 }

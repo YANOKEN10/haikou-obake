@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { CHARS, hiddenUnlockReady, hiddenUnlockValue, validOwnedChars, charExchangeMode } from "../src/data.js";
 
 const hidden = Object.entries(CHARS).filter(([, c]) => c.hidden);
-assert.equal(Object.keys(CHARS).length, 18, "通常8体と隠し10体が登録されている");
-assert.equal(hidden.length, 10, "隠しキャラが10体ある");
-assert.equal(new Set(hidden.map(([, c]) => c.order)).size, 10, "表示順が重複していない");
+assert.equal(Object.keys(CHARS).length, 18, "通常7体と隠し11体が登録されている");
+assert.equal(hidden.length, 11, "隠しキャラが11体ある");
+assert.equal(new Set(hidden.map(([, c]) => c.order)).size, 11, "表示順が重複していない");
 
 for (const [id, c] of hidden) {
   assert.ok(c.unlock && c.unlock.key && c.unlock.at > 0 && c.unlock.label, `${id}: 解放条件がある`);
@@ -14,6 +14,7 @@ for (const [id, c] of hidden) {
     below.playSeconds = c.unlock.at - 1;
     ready.playSeconds = c.unlock.at;
   }
+  for(const rule of c.unlock.requires || []) { below.stats[rule.key]=rule.at; ready.stats[rule.key]=rule.at; }
   assert.equal(hiddenUnlockValue(c, below), c.unlock.at - 1, `${id}: 条件値を読む`);
   assert.equal(hiddenUnlockReady(c, below), false, `${id}: 1不足では未解放`);
   assert.equal(hiddenUnlockReady(c, ready), true, `${id}: ちょうど達成で解放`);
@@ -34,3 +35,10 @@ assert.equal(charExchangeMode("nurikabe", false), "deny", "未解放のぬりか
 assert.equal(charExchangeMode("kyubi", false), "buy", "通常キャラは交換できる");
 
 console.log(`hidden character test: ${hidden.length} unlock conditions + stale cleanup + hidden selection passed`);
+
+for(const [laughed,behind,expected] of [[0,1500,false],[1,1500,false],[0,1501,false],[1,1501,true],[2,1600,true]]) {
+  const profile={stats:{laughed,behind}};
+  assert.equal(hiddenUnlockReady(CHARS.kubinashi,profile),expected,`ライダー: 笑われた${laughed}・ふいうち${behind}`);
+  assert.equal(!!validOwnedChars({kubinashi:1},profile).kubinashi,expected,'古い購入済みデータにも条件を適用');
+}
+assert.equal(hiddenUnlockReady(CHARS.kubinashi,{}),false);

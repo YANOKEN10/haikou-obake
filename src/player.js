@@ -1,6 +1,7 @@
 import * as THREE from "../lib/three.module.js";
+import { buildAmanojaku } from "./amanojaku-model.js";
 import { buildHeadlessRider } from "./rider-model.js";
-import { buildTekeke, buildYukionna, buildAmanojakuMane, animateReferenceCharacter } from "./character-models.js";
+import { buildTekeke, buildYukionna, animateReferenceCharacter } from "./character-models.js";
 import { clamp, lerp, angleLerp } from "./util.js";
 import { CHARS, UPG_STEP, paintById } from "./data.js";
 
@@ -262,7 +263,7 @@ export class Player {
     this.tails = null;
     this.foot = null;
     this.extras = [];
-    this.tekekeRig = null; this.yukiRig = null; this.riderRig = null;
+    this.tekekeRig = null; this.yukiRig = null; this.riderRig = null; this.amanoRig = null;
     const M = (c, opt) => new THREE.MeshLambertMaterial({ color: c, emissive: opt && opt.e !== undefined ? opt.e : c,
       emissiveIntensity: opt && opt.i !== undefined ? opt.i : 0.35 });
     const B = (c) => new THREE.MeshBasicMaterial({ color: c });
@@ -342,97 +343,8 @@ export class Player {
       this.foot = geta;
 
     } else if (id === "amanojaku") {
-      // 添付の鬼らしい要素（赤い長髪・大きな腕・包帯）を参考にしつつ、
-      // ゲーム用の独自デザインとして、力強い二本脚の鬼へ作りなおした。
-      // 細い煙の下半身では遠くから頼りなく見えたので、肩・胸・脚で
-      // はっきり読める三角形のシルエットにする。
-      this.headScale = 1.12;
-      this.mouth.visible = false;
-      this.eyeL.visible = false; this.eyeR.visible = false;
-
-      // --- 鬼らしい 大きな体 --------------------------------
-      this.skirt.visible = false;
-      const chest = add(new THREE.Mesh(new THREE.SphereGeometry(0.58, 18, 14),
-        M(this.C.body, { e: this.C.glow, i: 0.34 })), "body");
-      chest.position.set(0, 0.78, 0); chest.scale.set(1.28, 1.15, 0.72);
-      const belly = add(new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12),
-        M(this.C.body, { e: this.C.glow, i: 0.3 })), "body");
-      belly.position.set(0, 0.48, 0.08); belly.scale.set(1.12, 1.05, 0.72);
-      for (const sx of [-1, 1]) {
-        const shoulder = add(new THREE.Mesh(new THREE.SphereGeometry(0.31, 14, 10),
-          M(this.C.body, { e: this.C.glow, i: 0.32 })), "body");
-        shoulder.position.set(sx * 0.63, 1.04, 0); shoulder.scale.set(1.15, 1, 0.9);
-        const arm = add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.23, 0.78, 12),
-          M(this.C.body, { e: this.C.glow, i: 0.3 })), "body");
-        arm.position.set(sx * 0.69, 0.73, 0.08); arm.rotation.z = sx * 0.22;
-        // 生成画像を貼らず、細い輪を重ねて包帯を立体で表す。
-        for (let i = 0; i < 4; i++) {
-          const wrap = add(new THREE.Mesh(new THREE.TorusGeometry(0.205 - i * 0.008, 0.035, 6, 14),
-            M(0xd8c49a, { i: 0.18 })));
-          wrap.position.set(sx * (0.76 - i * 0.012), 0.52 - i * 0.11, 0.1);
-          wrap.rotation.set(Math.PI / 2, 0, sx * 0.22);
-        }
-      }
-      // 胸の紫の文様。かざり色を選ぶと一緒に変えられる。
-      for (const sx of [-1, 1]) for (let i = 0; i < 2; i++) {
-        const mark = add(new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.1, 0.045),
-          M(0x8e5ac8, { i: 0.3 })), "deco");
-        mark.position.set(sx * 0.25, 0.88 - i * 0.17, 0.43);
-        mark.rotation.z = sx * -0.08;
-      }
-
-      for (const sx of [-1, 1]) {                      // つり上がった 金の目
-        const e = add(new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), B(0xffd23a)), "eye");
-        e.position.set(sx * 0.2, 1.29, 0.45); e.scale.set(1.15, 0.52, 0.5); e.rotation.z = sx * .3; e.renderOrder = 2;
-        const pu = add(new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 8), B(0x1a1418)), "fixed");
-        pu.position.set(sx * 0.2, 1.29, 0.51); pu.scale.set(0.6, 0.8, 0.5); pu.renderOrder = 3;
-        const brow = add(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.055, 0.05), B(0x243b3c)));
-        brow.position.set(sx * 0.21, 1.44, 0.47); brow.rotation.z = sx * 0.5;
-        const ear = add(new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.34, 4), M(this.C.body, { i: 0.2 })));
-        ear.position.set(sx * 0.48, 1.36, -0.02);      // とがった 耳
-        ear.rotation.set(0.2, 0, sx * -1.15);
-      }
-
-      // 頭から背中を覆う密な長髪。毛先のうねりと包帯・顔の細部は専用モデルにまとめる。
-      buildAmanojakuMane(this);
-
-      // --- 口と きば ----------------------------------------
-      const mouth2 = add(new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 10), B(0x3a1218)), "fixed");
-      mouth2.position.set(0, 1.05, 0.44); mouth2.scale.set(1.15, 0.75, 0.4); mouth2.renderOrder = 2;
-      for (const sx of [-0.12, 0.12]) {
-        const f = add(new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.23, 6), B(0xe4d47c)), "fixed");
-        f.position.set(sx, 1.12, 0.5); f.rotation.x = Math.PI; f.renderOrder = 3;
-      }
-
-      // --- どっしりした 二本脚 -------------------------------
-      for (const sx of [-1, 1]) {
-        const thigh = add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.27, 0.64, 12),
-          M(this.C.body, { e: this.C.glow, i: 0.3 })), "body");
-        thigh.position.set(sx * 0.3, 0.18, 0); thigh.rotation.z = sx * -0.08;
-        const shin = add(new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.22, 0.55, 12),
-          M(0xd8c49a, { i: 0.18 })), "deco");
-        shin.position.set(sx * 0.32, -0.3, 0.02);
-        for (let i = 0; i < 4; i++) {
-          const band = add(new THREE.Mesh(new THREE.TorusGeometry(0.195, 0.028, 6, 14),
-            M(0xb89e78, { i: 0.15 })), "deco");
-          band.position.set(sx * 0.32, -0.16 - i * 0.11, 0.02); band.rotation.x = Math.PI / 2;
-        }
-        const foot = add(new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 9),
-          M(this.C.body, { e: this.C.glow, i: 0.28 })), "body");
-        foot.position.set(sx * 0.32, -0.61, 0.12); foot.scale.set(1, 0.62, 1.38);
-        for (let i = 0; i < 3; i++) {
-          const toe = add(new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.17, 5), M(0xf5d27a, { i: 0.25 })), "deco");
-          toe.position.set(sx * 0.32 + (i - 1) * 0.08, -0.67, 0.4); toe.rotation.x = Math.PI / 2;
-        }
-      }
-
-      // --- 大きな 手 ----------------------------------------
-      this.handL.scale.setScalar(1.9);
-      this.handR.scale.setScalar(1.9);
-      this.handL.position.set(-0.52, 0.92, 0.42);      // 前へ かまえる
-      this.handR.position.set(0.52, 0.92, 0.42);
-      // 手は大きな拳として読ませる。細い爪は遠景で一本の横棒に
-      // つながって見えたため、シルエットを優先して付けない。
+      for(const m of [this.head,this.skirt,this.handL,this.handR,this.eyeL,this.eyeR,this.mouth]) m.visible=false;
+      buildAmanojaku(this);
 
     } else if (id === "kappa") {
       // 頭の皿と おかっぱ髪、大きな目、黄色いくちばし、白いおなか

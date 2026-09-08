@@ -188,8 +188,9 @@ export const CHARS = {
     tip: "すばやく近づき、ふりむいたところを おどかせる。",
   },
   kubinashi: {
-    name: "首無しライダー", icon: "🏍️", order: 17,
-    cost: { 4: 8, 5: 2 },
+    name: "首無しライダー", icon: "🏍️", order: 17, hidden: true,
+    unlock: { key: "behind", at: 1501, requires: [{ key: "laughed", at: 1 }],
+      label: "笑われた回数 1回以上・ふいうち成功 1501回以上" },
     speed: 1.30, dash: 1.40, phase: 1.04, scare: 1.24, reach: 1.12, size: 1.00,
     body: 0x948879, glow: 0x68675c,
     desc: "古いバイクにまたがり、長いマントをひるがえす首のないライダー。",
@@ -213,7 +214,8 @@ export function hiddenUnlockValue(c, profile) {
 }
 
 export function hiddenUnlockReady(c, profile) {
-  return !!(c && c.hidden && c.unlock && hiddenUnlockValue(c, profile) >= c.unlock.at);
+  return !!(c && c.hidden && c.unlock && hiddenUnlockValue(c, profile) >= c.unlock.at
+    && (c.unlock.requires || []).every(rule => hiddenUnlockValue({ unlock: rule }, profile) >= rule.at));
 }
 
 // 古い記録や試験データに隠しキャラの印が混ざっていても、
