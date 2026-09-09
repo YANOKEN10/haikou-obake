@@ -111,7 +111,7 @@ export const CHARS = {
     name: "九尾", icon: "🦊", order: 6,
     cost: { 5: 10, 6: 3 },                     // 銀10・金3
     speed: 1.28, dash: 1.28, phase: 1.35, scare: 1.4, reach: 1.25, size: 1.1,
-    body: 0xfaf6f2, glow: 0xe8908f,
+    body: 0xfaf6f2, glow: 0x9eaeb4,
     desc: "九つの尾を もつ 大妖怪。すべてが ずばぬけている。",
     tip: "廃校の ぬしにふさわしい すがた。ここまで来たら 無敵。",
   },
@@ -186,6 +186,14 @@ export const CHARS = {
     body: 0xead5cf, glow: 0x9b3655,
     desc: "白いマスクと長い髪で、放課後の曲がり角に現れる妖怪。",
     tip: "すばやく近づき、ふりむいたところを おどかせる。",
+  },
+  raimei: {
+    name: "雷鳴様", icon: "⚡", order: 18, hidden: true,
+    unlock: { key: "scares", at: 3000, label: "おどろかした回数 3000回" },
+    speed: 1.05, dash: 1.12, phase: 1.25, scare: 1.48, reach: 1.42, size: 1.04,
+    body: 0x078fce, glow: 0x4d9cd0,
+    desc: "金色の髪と七つの太鼓。大きな雲に乗って現れる、青い雷さま。",
+    tip: "太鼓を鳴らして、広いはんいの人を おどろかせる。",
   },
   kubinashi: {
     name: "首無しライダー", icon: "🏍️", order: 17, hidden: true,

@@ -4,6 +4,7 @@ import {Player,buildGhostLook} from '../src/player.js';
 const p=new Player(new THREE.Scene(),{},'amanojaku'),r=p.amanoRig;
 assert.ok(r);assert.equal(p.head.visible,false);assert.equal(p.handL.visible,false);
 p.applyPose(1/60,.1,0);const idle=r.arms.map(a=>a.rotation.x);p.applyPose(1/60,1.2,6);assert.notDeepEqual(r.arms.map(a=>a.rotation.x),idle,'作り直した腕が走行で動く');
+assert.ok(r.arms.every(a=>a.rotation.x < -1.9),'移動中は両腕を頭より上へ');assert.ok(r.root.position.y>.15,'浮いて進む');
 p.scarePose=1;p.applyPose(1/60,1.3,0);assert.ok(r.arms.every(a=>a.rotation.x<-.4),'威嚇で両腕を持ち上げる');
 p.animateMane(1,6);const hair=p.mane.map(x=>x.m.rotation.x);p.animateMane(2,6);assert.notDeepEqual(p.mane.map(x=>x.m.rotation.x),hair);
 p.phasing=true;for(let i=0;i<60;i++)p.applyPose(1/60,2+i/60,6);assert.ok(p.extras.every(m=>Math.abs(m.material.opacity-.34)<.01));

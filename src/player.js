@@ -1,4 +1,6 @@
 import * as THREE from "../lib/three.module.js";
+import { buildRaimei } from "./raimei-model.js";
+import { buildKyubi } from "./kyubi-model.js";
 import { buildAmanojaku } from "./amanojaku-model.js";
 import { buildHeadlessRider } from "./rider-model.js";
 import { buildTekeke, buildYukionna, animateReferenceCharacter } from "./character-models.js";
@@ -263,7 +265,7 @@ export class Player {
     this.tails = null;
     this.foot = null;
     this.extras = [];
-    this.tekekeRig = null; this.yukiRig = null; this.riderRig = null; this.amanoRig = null;
+    this.tekekeRig = null; this.yukiRig = null; this.riderRig = null; this.amanoRig = null; this.kyubiRig = null; this.raimeiRig = null;
     const M = (c, opt) => new THREE.MeshLambertMaterial({ color: c, emissive: opt && opt.e !== undefined ? opt.e : c,
       emissiveIntensity: opt && opt.i !== undefined ? opt.i : 0.35 });
     const B = (c) => new THREE.MeshBasicMaterial({ color: c });
@@ -410,37 +412,12 @@ export class Player {
       const vest = add(new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.66, 0.5, 16), M(0x2a7a4a, { i: 0.2 })));
       vest.position.y = 0.94;
 
+    } else if (id === "raimei") {
+      for(const m of [this.head,this.skirt,this.handL,this.handR,this.eyeL,this.eyeR,this.mouth]) m.visible=false;
+      buildRaimei(this);
     } else if (id === "kyubi") {
-      // 白ぎつね。とがった鼻づら、耳、赤い目、先がピンクの九つの尾
-      this.headScale = 1.04;
-      this.mouth.visible = false;
-      this.eyeL.visible = false; this.eyeR.visible = false;
-      for (const sx of [-1, 1]) {                      // 赤い切れ長の目
-        const e = add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10), B(0xe0323c)), "eye");
-        e.position.set(sx * 0.2, 1.32, 0.42); e.scale.set(1.35, 0.55, 0.5); e.renderOrder = 2;
-      }
-      const snout = add(new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.5, 10), M(0xfaf6f2, { i: 0.25 })));
-      snout.position.set(0, 1.16, 0.56); snout.rotation.x = Math.PI / 2;
-      const nose2 = add(new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), B(0x3a2a2a)));
-      nose2.position.set(0, 1.16, 0.82); nose2.renderOrder = 2;
-      for (const sx of [-1, 1]) {                      // 耳
-        const ear = add(new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.44, 5), M(0xfaf6f2, { i: 0.25 })));
-        ear.position.set(sx * 0.3, 1.72, 0.0); ear.rotation.z = sx * 0.26;
-        const inner = add(new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.28, 5), B(0xf3aeb0)));
-        inner.position.set(sx * 0.3, 1.7, 0.07); inner.rotation.z = sx * 0.26;
-      }
-      this.tails = [];
-      for (let i = 0; i < 9; i++) {
-        const t2 = i / 8, a2 = (t2 - 0.5) * 2.5;
-        const tail = add(new THREE.Mesh(new THREE.ConeGeometry(0.17, 1.3, 8), M(0xfaf6f2, { i: 0.25 })));
-        tail.position.set(Math.sin(a2) * 0.62, 0.96 + Math.cos(a2) * 0.34, -0.5);
-        tail.rotation.set(-0.95, 0, -a2 * 0.95);
-        this.tails.push({ m: tail, a: a2, base: tail.rotation.z });
-        const tip = add(new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.42, 8), B(0xf3949a)));
-        tip.position.set(Math.sin(a2) * 1.0, 1.5 + Math.cos(a2) * 0.62, -0.72);
-        tip.rotation.set(-0.95, 0, -a2 * 0.95);
-        this.tails.push({ m: tip, a: a2, base: tip.rotation.z });
-      }
+      for(const m of [this.head,this.skirt,this.handL,this.handR,this.eyeL,this.eyeR,this.mouth]) m.visible=false;
+      buildKyubi(this);
     } else if (id === "kaiju") {
       this.headScale = 1.18; this.mouth.visible = false;
       this.eyeL.visible = false; this.eyeR.visible = false; this.skirt.visible = false;
@@ -825,23 +802,8 @@ export class Player {
     this.head.scale.set(sc * hs, (sc * 1.05 + p * 0.1) * hs, sc * 0.96 * hs);
     this.handL.position.set(-0.55 - p * 0.22, 1.0 + p * 0.75, 0.1 + p * 0.15);
     this.handR.position.set(0.55 + p * 0.22, 1.0 + p * 0.75, 0.1 + p * 0.15);
-    if(this.charId==="amanojaku"){
-      const walk=Math.min(1,moving/5.4),step=Math.sin(this.bob*1.6);
-      const counter=Math.cos(this.bob*1.6),run=this.dashing?1:0;
-      const power=walk*(.24+run*.2),breath=Math.sin(t*2.15);
-      this.group.position.y+=breath*.025+Math.abs(step)*walk*.06;
-      this.group.rotation.z=step*walk*.045;
-      this.head.rotation.x=-p*.16+step*walk*.04;
-      this.head.scale.x*=1+breath*.012;
-      this.head.scale.y*=1+breath*.018;
-      this.handL.position.set(-.63-p*.34,.78+p*.92,.4+counter*power-p*.1);
-      this.handR.position.set(.63+p*.34,.78+p*.92,.4-counter*power-p*.1);
-      this.handL.rotation.x=-step*power-p*.6;
-      this.handR.rotation.x=step*power-p*.6;
-    }else{
-      this.group.rotation.z=0; this.head.rotation.x=0;
-      this.handL.rotation.x=0; this.handR.rotation.x=0;
-    }
+    this.group.rotation.z=0; this.head.rotation.x=0;
+    this.handL.rotation.x=0; this.handR.rotation.x=0;
     if (this.mouth.visible) this.mouth.scale.set(0.85 + p * 0.5, 0.5 + p * 2.2, 0.4);
     if (this.eyeL.visible) this.eyeL.scale.set(1 + p * 0.5, 1.25 + p * 0.5, 0.6);
     if (this.eyeR.visible) this.eyeR.scale.set(1 + p * 0.5, 1.25 + p * 0.5, 0.6);
@@ -854,7 +816,7 @@ export class Player {
     this.light.intensity = 1.6 + p * 3.6 + Math.sin(t * 3.1) * 0.12;
 
     animateReferenceCharacter(this, t, moving, p);
-    if (this.tekekeRig || this.yukiRig || this.riderRig || this.charId === "amanojaku") {
+    if (this.tekekeRig || this.yukiRig || this.riderRig || this.kyubiRig || this.raimeiRig || this.charId === "amanojaku") {
       // すりぬけ中は、新しいモデルも本体と同じ透明度にする。
       for (const mesh of this.extras) mesh.material.opacity = this.bodyMat.opacity;
     }

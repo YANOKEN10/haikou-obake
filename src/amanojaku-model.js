@@ -137,9 +137,11 @@ export function buildAmanojaku(owner) {
   // 毛束と腕が別々に揺れ、威嚇では上体と爪を前へ出す。
   owner.amanoRig={root,arms,head,tongue,update(t,moving,scare){
     const run=Math.min(1,moving/6);
+    root.position.y=run*(.28+Math.sin(t*2.8)*.08);
+    root.rotation.x=run*.1;root.rotation.z=Math.sin(t*2)*run*.025;
     head.rotation.x=.04+Math.sin(t*2)*.02-scare*.12;
     tongue.rotation.x=Math.sin(t*3)*.12;
-    arms.forEach((a,i)=>{a.rotation.x=Math.sin(t*(run?8:2)+i*Math.PI)*(.016+run*.13)-scare*.5;a.rotation.z=(i?1:-1)*(scare*.18+Math.sin(t*2)*.018);});
+    arms.forEach((a,i)=>{a.rotation.x=-run*2.1+Math.sin(t*2+i*.65)*(.016+run*.07)-scare*.5*(1-run*.7);a.rotation.z=(i?1:-1)*(run*.24+scare*.18+Math.sin(t*2)*.018);});
   }};
   owner.xray.clear();
   for(const [p,s] of [[[0,1.65,0],[.76,.7,.32]],[[-.98,1.4,.18],[.33,.82,.27]],[[.98,1.4,.18],[.33,.82,.27]],[[0,2.19,.5],[.26,.31,.2]]]){

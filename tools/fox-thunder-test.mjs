@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import * as THREE from '../lib/three.module.js';
+import {Player,buildGhostLook} from '../src/player.js';
+import {CHARS,hiddenUnlockReady,charExchangeMode} from '../src/data.js';
+const p=new Player(new THREE.Scene(),{},'kyubi'),r=p.kyubiRig;
+assert.equal(r.tails.length,9);assert.equal(r.legs.length,4);assert.equal(p.head.visible,false);assert.equal(p.skirt.visible,false);
+assert.equal(new Set(r.tails.map(t=>t.name)).size,9);
+p.applyPose(1/60,1,0);const tails=r.tails.map(t=>t.rotation.z);p.applyPose(1/60,2,5);assert.notDeepEqual(r.tails.map(t=>t.rotation.z),tails);
+assert.ok(r.legs.every(l=>Math.abs(l.g.rotation.x)>0),'四本脚の歩行');
+p.phasing=true;for(let i=0;i<60;i++)p.applyPose(1/60,2+i/60,6);assert.ok(p.extras.every(m=>Math.abs(m.material.opacity-.34)<.01));
+assert.equal(buildGhostLook('kyubi').extras.length,p.extras.length);
+p.setChar('raimei');assert.equal(p.kyubiRig,null);assert.equal(p.raimeiRig.drums.length,7);assert.equal(charExchangeMode('raimei',false),'deny');
+assert.equal(hiddenUnlockReady(CHARS.raimei,{stats:{scares:2999}}),false);assert.equal(hiddenUnlockReady(CHARS.raimei,{stats:{scares:3000}}),true);
+p.scarePose=1;p.applyPose(1/60,4,0);assert.ok(p.raimeiRig.arms.some(a=>Math.abs(a.rotation.x)>.2),'ばちを動かす');
+p.group.updateMatrixWorld(true);p.group.traverse(o=>{assert.ok(o.matrixWorld.elements.every(Number.isFinite));if(o.geometry)assert.ok(Array.from(o.geometry.attributes.position.array).every(Number.isFinite));});
+assert.equal(buildGhostLook('raimei').extras.length,p.extras.length);p.setChar('obake');assert.equal(p.raimeiRig,null);p.applyPose(1/60,5,0);
+console.log('fox/thunder test: 四本脚・九尾・太鼓7つ・実績境界・歩行・威嚇・透明化・相手表示・着替え passed');

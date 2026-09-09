@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { CHARS, hiddenUnlockReady, hiddenUnlockValue, validOwnedChars, charExchangeMode } from "../src/data.js";
 
 const hidden = Object.entries(CHARS).filter(([, c]) => c.hidden);
-assert.equal(Object.keys(CHARS).length, 18, "通常7体と隠し11体が登録されている");
-assert.equal(hidden.length, 11, "隠しキャラが11体ある");
-assert.equal(new Set(hidden.map(([, c]) => c.order)).size, 11, "表示順が重複していない");
+assert.equal(Object.keys(CHARS).length, 19, "通常7体と隠し12体が登録されている");
+assert.equal(hidden.length, 12, "隠しキャラが12体ある");
+assert.equal(new Set(hidden.map(([, c]) => c.order)).size, 12, "表示順が重複していない");
 
 for (const [id, c] of hidden) {
   assert.ok(c.unlock && c.unlock.key && c.unlock.at > 0 && c.unlock.label, `${id}: 解放条件がある`);

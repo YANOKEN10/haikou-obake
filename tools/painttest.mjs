@@ -88,17 +88,17 @@ for (const charId of Object.keys(CHARS)) {
 const amano=new Player(new THREE.Scene(),{},"amanojaku");
 amano.bob=.25;
 amano.applyPose(1/60,.2,0);
-const idleHand=amano.handL.position.clone();
+const idleHand=amano.amanoRig.arms[0].rotation.x;
 amano.animateMane(.2,0);
 const idleHair=amano.mane[0].m.rotation.x;
 amano.bob=1.1; amano.dashing=true;
 amano.applyPose(1/60,1.2,9);
 amano.animateMane(1.2,9);
-assert.notDeepEqual(amano.handL.position.toArray(),idleHand.toArray(),"あまのじゃく: 走ると腕を振る");
+assert.ok(amano.amanoRig.arms[0].rotation.x < idleHand-1,"あまのじゃく: 移動中は両腕を上げる");
 assert.notEqual(amano.mane[0].m.rotation.x,idleHair,"あまのじゃく: 走ると長髪がたなびく");
 amano.scarePose=1;
 amano.applyPose(1/60,1.4,0);
-assert.ok(amano.handL.position.y>1.2,"あまのじゃく: おどかす時に両腕を上げる");
+assert.ok(amano.amanoRig.arms.every(a=>a.rotation.x<-.4),"あまのじゃく: おどかす時に両腕を上げる");
 assert.notEqual(amano.group.rotation.z,undefined,"あまのじゃく: 全身の重心を動かす");
 
 console.log(`paint test: ${checks} basic + ${allColorChecks} all-color checks passed`);
