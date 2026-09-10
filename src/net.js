@@ -124,12 +124,12 @@ export class Net {
   }
 
   // おどかしたことをホストへ知らせる（自分がホストなら、そのまま自分で使う）
-  reportScare(hid, amount, why) {
+  reportScare(hid, amount, why, battleId) {
     if (!this.on || hid == null) return;
-    if (this.isHost) { this.inActs.push({ k: "scare", hid, a: Math.round(amount), w: why }); return; }
+    if (this.isHost) return; // 自分の効果は呼び出し元で反映済み。二重に加算しない。
     // 1回とどかなくても大丈夫なように、しばらく同じ合図を送りつづける。
     // おやは番号を見て、同じものは1回しか使わない
-    this.outActs.push({ i: this.actNo++, k: "scare", hid, a: Math.round(amount), w: why });
+    this.outActs.push({ i: this.actNo++, k: "scare", hid, a: Math.round(amount), w: why, b: battleId });
     if (this.outActs.length > 8) this.outActs.shift();
   }
 
@@ -380,7 +380,7 @@ export class Net {
         const last = this.actSeen.get(key) || 0;
         if (!a.i || a.i <= last) continue;
         this.actSeen.set(key, a.i);
-        this.inActs.push(a);
+        this.inActs.push({...a,q:pid});
       }
     }
   }

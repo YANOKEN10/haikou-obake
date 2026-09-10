@@ -686,12 +686,11 @@ class Game {
       * (mate ? 2.1 : 1.0);
     if (best.seenGhostT > 0.2) amount *= 0.7;      // 見られていると効きが悪い
 
-    const eff = best.addFear(amount, p.x, p.z, "direct", "おどかし");
-    if (this.net.on) { this.net.reportScare(best.hid, amount, "direct"); this.myScareT.set(best.hid, Date.now()); }
+    const eff = this.applyFear(best, amount, p.x, p.z, "direct", "おどかし");
+    if (this.net.on) { this.net.reportScare(best.hid, amount, "direct", this.battle.id); this.myScareT.set(best.hid, Date.now()); }
     this.texts.push(new FloatText(this.scene, "わっ！", p.x, p.y + 2.1, p.z, "#ffe27a", 2.3));
 
     if (eff > 0) {
-      this.battle.countScare();                  // 勝負ちゅうなら 1人 かぞえる
       this.bump("scares"); this.best("biggest", eff);
       if (behind) this.bump("behind");
       if (best.lastCombo) this.bump("combos");
@@ -761,7 +760,15 @@ class Game {
   }
 
   // --- 人間が逃げ切った --------------------------------------
+  applyFear(h,amount,x,z,why,label){
+    const wasFlee=h.state==="flee"||h.fear>=h.maxFear||h.out;
+    const eff=h.addFear(amount,x,z,why,label);
+    this.battle.claim(h,this.net.pid,eff,wasFlee);
+    return eff;
+  }
+
   onEscape(h) {
+    this.battle.countEscape(h);
     this.kicked++;
     this.bumpIn("byHuman", h.name);
     this.best("bestWave", this.wave);
@@ -868,6 +875,9 @@ class Game {
   // --- 毎フレーム --------------------------------------------
   update(dt, t) {
     const inp = this.input, p = this.player, w = this.world;
+    const battleNow=performance.now();
+    this.battle.update(this._battleTick==null?0:(battleNow-this._battleTick)/1000);this._battleTick=battleNow;
+    if(this.net.on)this.syncNet(dt,t);
 
     // 遊んだ時間と自動セーブ
     if (this.profile) {
@@ -892,21 +902,25 @@ class Game {
       if (inp.once("KeyS")) { this.saveNow(true); }
       if (inp.once("KeyH")) { this.goHome(); return; }
     }
-    if (this.ui.craftOpen || this.paused) { w.update(0, t); this.sky.update(0, t); this.renderer.render(this.scene, this.camera); inp.endFrame(); return; }
+    if ((this.ui.craftOpen || this.paused) && !this.battle.on) { w.update(0, t); this.sky.update(0, t); this.renderer.render(this.scene, this.camera); inp.endFrame(); return; }
 
     // 仕掛けの選択
     // 仕掛けは12種あるので、1〜9 と 0 でえらべるようにする
-    const nTrap = Object.keys(TRAPS).length;
-    for (let i = 0; i < 9 && i < nTrap; i++) {
-      if (inp.once("Digit" + (i + 1))) { this.selTrap = i; this.audio.click(); }
-    }
-    if (nTrap > 9 && inp.once("Digit0")) { this.selTrap = 9; this.audio.click(); }
-    if (inp.wheel) { this.selTrap = (this.selTrap + inp.wheel + nTrap) % nTrap; this.audio.click(); }
-    if (inp.once("KeyF")) this.placeTrap();
-    if (inp.once("KeyR")) this.retrieve();
-    if (inp.once("KeyE")) this.doScare();
+    const menuOpen=this.ui.craftOpen||this.paused;
+    if(!menuOpen){
+      const nTrap = Object.keys(TRAPS).length;
+      for (let i = 0; i < 9 && i < nTrap; i++) {
+        if (inp.once("Digit" + (i + 1))) { this.selTrap = i; this.audio.click(); }
+      }
+      if (nTrap > 9 && inp.once("Digit0")) { this.selTrap = 9; this.audio.click(); }
+      if (inp.wheel) { this.selTrap = (this.selTrap + inp.wheel + nTrap) % nTrap; this.audio.click(); }
+      if (inp.once("KeyF")) this.placeTrap();
+      if (inp.once("KeyR")) this.retrieve();
+      if (inp.once("KeyE")) this.doScare();
 
-    p.update(dt, inp, this.camera, t);
+    }
+    // メニュー中も勝負と人間は進めるが、操作は止める。
+    p.update(dt, menuOpen?{mouseDX:0,mouseDY:0,axisX:0,axisZ:0,k:()=>false}:inp, this.camera, t);
     w.update(dt, t);
     this.sky.update(dt, t);
 
@@ -967,12 +981,13 @@ class Game {
       if (!p.phasing && h.canSee(p.x, p.y, p.z, 16)) {
         h.seenGhostT = 0.5;
         if (h.state === "wander") {
+          const wasFlee=h.state==="flee"||h.fear>=h.maxFear;
           h.fear += dt * 4.2;
           if (h.fear > h.maxFear * 0.35 && Math.random() < dt * 0.6) {
             h.state = "spooked"; h.stateT = 1.4; h.fearSrc = { x: p.x, z: p.z };
             h.speak(choice(h.type.scared), 2.4);
           }
-          if (h.fear >= h.maxFear) h.addFear(1, p.x, p.z, "stare");
+          if (h.fear >= h.maxFear) { const eff=h.addFear(1,p.x,p.z,"stare");this.battle.claim(h,this.net.pid,eff,wasFlee); }
         }
       }
     }
@@ -1009,8 +1024,8 @@ class Game {
           if (dist(tr.x, tr.z, h.x, h.z) > tr.def.radius) continue;
           const line = h.slip();
           if (!line) continue;
-          h.addFear(tr.def.fear, tr.x, tr.z, "trap:" + tr.id, tr.def.name);
-          if (this.net.on) { this.net.reportScare(h.hid, tr.def.fear, "trap:" + tr.id); this.myScareT.set(h.hid, Date.now()); }
+          this.applyFear(h, tr.def.fear, tr.x, tr.z, "trap:" + tr.id, tr.def.name);
+          if (this.net.on) { this.net.reportScare(h.hid, tr.def.fear, "trap:" + tr.id, this.battle.id); this.myScareT.set(h.hid, Date.now()); }
           h.speak(line, 3.0);
           this.bump("slipped");
           tr.fire();
@@ -1028,8 +1043,8 @@ class Game {
         const d = dist(tr.x, tr.z, h.x, h.z);
         if (d > tr.def.radius) continue;
         if (!w.colliders.lineOfSight(tr.x, tr.z, h.x, h.z, tr.baseY + 1.2, 0.7)) continue;
-        const eff = h.addFear(tr.def.fear, tr.x, tr.z, "trap:" + tr.id, tr.def.name);
-        if (this.net.on) { this.net.reportScare(h.hid, tr.def.fear, "trap:" + tr.id); this.myScareT.set(h.hid, Date.now()); }
+        const eff = this.applyFear(h, tr.def.fear, tr.x, tr.z, "trap:" + tr.id, tr.def.name);
+        if (this.net.on) { this.net.reportScare(h.hid, tr.def.fear, "trap:" + tr.id, this.battle.id); this.myScareT.set(h.hid, Date.now()); }
         tr.fire();
         this.bump("trapsFired");
         if (dist(tr.x, tr.z, p.x, p.z) < 34) this.audio.trapSound(tr.id);
@@ -1037,7 +1052,6 @@ class Game {
           eff > 0 ? "#ffb3e0" : "#8fa8c8", 1.9));
         if (eff > 0) {
           this.audio.scream(h.type.courage < 90 ? 1.3 : 1);
-          this.battle.countScare();              // 仕掛けの ぶんも かぞえる
           const drop = h.takeDrop();
           if (drop) this.dropAt(drop, h.x, h.z, h.y);
           // 理科室・音楽室の備品も呼応する
@@ -1056,11 +1070,11 @@ class Game {
       const s = this.summons[i];
       const res = s.update(dt, t, this.humans);
       if (res) {
-        const eff = res.human.addFear(res.amount, s.x, s.z, "summon:" + s.id, s.def.name);
+        const eff = this.applyFear(res.human, res.amount, s.x, s.z, "summon:" + s.id, s.def.name);
+        if(this.net.on)this.net.reportScare(res.human.hid,res.amount,"summon:"+s.id,this.battle.id);
         this.texts.push(new FloatText(this.scene, res.line, s.x, 2.3, s.z, eff > 0 ? "#b6ffd0" : "#8fa8c8", 1.8));
         if (eff > 0) {
           this.audio.scream(res.human.type.courage < 90 ? 1.3 : 1);
-          this.battle.countScare();              // 召喚おばけの ぶんも かぞえる
           const drop = res.human.takeDrop();
           if (drop) this.dropAt(drop, res.human.x, res.human.z, res.human.y);
         }
@@ -1179,12 +1193,10 @@ class Game {
     this.ui.setPlace(w.roomAt(p.x, p.z, p.y));
     this.updateFind(dt, t);
 
-    // --- おどかし勝負 ---------------------------------------
-    this.battle.update(dt);
+    // --- 追い出しバトル ---------------------------------------
+
     if (this.battle.on) {
-      const rows = [];
-      for (const [pid, pr] of this.net.peers) rows.push({ name: pr.name, score: pr.score || 0 });
-      rows.sort((a, b) => b.score - a.score);
+      const rows = this.battle.rows();
       this.ui.setBattle({ left: this.battle.left, score: this.battle.score, rows });
     } else if (this._battleWas) {
       this.ui.setBattle(null);
@@ -1199,8 +1211,6 @@ class Game {
     let danger = this.scareFx;
     for (const h of this.humans) if (!h.out && h.state === "panic" && dist(h.x, h.z, p.x, p.z) < 12) danger = Math.max(danger, 0.35);
     this.ui.vignette(danger);
-
-    if (this.net.on) this.syncNet(dt, t);
 
     // 状況に応じたヒント
     let hint = "";
@@ -1683,7 +1693,7 @@ class Game {
       c: this.charId || "obake",                   // どの すがたで 遊んでいるか
       pt: { ...(this.paint[this.charId] || {}) },    // からだ・かざり・ひかり・目の色
       st: this.stageId,                             // みんなが同じマップにいるか確認する
-      sc: this.battle.score,                       // おどかし勝負で おどかした人数
+      sc: this.battle.score,                       // ホストが確定した追い出し人数
       h: this.net.isHost ? 1 : 0,                  // この人が おや か
       bt: this.net.isHost ? this.battle.netState() : undefined,
       got: this.gotOut.slice(),                    // 拾ったものの 番号
@@ -1701,8 +1711,10 @@ class Game {
         if (a.k !== "scare") continue;
         for (const h of this.humans) {
           if (h.hid !== a.hid || h.out) continue;
+          const wasFlee=h.state==="flee"||h.fear>=h.maxFear;
           const eff = h.addFear(a.a, h.x, h.z, a.w || "mate", "ともだち");
           // ともだちが おどかしてくれたぶん、こちらにも 材料が 1つ
+          this.battle.claim(h,a.q,eff,wasFlee,a.b);
           if (eff > 0) this.giveShare(h);
           break;
         }
@@ -1714,8 +1726,6 @@ class Game {
 
     // 勝負の ようすを 合わせる
     if (!this.net.isHost) this.battle.applyRemote(this.net.remoteBattle);
-    this.battle.peerScores = {};
-    for (const [pid, pr] of this.net.peers) this.battle.peerScores[pid] = pr.score || 0;
 
     // ともだちが 拾ったものを、こちらの画面からも 消す。
     //  材料は こちらにも 入る（取りあいに ならない）

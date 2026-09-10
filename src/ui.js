@@ -436,7 +436,7 @@ export class UI {
     });
   }
 
-  // --- おどかし勝負 ------------------------------------------
+  // --- 追い出しバトル ------------------------------------------
   //  b … {left, score, rows:[{name,score}]}。null で 消す
   setBattle(b) {
     const bar = $("#battleBar");
@@ -459,7 +459,7 @@ export class UI {
   showCount(text, isGo) {
     const e = $("#count3");
     $("#count3n").textContent = text;
-    $("#count3s").textContent = isGo ? "スタート！" : "おどかし勝負！";
+    $("#count3s").textContent = isGo ? "スタート！" : "追い出しバトル！";
     e.classList.remove("on");
     void e.offsetWidth;                        // もう一度 動かすための おまじない
     e.classList.add("on");
@@ -473,8 +473,8 @@ export class UI {
   showResult(rows, gift, mine) {
     const medal = ["🥇", "🥈", "🥉"];
     $("#rsTitle").textContent = rows.length > 1
-      ? (mine.place === 1 ? "🎉 " + mine.score + "人で ゆうしょう！" : mine.place + "位　" + mine.score + "人 おどかした")
-      : mine.score + "人 おどかした！";
+      ? (mine.place === 1 ? "🎉 " + mine.score + "人で ゆうしょう！" : mine.place + "位　" + mine.score + "人 追い出した")
+      : mine.score + "人 追い出した！";
     $("#rsRank").innerHTML = rows.map((r) =>
       "<div class='rsrow" + (r.me ? " me" : "") + "'>" +
       "<span class='pl'>" + (medal[r.place - 1] || r.place + "位") + "</span>" +
@@ -512,7 +512,7 @@ export class UI {
     const on = !!(net && net.on);
     // 画面いっぱいの まとめを 作って、変わったときだけ 書きかえる
     const names = on ? Array.from(net.peers.values()).map((p) => p.name) : [];
-    const key = [on, on && net.code, on && net.isHost, on && net.name, names.join(" ")].join("|");
+    const key = [this.game.battle.phase, on, on && net.code, on && net.isHost, on && net.name, names.join(" ")].join("|");
     if (!force && key === this._roomKey) return;
     this._roomKey = key;
 
@@ -540,13 +540,13 @@ export class UI {
       "<span class='tag'>" + (m.me ? (m.host ? "じぶん・おや" : "じぶん") : "ともだち") + "</span></div>").join("");
 
     // 勝負を はじめられるのは おや だけ。ひとりでは できない
-    const canFight = net.isHost && net.peers.size > 0;
+    const canFight = net.isHost && net.peers.size > 0 && !this.game.battle.on;
     $("#rBattle").disabled = !canFight;
     $("#rBattle").style.opacity = canFight ? "1" : ".45";
     $("#bNote").innerHTML = net.isHost
-      ? (net.peers.size ? "だれが いちばん たくさん おどかせるか。<br>おわると、おどかした人数ぶん 材料が もらえます。"
+      ? (net.peers.size ? "2〜4人で、追い出した数を きそう！<br>逃げださせた人に、門から出たとき 1点。<br>途中で入った人は、次の勝負から参加できます。"
                         : "ともだちが 入ってくると、勝負を はじめられます。")
-      : "おやが はじめるのを 待っています。";
+      : "逃げださせた人に、門から出たとき 1点。<br>おやが はじめるのを 待っています。";
     $("#bPick").style.display = net.isHost ? "flex" : "none";
     $("#rBattle").style.display = net.isHost ? "block" : "none";
     $("#bHead").style.display = net.isHost ? "block" : "none";

@@ -315,7 +315,7 @@ body.touch .hpanel, body.touch .namelist, body.touch .cwrap{-webkit-overflow-scr
 .ucard.can .ubtn{border-color:#8fe6b0;color:#9dffe0}
 .ucard.no .ubtn{opacity:.45;cursor:not-allowed}
 
-/* おどかし勝負 */
+/* 追い出しバトル */
 #battleBar{position:absolute;left:50%;transform:translateX(-50%);top:56px;z-index:7;
   display:flex;align-items:center;gap:10px;background:rgba(24,14,32,.88);
   border:1px solid #ff8ac4;border-radius:14px;padding:6px 14px;
@@ -897,7 +897,7 @@ body.touch #craftClose{display:block}
   <div id="roomChip" hidden></div>
   <div id="battleBar" hidden>
     <div id="bClock">3:00</div>
-    <div id="bMine"><b id="bCount">0</b>人</div>
+    <div id="bMine">追い出し <b id="bCount">0</b>人</div>
     <div id="bList"></div>
   </div>
   <div id="findBar" hidden>
@@ -919,7 +919,7 @@ body.touch #craftClose{display:block}
   <div class="tbtn" id="bScare"><i>😱</i>おどかす</div>
 </div>
 
-<div id="count3"><div id="count3n">3</div><div id="count3s">おどかし勝負！</div></div>
+<div id="count3"><div id="count3n">3</div><div id="count3s">追い出しバトル！</div></div>
 
 <div id="result">
   <div class="rsbox">
@@ -973,9 +973,9 @@ body.touch #craftClose{display:block}
         <button class="pbtn bmin on" data-min="3">3分</button>
         <button class="pbtn bmin" data-min="5">5分</button>
       </div>
-      <button class="pbtn" id="rBattle">⚔ おどかし勝負を はじめる</button>
-      <div class="rnote" id="bNote">だれが いちばん たくさん おどかせるか。<br>
-        おわると、おどかした人数ぶん 材料が もらえます。</div>
+      <button class="pbtn" id="rBattle">⚔ 追い出しバトルを はじめる</button>
+      <div class="rnote" id="bNote">だれが いちばん たくさん 追い出せるか。<br>
+        おわると、追い出した人数ぶん 材料が もらえます。</div>
       <button class="pbtn" id="rLeave">👋 部屋を出る</button>
     </div>
     <div id="rMsg"></div>

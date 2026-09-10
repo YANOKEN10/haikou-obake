@@ -221,7 +221,7 @@ module.exports = async function handler(req, res) {
       if (isHost) {
         for (const q of Object.keys(room.players)) {
           if (q === pid) continue;
-          for (const a of room.players[q].acts || []) out.acts.push({ q, i: a.i, k: a.k, hid: a.hid, a: a.a, w: a.w });
+          for (const a of room.players[q].acts || []) out.acts.push({ q, i: a.i, k: a.k, hid: a.hid, a: a.a, w: a.w, b: a.b });
         }
         out.world = null;                            // 自分が書いたものは返さなくてよい
       } else {

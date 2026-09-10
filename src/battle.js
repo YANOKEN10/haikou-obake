@@ -1,164 +1,97 @@
 // ============================================================
-//  おどかし勝負（ともだちとの バトル）
+//  追い出しバトル（ともだちとの バトル）
 //   ・部屋を作った人（おや）が「はじめる」を おすと、
 //     3・2・1 の あとに 勝負が はじまる
 //   ・おなじ廃校で、決めた時間のあいだに
-//     どれだけ たくさん おどかせたかを きそう
-//   ・おわると けっかが 出て、おどかした人数ぶん 材料がもらえる
+//     どれだけ たくさん 追い出せたかを きそう
+//   ・おわると けっかが 出て、追い出した人数ぶん 材料がもらえる
 //
 //  どうやって みんなで 合わせているか
 //   ・時こく（時計）は 端末ごとに ずれるので、送るのは
 //     「のこり何秒か」だけ。うけとった側は そこから
 //     自分で へらしていく
 //   ・おやが のこり秒と ようすを 送り、お客さんは それに合わせる
-//   ・自分が おどかした人数は、自分で 数えて みんなに 送る
+//   ・追い出した人数と順位は、おやが 数えて みんなに 送る
 // ============================================================
 
-// もらえる材料。おどかすほど たくさん・いい色になる
+// もらえる材料。追い出すほど たくさん・いい色になる
 import { MATERIALS, RARITY } from "./data.js";
 
 export const BATTLE_DROPS = ["onnen", "hokori", "denchi", "pan", "wax", "kami", "nurunuru"];
 
+// 得点はホストだけが確定する。試合IDと更新番号で前の試合・遅れた通信を除外する。
 export class Battle {
-  constructor(game) {
-    this.game = game;
-    this.reset();
-  }
-
+  constructor(game) { this.game=game;this.seen=new Set();this.rewarded=new Set();this.reset(); }
   reset() {
-    this.phase = "off";      // off / count（3・2・1）/ play（勝負ちゅう）/ over（けっか）
-    this.left = 0;           // のこり秒
-    this.dur = 180;          // 何秒の勝負か
-    this.score = 0;          // 自分が おどかした 人数
-    this.peerScores = {};    // pid → 人数
-    this.lastCount = -1;     // 3・2・1 の 出しわけ用
-    this.ended = null;       // けっかの ならび
+    this.phase="off";this.left=0;this.dur=180;this.score=0;this.peerScores={};this.lastCount=-1;
+    this.startedAt=0;this.ended=null;this.id="";this.host="";this.rev=0;this.roster=[];this.scores={};this.owners=new Map();this.exits=new Set();
   }
-
-  get on() { return this.phase === "count" || this.phase === "play"; }
-  get playing() { return this.phase === "play"; }
-
-  // --- おや：勝負を はじめる --------------------------------
-  start(minutes) {
-    const g = this.game;
-    if (!g.net.on || !g.net.isHost) return false;
-    this.reset();
-    this.dur = Math.round((minutes || 3) * 60);
-    this.phase = "count";
-    this.left = 3.999;                       // 3・2・1
-    g.ui.closeRoom();
-    g.setPaused(false);
-    g.ui.hideResult();
-    return true;
+  get on(){return this.phase==="count"||this.phase==="play";}
+  get playing(){return this.phase==="play"&&this.left>0;}
+  start(minutes){
+    const g=this.game;
+    if(!g.net.on||!g.net.isHost||g.net.peers.size<1||this.on)return false;
+    if(![1,3,5].includes(Number(minutes)))return false;
+    const stamp=Math.max(Date.now(),this.startedAt+1);this.reset();this.startedAt=stamp;this.id=stamp.toString(36)+"-"+Math.random().toString(36).slice(2,9);this.seen.add(this.id);
+    this.host=g.net.pid;this.roster=[{pid:g.net.pid,name:g.net.name||"じぶん"},...Array.from(g.net.peers,([pid,p])=>({pid,name:p.name}))].slice(0,4);
+    this.scores=Object.fromEntries(this.roster.map(p=>[p.pid,0]));this.dur=minutes*60;this.left=3;this.phase="count";
+    this.prepare();return true;
   }
-
-  // --- おどかしたぶんを 数える ------------------------------
-  //  たたみかけ・ふいうちでも 1人は 1人。
-  //  同じ人を 何度おどかしても、慣れられて 効かなくなるので
-  //  むやみに 連打しても 増えない。
-  countScare() {
-    if (this.phase !== "play") return;
-    this.score++;
-    this.game.audio.tone(880, 0.09, "square", 0.05, 1200);
+  prepare(){const g=this.game;g.ui.closeRoom();g.ui.closeCraft?.();g.setPaused(false);g.ui.hideResult();}
+  // 恐怖が限界に達して逃走を始めた人を記録。逃げている人への追撃では横取りしない。
+  claim(h,pid,eff,wasFlee,matchId=this.id){
+    if(!this.game.net.isHost||!this.playing||matchId!==this.id||wasFlee||eff<=0||h.fear<h.maxFear||!(pid in this.scores))return;
+    if(!this.owners.has(h.hid))this.owners.set(h.hid,pid);
   }
-
-  // --- 毎フレーム ------------------------------------------
-  update(dt) {
-    const g = this.game;
-    if (this.phase === "off") return;
-
-    // 部屋から出たら 勝負も おわり
-    if (!g.net.on && this.phase !== "over") { this.finish(true); return; }
-
-    if (g.net.isHost) {
-      // おやが 時間を すすめる
-      this.left -= dt;
-      if (this.phase === "count" && this.left <= 0) {
-        this.phase = "play";
-        this.left = this.dur;
-        g.ui.showCount("スタート！", true);
-        g.audio.rankUp();
-      } else if (this.phase === "play" && this.left <= 0) {
-        this.finish(false);
-        return;
-      }
-    } else {
-      // お客さんは、とどいた のこり秒から 自分で へらす
-      this.left -= dt;
-      if (this.left < 0) this.left = 0;
+  countEscape(h){
+    if(!this.game.net.isHost||!this.playing||!h.out||this.exits.has(h.hid))return;
+    const pid=this.owners.get(h.hid);if(!pid)return;
+    this.exits.add(h.hid);this.scores[pid]++;this.syncScore();
+  }
+  syncScore(){this.score=this.scores[this.game.net.pid]||0;this.peerScores={...this.scores};}
+  rows(){
+    const rows=this.roster.map(p=>({...p,score:this.scores[p.pid]||0,me:p.pid===this.game.net.pid})).sort((a,b)=>b.score-a.score);
+    let rank=0,last=null;rows.forEach((r,i)=>{if(r.score!==last){rank=i+1;last=r.score;}r.place=rank;});return rows;
+  }
+  update(dt){
+    const g=this.game;if(!this.on)return;
+    if(!g.net.on||(g.net.isHost&&this.host!==g.net.pid)){this.finish(true);return;}
+    const remaining=this.left-Math.max(0,dt);this.left=Math.max(0,remaining);
+    if(g.net.isHost&&this.left===0){
+      if(this.phase==="count"){this.phase="play";this.left=Math.max(0,this.dur+remaining);g.ui.showCount("スタート！",true);g.audio.rankUp();}
+      else {this.finish(false);return;}
     }
-
-    // 3・2・1 の 数字を 出す
-    if (this.phase === "count") {
-      const n = Math.max(1, Math.ceil(this.left));
-      if (n !== this.lastCount) {
-        this.lastCount = n;
-        g.ui.showCount(String(n), false);
-        g.audio.tone(520, 0.16, "square", 0.07, 520);
-      }
+    if(g.net.isHost&&this.phase==="play"&&this.left===0){this.finish(false);return;}
+    if(this.phase==="count"){
+      const n=Math.max(1,Math.ceil(this.left));if(n!==this.lastCount){this.lastCount=n;g.ui.showCount(String(n),false);g.audio.tone(520,.16,"square",.07,520);}
     }
   }
-
-  // --- おやから とどいた ようすに 合わせる ------------------
-  applyRemote(bt) {
-    if (!bt) {
-      // おやが 勝負を やめた
-      if (this.phase === "count" || this.phase === "play") this.finish(true);
-      return;
-    }
-    const was = this.phase;
-    if (was === "play" && bt.p === "over") { this.finish(false); return; }
-    this.phase = bt.p;
-    this.dur = bt.d || this.dur;
-    // のこり秒は、ずれが 大きいときだけ 合わせる（カクつかせない）
-    if (Math.abs(this.left - bt.l) > 0.9 || was !== bt.p) this.left = bt.l;
-    if (was !== "play" && bt.p === "play") {
-      this.game.ui.showCount("スタート！", true);
-      this.game.audio.rankUp();
-      this.lastCount = -1;
-    }
+  applyRemote(bt){
+    if(!bt){if(this.on)this.finish(true);return;}
+    if(!bt.id||!Array.isArray(bt.members)||!bt.scores||!["off","count","play","over"].includes(bt.p))return;
+    if(bt.id!==this.id){if(this.seen.has(bt.id)||(bt.host===this.host&&bt.at<this.startedAt))return;this.reset();this.id=bt.id;this.startedAt=bt.at;this.seen.add(bt.id);this.prepare();}
+    if(bt.r<=this.rev)return;
+    const was=this.phase;this.rev=bt.r;this.host=bt.host;this.roster=bt.members.map(p=>({...p}));this.scores={...bt.scores};this.syncScore();
+    this.dur=bt.d;this.left=Math.max(0,bt.l);this.phase=bt.p;
+    if(was!=="play"&&bt.p==="play"){this.game.ui.showCount("スタート！",true);this.game.audio.rankUp();}
+    if(bt.p==="over")this.showResult();
+    if(bt.p==="off"&&was!=="off"){this.game.ui.setBattle(null);this.game.ui.toast?.("追い出しバトルは中止になりました", "bad");}
   }
-
-  // おやが みんなに 送る ようす
-  netState() {
-    if (this.phase === "off") return null;
-    return { p: this.phase, l: +this.left.toFixed(2), d: this.dur };
+  netState(){return this.id?{id:this.id,at:this.startedAt,r:++this.rev,host:this.host,p:this.phase,l:+this.left.toFixed(2),d:this.dur,members:this.roster,scores:{...this.scores}}:null;}
+  finish(cancelled){
+    if(!this.on)return;this.left=0;this.phase=cancelled?"off":"over";this.game.ui.setBattle(null);
+    if(cancelled){this.game.ui.toast?.("追い出しバトルは中止になりました", "bad");return;}this.showResult();
   }
-
-  // --- おわり ----------------------------------------------
-  finish(cancelled) {
-    const g = this.game;
-    const wasPlaying = this.phase === "play" || this.phase === "count";
-    this.phase = "over";
-    this.left = 0;
-    g.ui.setBattle(null);
-    if (cancelled) { this.phase = "off"; return; }
-    if (!wasPlaying) return;
-
-    // じゅんい を つける
-    const me = { name: (g.net.name || "じぶん"), score: this.score, me: true };
-    const rows = [me];
-    for (const [pid, pr] of g.net.peers) {
-      rows.push({ name: pr.name, score: this.peerScores[pid] || 0, me: false });
-    }
-    rows.sort((a, b) => b.score - a.score);
-    let place = 0, lastScore = null;
-    rows.forEach((r, i) => {
-      if (r.score !== lastScore) { place = i + 1; lastScore = r.score; }
-      r.place = place;
-    });
-
-    const mine = rows.find((r) => r.me);
-    const gift = this.giveGift(mine.score, mine.place === 1 && rows.length > 1);
-    const txt = giftText(gift);
-    this.ended = rows;
-    g.ui.showResult(rows, { num: gift.num, won: gift.won, items: txt.items, tiers: txt.tiers }, mine);
-    g.audio.rankUp();
-    setTimeout(() => { if (this.phase === "over") this.phase = "off"; }, 400);
+  showResult(){
+    if(this.rewarded.has(this.id))return;this.rewarded.add(this.id);
+    const rows=this.rows(),mine=rows.find(r=>r.me);this.ended=rows;this.game.ui.setBattle(null);
+    if(!mine){this.game.ui.toast?.("バトル終了。次の勝負から参加できます", "good");return;}
+    const gift=this.giveGift(mine.score,mine.place===1&&rows.length>1),txt=giftText(gift);
+    this.game.ui.showResult(rows,{num:gift.num,won:gift.won,items:txt.items,tiers:txt.tiers},mine);this.game.audio.rankUp();
   }
 
   // --- ごほうび --------------------------------------------
-  //  おどかした人数が 多いほど、たくさん・いい色 もらえる。
+  //  追い出した人数が 多いほど、たくさん・いい色 もらえる。
   //  1位には おまけ。0人でも 参加賞は もらえる。
   giveGift(score, won) {
     const g = this.game;
