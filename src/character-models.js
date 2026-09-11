@@ -227,9 +227,23 @@ export function animateReferenceCharacter(owner, t, moving, scare) {
   if(owner.riderRig) owner.riderRig.update(t,moving,scare);
   const run=Math.min(1,moving/6);
   if(owner.tekekeRig) {
-    const {root,arms}=owner.tekekeRig;
-    root.rotation.x=-.1*run; root.position.y=Math.abs(Math.sin(t*9))*run*.04;
-    arms.forEach((a,i)=>{const s=i?1:-1;a.rotation.x=Math.sin(t*(run?9:2.2)+i*Math.PI)*(.025+run*.24)-scare*.28;a.rotation.z=s*(Math.sin(t*2+i)*.018+scare*.15);});
+    const rig=owner.tekekeRig,{root,arms}=rig;
+    // 両手を高く開いてため、体と一緒に前へ突き出す。友だち側も同じ動きにする。
+    if(scare>(rig.lastScare||0)+.2)rig.scareStart=t;
+    rig.lastScare=scare;
+    const phase=Math.max(0,Math.min(1,(t-(rig.scareStart??-10))/.75));
+    const wind=phase<.32?Math.sin(Math.PI*phase/.32):0;
+    const thrust=Math.sin(Math.PI*Math.max(0,Math.min(1,(phase-.18)/.82)));
+    root.rotation.x=-.1*run+scare*(-wind*.22+thrust*.4);
+    root.position.y=Math.abs(Math.sin(t*9))*run*.04+scare*(wind*.2+thrust*.12);
+    root.position.z=scare*thrust*.55;
+    arms.forEach((a,i)=>{
+      const side=i?1:-1;
+      a.rotation.x=Math.sin(t*(run?9:2.2)+i*Math.PI)*(.025+run*.24)*(1-scare)+scare*(-wind*1.15+thrust*.45);
+      a.rotation.y=-side*scare*thrust*.85;
+      a.rotation.z=side*(Math.sin(t*2+i)*.018+scare*(.3+wind*.7));
+      a.position.z=-.08+scare*thrust*.25;
+    });
   }
   if(owner.yukiRig) {
     const {locks,sleeves,wisps}=owner.yukiRig;
