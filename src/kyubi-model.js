@@ -86,17 +86,28 @@ export function buildKyubi(owner) {
   owner.xray.clear();const outlineTails=[];
   for(const tail of tails){const copy=new THREE.Group();copy.position.copy(tail.position);for(const m of tail.children){if(m.isMesh)copy.add(new THREE.Mesh(m.geometry,owner.xrayMat));}owner.xray.add(copy);outlineTails.push(copy);}
   for(const [p,s] of [[[0,1.07,-.2],[.265,.37,.62]],[[0,1.65,.38],[.22,.255,.21]]]){const m=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),owner.xrayMat);m.position.set(...p);m.scale.set(...s);owner.xray.add(m);}
+  let gait=0,lastT=null,pace=0,windTime=0;
   owner.kyubiRig={root,head,legs,tails,update(t,moving,scare){
-    const run=Math.min(1,moving/6);
-    root.position.y=Math.abs(Math.sin(t*8))*run*.035;
+    const dt=lastT===null?1/60:Math.max(0,Math.min(.1,t-lastT));lastT=t;
+    const run=Math.min(1,Math.max(0,moving)/6);
+    pace+=(run-pace)*(1-Math.exp(-dt*10));gait+=dt*(5+run*7);windTime+=dt*(1+pace*1.5);
+
+    root.position.y=Math.abs(Math.sin(gait*2))*pace*.045;
     head.rotation.x=Math.sin(t*1.7)*.018-scare*.065;
     head.rotation.y=Math.sin(t*.75)*.025;
     for(let i=0;i<9;i++){
       const side=(i-4)/4;
-      tails[i].rotation.z=Math.sin(t*1.35+i*.6)*.023-side*scare*.055;
-      tails[i].rotation.x=Math.sin(t*1.6+i*.43)*.022-run*.1;
+      tails[i].rotation.z=Math.sin(windTime*1.35+i*.6)*(.035+pace*.22)-side*scare*.055;
+      tails[i].rotation.x=Math.sin(windTime*1.6+i*.43)*(.035+pace*.17)-pace*.38;
+      tails[i].rotation.y=Math.sin(windTime*1.8+i*.7)*pace*.18;
       outlineTails[i].rotation.copy(tails[i].rotation);
     }
-    for(const {g,rear,sx} of legs){g.rotation.x=Math.sin(t*9+(rear?(sx>0?0:Math.PI):(sx>0?Math.PI:0)))*run*.24;}
+    // 四拍の足運び。片脚ずつ前へ運び、接地中は体の後ろへ送る。
+    for(const {g,rear,sx} of legs){
+      const offset=rear?(sx>0?0:Math.PI):(sx>0?Math.PI*.5:Math.PI*1.5);
+      const step=Math.sin(gait+offset);
+      g.rotation.x=step*pace*.46;
+      g.position.y=(rear?1.1:1.18)+Math.max(0,Math.cos(gait+offset))*pace*.085;
+    }
   }};
 }

@@ -41,13 +41,16 @@ export function buildAmanojaku(owner) {
       const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(v,3));geo.setIndex(sx>0?ix:ix.slice().reverse());geo.computeVertexNormals();put(geo,0x9256b4,'deco');
     }
   }
+  const legs=[];
   // 開いた膝と獣の足。長身の直立姿勢を避け、重心を地面へ近づける。
   for(const sx of [-1,1]){
-    bone([sx*.19,1.03,-.06],[sx*.73,.58,.2],.24,.25);
-    muscle([sx*.49,.79,.07],[.35,.29,.27]);muscle([sx*.75,.52,.23],[.24,.21,.24]);
-    bone([sx*.75,.5,.23],[sx*.67,.12,-.05],.19,.13);
-    muscle([sx*.68,.26,.035],[.16,.22,.18]);muscle([sx*.68,.075,.16],[.2,.11,.35]);
-    for(let j=0;j<3;j++)lock([[sx*.68+(j-1)*.105,.1,.36],[sx*.68+(j-1)*.12,.06,.48],[sx*.68+(j-1)*.13,.03,.56]],.055,0xb7ae79,root,'fixed',.5);
+    const hip=group(`amano-hip-${sx}`),knee=group(`amano-knee-${sx}`);
+    bone([sx*.19,1.03,-.06],[sx*.73,.58,.2],.24,.25,skin,hip);
+    muscle([sx*.49,.79,.07],[.35,.29,.27],skin,hip);muscle([sx*.75,.52,.23],[.24,.21,.24],skin,hip);
+    bone([sx*.75,.5,.23],[sx*.67,.12,-.05],.19,.13,skin,knee);
+    muscle([sx*.68,.26,.035],[.16,.22,.18],skin,knee);muscle([sx*.68,.075,.16],[.2,.11,.35],skin,knee);
+    for(let j=0;j<3;j++)lock([[sx*.68+(j-1)*.105,.1,.36],[sx*.68+(j-1)*.12,.06,.48],[sx*.68+(j-1)*.13,.03,.56]],.055,0xb7ae79,knee,'fixed',.5);
+    legs.push({hip,knee,sx});
     // 腰布は画面の小さいサイズでも分かる、短い黄土色の毛皮。
     for(let j=0;j<7;j++){const x=sx*(.03+j*.042);shape([[x,.99],[x+sx*.068,.96],[x+sx*.05,.66+(j%3)*.045],[x-sx*.02,.73]],.07,j%2?0x9e8c61:0xb3a174,'deco',root,.25,.007);}
   }
@@ -134,14 +137,41 @@ export function buildAmanojaku(owner) {
     lock([[q*.235,2.52-Math.abs(q)*.2,.04],[q*.35,2.77-Math.abs(q)*.12,-.19],[q*.48,2.82-Math.abs(q)*.13,-.65],[q*.63+.1,2.69,-1.2]],j%3?.043:.11,j%4?red:0xc03a32);
   }
   b.finish();
-  // 毛束と腕が別々に揺れ、威嚇では上体と爪を前へ出す。
-  owner.amanoRig={root,arms,head,tongue,update(t,moving,scare){
-    const run=Math.min(1,moving/6);
-    root.position.y=run*(.28+Math.sin(t*2.8)*.08);
-    root.rotation.x=run*.1;root.rotation.z=Math.sin(t*2)*run*.025;
-    head.rotation.x=.04+Math.sin(t*2)*.02-scare*.12;
-    tongue.rotation.x=Math.sin(t*3)*.12;
-    arms.forEach((a,i)=>{a.rotation.x=-run*2.1+Math.sin(t*2+i*.65)*(.016+run*.07)-scare*.5*(1-run*.7);a.rotation.z=(i?1:-1)*(run*.24+scare*.18+Math.sin(t*2)*.018);});
+  // まとめた形状を関節の原点へ移し、膝を股関節の子にする。
+  for(const {hip,knee,sx} of legs){
+    for(const [joint,pivot] of [[hip,[sx*.19,1.03,-.06]],[knee,[sx*.75,.5,.23]]]){
+      joint.children.forEach(m=>m.geometry.translate(-pivot[0],-pivot[1],-pivot[2]));joint.position.set(...pivot);
+    }
+    hip.attach(knee);
+  }
+  // 飛行姿勢へ滑らかに移り、威嚇は振りかぶり→両腕の振り下ろし→戻りで見せる。
+  let flight=0,lastT=null,previousScare=0,scareStart=-10;
+  owner.amanoRig={root,arms,legs,head,tongue,update(t,moving,scare){
+    const dt=lastT===null?1/60:Math.max(0,Math.min(.1,t-lastT));lastT=t;
+    const run=Math.min(1,Math.max(0,moving)/6);
+    flight+=(run-flight)*(1-Math.exp(-dt*9));
+    if(scare>previousScare+.2)scareStart=t;
+    previousScare=scare;
+    const phase=Math.max(0,Math.min(1,(t-scareStart)/.75));
+    const wind=phase<.3?Math.sin(Math.PI*phase/.3):0;
+    const slam=Math.sin(Math.PI*Math.max(0,Math.min(1,(phase-.2)/.8)));
+    root.position.y=flight*(.55+Math.sin(t*2.8)*.1)+scare*(wind*.18+slam*.12);
+    root.position.z=scare*slam*.55;
+    root.rotation.x=flight*.2+scare*(-wind*.2+slam*.48);
+    root.rotation.z=Math.sin(t*2)*flight*.035;
+    legs.forEach(({hip,knee},i)=>{
+      hip.rotation.x=flight*(.85+Math.sin(t*2.8+i*.7)*.09)+scare*slam*.18;
+      hip.rotation.z=(i?1:-1)*flight*.12;
+      knee.rotation.x=flight*(.65+Math.sin(t*2.8+i*.7+.8)*.1);
+    });
+    head.rotation.x=.04+Math.sin(t*2)*.02+scare*(wind*.2-slam*.38);
+    head.position.z=.4+scare*slam*.18;
+    tongue.rotation.x=Math.sin(t*3)*.12+scare*slam*.5;
+    arms.forEach((a,i)=>{
+      const idle=-flight*2.1+Math.sin(t*2+i*.65)*(.016+flight*.07);
+      a.rotation.x=idle*(1-scare)+(-2.75+slam*1.95)*scare;
+      a.rotation.z=(i?1:-1)*(flight*.24+scare*(.32+wind*.4)+Math.sin(t*2)*.018);
+    });
   }};
   owner.xray.clear();
   for(const [p,s] of [[[0,1.65,0],[.76,.7,.32]],[[-.98,1.4,.18],[.33,.82,.27]],[[.98,1.4,.18],[.33,.82,.27]],[[0,2.19,.5],[.26,.31,.2]]]){

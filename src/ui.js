@@ -258,13 +258,14 @@ export class UI {
       .map(([id, c]) => "<div class='uchar" + (id === cid ? " on" : "") + (g.chars[id] ? "" : " lock") +
         "' data-c='" + id + "'>" + c.icon + " " + c.name + (g.chars[id] ? "" : " 🔒") + "</div>").join("");
 
+    const labels={amanojaku:{body:"肌・手足",deco:"髪・かざり"},tekeke:{body:"肌・手足",deco:"髪・かざり"},kubinashi:{body:"服",deco:"バイク・マント"},kyubi:{body:"からだ・脚",deco:"しっぽ・毛束"}}[cid]||{};
     const parts = Object.entries(PARTS).map(([pk, P]) => {
       const cur = paintById(g.paintOn(cid, pk));
       const sw = cur.hex !== null && cur.hex !== undefined
         ? "#" + cur.hex.toString(16).padStart(6, "0")
         : "#" + CHARS[cid].body.toString(16).padStart(6, "0");
       return "<div class='ppart" + (pk === part ? " on" : "") + "' data-p='" + pk + "'>" +
-        "<i style='background:" + sw + "'></i>" + P.icon + " " + P.name + "</div>";
+        "<i style='background:" + sw + "'></i>" + P.icon + " " + (labels[pk]||P.name) + "</div>";
     }).join("");
 
     const nowId = g.paintOn(cid, part);
@@ -295,13 +296,13 @@ export class UI {
 
     grid.innerHTML = "<div id='pntHead'>" + chars + "</div>" +
       "<div id='pntParts'>" + parts + "</div>" +
-      "<div id='pntNote'>" + PARTS[part].icon + " <b>" + PARTS[part].name + "</b> … " + PARTS[part].desc +
-      "<br>色は いちど 手に入れれば、どの すがたでも つかえます。ぬる色は すがたごとに 決められます。</div>" +
+      "<div id='pntNote'>" + PARTS[part].icon + " <b>" + (labels[part]||PARTS[part].name) + "</b> … " + PARTS[part].desc +
+      "<br>色は いちど 手に入れれば、どの すがたでも つかえます。ぬる色は すがたごとに 決められます。選んだすがたに着がえて、色をたしかめられます。</div>" +
       cards;
 
     grid.querySelectorAll(".uchar").forEach((el) => el.addEventListener("click", () => {
       if (el.classList.contains("lock")) { g.ui.toast("まだ 使えない すがたです", "bad"); g.audio.deny(); return; }
-      this.pntChar = el.dataset.c; g.audio.click(); this.renderPaint(grid);
+      this.pntChar = el.dataset.c; g.setChar(this.pntChar); g.audio.click(); this.renderPaint(grid);
     }));
     grid.querySelectorAll(".ppart").forEach((el) => el.addEventListener("click", () => {
       this.pntPart = el.dataset.p; g.audio.click(); this.renderPaint(grid);
