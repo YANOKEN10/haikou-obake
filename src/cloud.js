@@ -51,6 +51,7 @@ export class Cloud {
       }
       return { ok: false, why: (d && d.message) || "うまくいきませんでした（" + r.status + "）", status: r.status };
     }
+    if(d?.tradeLedger&&this.signedIn)this.onTradeLedger?.(d.tradeLedger,d.tradeVersion||0);
     return { ok: true, data: d || {} };
   }
 
@@ -87,9 +88,14 @@ export class Cloud {
   }
 
   async push(payload) {
-    const r = await this.call("/api/save", { method: "POST", body: { payload } });
-    if (r.ok) this.user = r.data.user;
-    return r;
+    const snapshot=JSON.parse(JSON.stringify(payload));
+    const send=async()=>{
+      const r=await this.call("/api/save",{method:"POST",body:{payload:snapshot}});
+      if(r.ok)this.user=r.data.user;
+      return r;
+    };
+    this.pendingSave=(this.pendingSave||Promise.resolve()).then(send,send);
+    return await this.pendingSave;
   }
 
   async removeAccount(pw) {
@@ -104,7 +110,7 @@ export class Cloud {
 
   // --- ともだち --------------------------------------------
   async friends() { return await this.call("/api/friends"); }
-  async friendAct(body) { return await this.call("/api/friends", { method: "POST", body }); }
+  async friendAct(body) { if(body.action?.startsWith("trade")&&this.pendingSave){const saved=await this.pendingSave;if(!saved.ok)return saved;} return await this.call("/api/friends", { method: "POST", body }); }
   async findFriend(name) { return await this.friendAct({ action: "search", name }); }
   async askFriend(id) { return await this.friendAct({ action: "request", id }); }
   async answerFriend(act, id) { return await this.friendAct({ action: act, id }); }

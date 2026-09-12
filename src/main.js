@@ -878,7 +878,7 @@ class Game {
     this.cameraMode=((this.cameraMode||0)+1)%distances.length;
     this.player.camDist=distances[this.cameraMode];
     const button=document.getElementById("cameraZoom");
-    button.textContent="📷 カメラ："+labels[this.cameraMode]+"（V）";
+    button.textContent="📷 "+labels[this.cameraMode];
     button.setAttribute("aria-label","カメラ距離："+labels[this.cameraMode]+"。押すと次の距離");
   }
 
@@ -1817,6 +1817,21 @@ class Game {
     return await this.cloud.push({ v: 1, profile: p });
   }
 
+  applyTradeLedger(ledger,version) {
+    if(!this.profile)return;
+    if(version<(this.profile.tradeVersion||0))return;
+    this.profile.inv=this.profile.inv||{};
+    if(!this.started)this.inv={...this.profile.inv};
+    const seen=this.profile.tradeLedger||{};
+    for(const kind of Object.keys(ledger)){
+      const delta=ledger[kind]-(seen[kind]||0);
+      this.inv[kind]=Math.max(0,(this.inv[kind]||0)+delta);
+      this.profile.inv[kind]=Math.max(0,(this.profile.inv[kind]||0)+delta);
+    }
+    this.profile.tradeVersion=version;this.profile.tradeLedger={...ledger};
+    S.saveProfile(this.profile);this.ui.setBag(this.inv);
+  }
+
   async pullFromCloud() {
     if (!this.cloud || !this.cloud.signedIn) return { ok: false, why: "ログインしていません" };
     const r = await this.cloud.pull();
@@ -1827,6 +1842,7 @@ class Game {
     S.saveProfile(p);
     S.setCurrent(p.name);
     this.profile = S.getProfile(p.name);
+    this.inv={...(this.profile.inv||{})};this.ui.setBag(this.inv);
     return { ok: true };
   }
 
@@ -1873,6 +1889,7 @@ game.loop(performance.now());
 
 game.resize();
 game.cloud = new Cloud();
+game.cloud.onTradeLedger=(ledger,version)=>game.applyTradeLedger(ledger,version);
 game.home = new Home(game);
 game.cloud.restore().then((ok) => {
   if (ok && game.home.tab === "login" && game.home.sub === "mail") game.home.renderLogin();

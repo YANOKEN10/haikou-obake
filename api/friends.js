@@ -10,6 +10,7 @@
 const crypto = require("crypto");
 const L = require("./_lib");
 const TradeDb = require("./_trade-db");
+const Inventory = require("./_inventory");
 
 const MAX_FRIENDS = 30;
 const MAX_REQ = 20;
@@ -72,6 +73,7 @@ async function mine(user) {
     if (f) friends.push(cardOf(f));
   }
   return {
+    tradeVersion: user.tradeVersion || 0, tradeLedger: user.tradeLedger || {},
     me: { id: user.id, display: user.display },
     friends,
     reqIn: arr(user.reqIn).map((r) => ({ id: r.id, display: r.display, t: r.t })),
@@ -156,7 +158,7 @@ module.exports = async function handler(req, res) {
       if ((myInv[giveKind] || 0) < giveN) {
         res.status(409).json({ error: "short", message: "わたす材料が 足りません。" }); return;
       }
-      myInv[giveKind] = (myInv[giveKind] || 0) - giveN;
+      Inventory.change(me,giveKind,-giveN);
       const t = { id: crypto.randomUUID(), from: me.id, fromName: me.display,
         to: other.id, toName: other.display, give: { kind: giveKind, n: giveN },
         want: { kind: wantKind, n: wantN }, t: Date.now() };
@@ -187,11 +189,11 @@ module.exports = async function handler(req, res) {
       sender.tradesOut = arr(sender.tradesOut).filter((x) => x.id !== tradeId);
       receiver.tradesIn = arr(receiver.tradesIn).filter((x) => x.id !== tradeId);
       if (act === "tradeAccept") {
-        receiverInv[t.want.kind] -= t.want.n;
-        receiverInv[t.give.kind] = (receiverInv[t.give.kind] || 0) + t.give.n;
-        senderInv[t.want.kind] = (senderInv[t.want.kind] || 0) + t.want.n;
+        Inventory.change(receiver,t.want.kind,-t.want.n);
+        Inventory.change(receiver,t.give.kind,t.give.n);
+        Inventory.change(sender,t.want.kind,t.want.n);
       } else {
-        senderInv[t.give.kind] = (senderInv[t.give.kind] || 0) + t.give.n;
+        Inventory.change(sender,t.give.kind,t.give.n);
       }
       await L.writeUser(other);
       await L.writeUser(me);

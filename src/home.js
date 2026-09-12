@@ -178,7 +178,7 @@ export class Home {
     if (!r.ok) return;
     this.fr = r.data;
     this.updateBadge();
-    if (!quiet && this.tab === "friends") this.drawFriends();
+    if (!quiet && this.tab === "friends" && !$("#frBody .tradeform")) this.drawFriends();
   }
 
   show(tab) {
@@ -459,7 +459,8 @@ export class Home {
         const r = await cloud.answerTrade(act, b.dataset.tid);
         if (!r.ok) { b.disabled = false; this.frMsg(r.why); return; }
         this.fr = r.data;
-        await this.game.pullFromCloud();
+        const pulled=await this.game.pullFromCloud();
+        if(!pulled.ok){this.drawFriends();this.frMsg("交換は完了しました。記録の読み込みを再度お試しください："+pulled.why);return;}
         this.drawFriends();
         this.frMsg(act === "tradeAccept" ? "材料を交換しました！" : "交換を かたづけました", true);
       });
@@ -494,7 +495,8 @@ export class Home {
         box.querySelector(".trWant").value, Number(box.querySelector(".trWantN").value));
       if (!r.ok) { btn.disabled = false; box.querySelector(".trMsg").textContent = r.why; return; }
       this.fr = r.data;
-      await this.game.pullFromCloud();
+      const pulled=await this.game.pullFromCloud();
+      if(!pulled.ok){this.drawFriends();this.frMsg("申し込みは完了しました。記録の読み込みを再度お試しください："+pulled.why);return;}
       this.drawFriends();
       this.frMsg(display + " さんに 材料交換を申しこみました", true);
     });

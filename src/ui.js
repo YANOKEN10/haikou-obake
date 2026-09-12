@@ -11,6 +11,11 @@ function esc(s) {
 export class UI {
   constructor(game) {
     this.game = game;
+    $("#humansToggle").addEventListener("click",()=>{
+      const list=$("#humanList"),button=$("#humansToggle");
+      list.hidden=!list.hidden;button.setAttribute("aria-expanded",String(!list.hidden));
+      button.textContent=list.hidden?"👥 一覧を開く":"👥 一覧を閉じる";
+    });
     $("#cameraZoom").addEventListener("click",()=>game.cycleCamera());
     this.craftTab = "trap";
     this.craftOpen = false;
@@ -189,7 +194,7 @@ export class UI {
     e.textContent = text;
     const box = $("#toasts");
     box.appendChild(e);
-    while (box.children.length > 5) box.removeChild(box.firstChild);
+    while (box.children.length > 2) box.removeChild(box.firstChild);
     setTimeout(() => { e.style.transition = "opacity .4s,transform .4s"; e.style.opacity = "0"; e.style.transform = "translateY(-10px)"; }, ms);
     setTimeout(() => e.remove(), ms + 500);
   }

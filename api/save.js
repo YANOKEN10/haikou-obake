@@ -1,6 +1,7 @@
 // 記録の読み書き（ログインしている本人のぶんだけ）
 const L = require("./_lib");
 const TradeDb = require("./_trade-db");
+const Inventory = require("./_inventory");
 
 const MAX_BYTES = 200 * 1024;   // 記録1つの上限
 
@@ -79,9 +80,9 @@ module.exports = async function handler(req, res) {
       res.status(413).json({ error: "big", message: "記録が大きすぎます。" });
       return;
     }
-    user.payload = b.payload;
+    user.payload = Inventory.merge(user,b.payload);
     await L.writeUser(user);
-    res.status(200).json({ user: L.publicUser(user), saved: true });
+    res.status(200).json({ user: L.publicUser(user), saved: true, tradeVersion: user.tradeVersion || 0, tradeLedger: user.tradeLedger || {} });
   } catch (e) {
     res.status(500).json({ error: "server", message: "サーバーにつながりませんでした。" });
   } finally {
