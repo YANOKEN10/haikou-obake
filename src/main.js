@@ -872,6 +872,16 @@ class Game {
     this.ui.setFind(h.name, bearing - Math.PI / 2, d, where);
   }
 
+  cycleCamera() {
+    if(!this.started||this.paused||this.ui.craftOpen)return;
+    const distances=[4.4,8,14,22],labels=["標準","遠く","全体","最大"];
+    this.cameraMode=((this.cameraMode||0)+1)%distances.length;
+    this.player.camDist=distances[this.cameraMode];
+    const button=document.getElementById("cameraZoom");
+    button.textContent="📷 カメラ："+labels[this.cameraMode]+"（V）";
+    button.setAttribute("aria-label","カメラ距離："+labels[this.cameraMode]+"。押すと次の距離");
+  }
+
   // --- 毎フレーム --------------------------------------------
   update(dt, t) {
     const inp = this.input, p = this.player, w = this.world;
@@ -906,6 +916,7 @@ class Game {
 
     // 仕掛けの選択
     // 仕掛けは12種あるので、1〜9 と 0 でえらべるようにする
+    if(inp.once("KeyV"))this.cycleCamera();
     const menuOpen=this.ui.craftOpen||this.paused;
     if(!menuOpen){
       const nTrap = Object.keys(TRAPS).length;

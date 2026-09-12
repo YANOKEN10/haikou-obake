@@ -11,6 +11,7 @@ function esc(s) {
 export class UI {
   constructor(game) {
     this.game = game;
+    $("#cameraZoom").addEventListener("click",()=>game.cycleCamera());
     this.craftTab = "trap";
     this.craftOpen = false;
     this._hint = "";

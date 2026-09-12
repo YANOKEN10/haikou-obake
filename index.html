@@ -703,6 +703,8 @@ body.touch #craftClose{display:block}
 .rankbig{text-align:center;font-size:21px;color:var(--spook);margin-bottom:4px}
 
 /* ゲーム中の「戻る」「セーブ」 */
+#cameraZoom{position:absolute;left:50%;top:92px;transform:translateX(-50%);pointer-events:auto;font-size:12px;padding:6px 12px;background:rgba(18,15,38,.85)}
+body.touch #cameraZoom{top:82px;min-height:40px}
 #sysbar{position:absolute;left:50%;top:12px;transform:translateX(-50%);display:flex;gap:8px}
 .sysbtn{pointer-events:auto;cursor:pointer;font-family:var(--jp);font-size:13px;padding:7px 16px;border-radius:10px;
   border:2px solid var(--edge2);background:rgba(16,13,34,.82);color:var(--ink);backdrop-filter:blur(4px)}
@@ -893,6 +895,7 @@ body.touch #craftClose{display:block}
     <button class="sysbtn" id="btnHome">↩ 戻る</button>
     <button class="sysbtn" id="btnSave">💾 セーブ</button>
   </div>
+  <button id="cameraZoom" class="sysbtn" type="button" title="Vキーでも切替：標準 → 遠く → 全体 → 最大 → 標準" aria-label="カメラ距離：標準。押すと次の距離">📷 カメラ：標準（V）</button>
   <div id="hint"></div>
   <div id="roomChip" hidden></div>
   <div id="battleBar" hidden>
