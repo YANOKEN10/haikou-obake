@@ -1277,6 +1277,10 @@ class Game {
     if (!p) return null;
     p.hasSave = true;
     p.kicked = this.kicked;
+    // 旧形式の一枚分の記録を残してから、今いるマップだけ更新する。
+    p.stageStates=p.stageStates||{};
+    const previous=p.stageId||"school";
+    if(!p.stageStates[previous])p.stageStates[previous]={traps:p.traps||[],summons:p.summons||[],pos:p.pos};
     p.stageId = this.stageId;
     p.wave = this.wave;
     p.rank = this.rankName;
@@ -1290,8 +1294,10 @@ class Game {
     p.paints = { ...this.paints };                        // 手に入れた色
     p.paint = JSON.parse(JSON.stringify(this.paint || {}));  // すがたごとの 色
     p.traps = this.traps.map((t) => ({ id: t.id, x: +t.x.toFixed(2), z: +t.z.toFixed(2),
-      y: +(t.baseY || 0).toFixed(2), uses: t.uses }));
+      y: +(t.baseY || 0).toFixed(2), yaw:t.group.rotation.y, uses: t.uses, cool:t.cool }));
     p.pos = { x: +this.player.x.toFixed(2), z: +this.player.z.toFixed(2) };
+    p.summons=this.summons.filter(o=>!o.dead&&o.life>0).map(o=>({id:o.id,x:o.x,z:o.z,y:o.baseY,life:o.life,cool:o.cool,yaw:o.yaw}));
+    p.stageStates[this.stageId]={traps:p.traps,summons:p.summons,pos:p.pos};
     p.playSeconds = Math.round(p.playSeconds || 0);
     p.stats = p.stats || S.blank(p.name).stats;
     p.stats.bestWave = Math.max(p.stats.bestWave || 0, this.wave);
@@ -1316,7 +1322,7 @@ class Game {
 
   // セーブデータを読みこんで反映する
   applySave(p) {
-    const sameStage = (p.stageId || "school") === this.stageId;
+    const state=p.stageStates?.[this.stageId]||((p.stageId||"school")===this.stageId?p:{});
     this.kicked = p.kicked || 0;
     this.shards = { ...(p.shards || {}) };
     this.chars = validOwnedChars(p.chars, p);
@@ -1333,13 +1339,19 @@ class Game {
     this.inv = { ...(p.inv || {}) };
     this.built = { ...(p.built || {}) };
     this.selTrap = p.selTrap || 0;
-    for (const t of sameStage ? (p.traps || []) : []) {
+    for (const t of state.traps || []) {
       if (!TRAPS[t.id]) continue;
-      const tr = new Trap(this.scene, t.id, t.x, t.z, 0, t.y || 0);
-      tr.uses = t.uses || 0;
+      const tr = new Trap(this.scene, t.id, t.x, t.z, t.yaw || 0, t.y || 0);
+      tr.uses = t.uses || 0;tr.cool=t.cool||0;
       this.traps.push(tr);
     }
-    if (sameStage && p.pos) { this.player.x = p.pos.x; this.player.z = p.pos.z; }
+    for(const o of state.summons||[]){
+      if(!GHOSTS[o.id]||!(o.life>0))continue;
+      const summon=new Summon(this.scene,this.world,o.id,o.x,o.z,o.y||0);
+      summon.life=Math.min(o.life,summon.def.life);summon.cool=o.cool||0;summon.yaw=o.yaw||0;
+      this.summons.push(summon);
+    }
+    if (state.pos) { this.player.x = state.pos.x; this.player.z = state.pos.z; }
     this.rankName = this.ui.setRank(this.kicked).name;
     this.ui.setBag(this.inv);
     this.ui.setHotbar(this.built, this.selTrap);
@@ -1407,6 +1419,7 @@ class Game {
   startGame(cont) {
     this.profile = this.ensureProfile();
     this.resetSession();
+    if(!cont){delete this.profile.stageStates;this.profile.traps=[];this.profile.summons=[];this.profile.pos=null;}
     if (cont && this.profile.hasSave) this.applySave(this.profile);
     if (this.adminPreview) this.applyAdminPreview();
 
@@ -1589,6 +1602,7 @@ class Game {
       if (!stageUnlocked(roomStage, this.profile ? this.profile.kicked : 0, this.adminPreview))
         return { ok: false, why: "おやは「" + roomStage.name + "」にいます。まだ このステージは開いていません。" };
       try { sessionStorage.setItem("haikou-obake:rejoin", JSON.stringify({ code, name })); } catch (e) { /* 保存不可 */ }
+      if(this.started&&!this.saveNow(false))return {ok:false,why:"記録を保存できませんでした。移動前にセーブしてください。"};
       location.href = stageUrl(roomStage.id);
       return { ok: true, reloading: true };
     }

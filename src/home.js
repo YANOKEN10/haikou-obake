@@ -31,6 +31,7 @@ export class Home {
     $("#stageList").addEventListener("click", (e) => {
       const b = e.target.closest && e.target.closest("button[data-stage]");
       if (!b || b.disabled || b.dataset.stage === this.game.stageId) return;
+      if(this.game.started&&!this.game.saveNow(false)){this.game.ui.toast("保存できませんでした。もう一度セーブしてください", "bad");return;}
       location.href = stageUrl(b.dataset.stage);
     });
 
@@ -616,7 +617,7 @@ export class Home {
   }
 
   trapCount(p) {
-    let n = (p.traps || []).length;
+    let n = p.stageStates?Object.values(p.stageStates).reduce((sum,state)=>sum+(state.traps||[]).length,0):(p.traps||[]).length;
     for (const k in p.built || {}) n += p.built[k];
     return n;
   }
