@@ -11,6 +11,7 @@ function esc(s) {
 export class UI {
   constructor(game) {
     this.game = game;
+    $("#bCraft").addEventListener("click",()=>{if(!game.touch)this.toggleCraft();});
     $("#humansToggle").addEventListener("click",()=>{
       const list=$("#humanList"),button=$("#humansToggle");
       list.hidden=!list.hidden;button.setAttribute("aria-expanded",String(!list.hidden));
@@ -25,7 +26,7 @@ export class UI {
 
     // ホットバーはタップ／クリックでも選べる
     const bar = $("#hotbar");
-    if (bar) bar.addEventListener("pointerdown", (e) => {
+    if (bar) bar.addEventListener("click", (e) => {
       const s = e.target.closest(".slot");
       if (!s) return;
       e.preventDefault();

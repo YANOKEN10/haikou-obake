@@ -45,7 +45,7 @@ export class TouchControls {
     // 画面をなぞる操作をさまたげるのは、ゲーム中だけにする。
     // ホーム画面やメニューでは、ふつうにスクロールできないと詰んでしまう。
     document.addEventListener("touchmove", (e) => {
-      if (!game.started || game.paused || game.ui.craftOpen) return;
+      if (!game.started || game.paused || game.ui.craftOpen || e.target.closest?.("#hotbar")) return;
       e.preventDefault();
     }, { passive: false });
     document.addEventListener("gesturestart", (e) => e.preventDefault());
@@ -109,7 +109,7 @@ export class TouchControls {
 
   // --- 画面をなぞって視点を回す ------------------------------
   bindLook() {
-    const isControl = (el) => el && el.closest && el.closest("#stick,.tbtn,#sysbar,#cameraZoom,#viewControls,#pause,#room,#craft,#screen,#rotate");
+    const isControl = (el) => el && el.closest && el.closest("#stick,#hotbar,.tbtn,#sysbar,#cameraZoom,#viewControls,#pause,#room,#craft,#screen,#rotate");
     addEventListener("touchstart", (e) => {
       if (this.lookId !== null) return;
       for (const t of e.changedTouches) {
