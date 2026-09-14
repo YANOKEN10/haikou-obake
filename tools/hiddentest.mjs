@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { CHARS, hiddenUnlockReady, hiddenUnlockValue, validOwnedChars, charExchangeMode } from "../src/data.js";
 
 const hidden = Object.entries(CHARS).filter(([, c]) => c.hidden);
-assert.equal(Object.keys(CHARS).length, 19, "通常7体と隠し12体が登録されている");
-assert.equal(hidden.length, 12, "隠しキャラが12体ある");
-assert.equal(new Set(hidden.map(([, c]) => c.order)).size, 12, "表示順が重複していない");
+assert.equal(Object.keys(CHARS).length, 20, "通常7体と隠し13体が登録されている");
+assert.equal(hidden.length, 13, "隠しキャラが13体ある");
+assert.equal(new Set(hidden.map(([, c]) => c.order)).size, 13, "表示順が重複していない");
 
 for (const [id, c] of hidden) {
   assert.ok(c.unlock && c.unlock.key && c.unlock.at > 0 && c.unlock.label, `${id}: 解放条件がある`);
@@ -42,3 +42,7 @@ for(const [laughed,behind,expected] of [[0,1500,false],[1,1500,false],[0,1501,fa
   assert.equal(!!validOwnedChars({kubinashi:1},profile).kubinashi,expected,'古い購入済みデータにも条件を適用');
 }
 assert.equal(hiddenUnlockReady(CHARS.kubinashi,{}),false);
+
+for (const [slipped, laughed, ready] of [[99,30,false],[100,29,false],[100,30,true]]) {
+  assert.equal(hiddenUnlockReady(CHARS.unko, { stats: { slipped, laughed } }), ready);
+}

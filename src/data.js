@@ -187,6 +187,14 @@ export const CHARS = {
     desc: "白いマスクと長い髪で、放課後の曲がり角に現れる妖怪。",
     tip: "すばやく近づき、ふりむいたところを おどかせる。",
   },
+  unko: {
+    name: "うんこ", icon: "💩", order: 19, hidden: true,
+    unlock: { key: "slipped", at: 100, requires: [{ key: "laughed", at: 30 }], label: "人間をすべらせる100回・笑われる30回" },
+    speed: 1.08, dash: 1.22, phase: 1.08, scare: 1.28, reach: 1.08, size: 0.95,
+    body: 0x79472f, glow: 0x956044,
+    desc: "つやつやの渦巻きに、まんまるの青い目。赤い舌を出す、いたずら好きの隠しおばけ。",
+    tip: "ぷるぷる弾んで移動！ 大きく飛びはねて、べろべろばあ！",
+  },
   raimei: {
     name: "雷鳴様", icon: "⚡", order: 18, hidden: true,
     unlock: { key: "scares", at: 3000, label: "おどろかした回数 3000回" },
