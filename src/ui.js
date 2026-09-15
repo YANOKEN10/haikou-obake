@@ -230,6 +230,7 @@ export class UI {
       }).join("");
       const stat = isTrap
         ? "こわさ " + d.fear + " ／ 範囲 " + d.radius + "m ／ 再発動 " + d.cooldown + "秒"
+        : d.collect ? "材料を自動回収 ／ 探索 " + d.radius + "m ／ 持続 " + d.life + "秒"
         : "こわさ " + d.fear + " ／ 範囲 " + d.radius + "m ／ 持続 " + d.life + "秒";
       const owned = isTrap ? "　所持 " + (g.built[id] || 0) : "";
       return "<div class='card " + (locked ? "locked" : can ? "can" : "no") + "' data-id='" + id + "' data-kind='" + (isTrap ? "trap" : "ghost") + "'>" +

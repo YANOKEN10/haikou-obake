@@ -912,7 +912,7 @@ class Game {
       if (inp.once("KeyS")) { this.saveNow(true); }
       if (inp.once("KeyH")) { this.goHome(); return; }
     }
-    if ((this.ui.craftOpen || this.paused) && !this.battle.on) { w.update(0, t); this.sky.update(0, t); this.renderer.render(this.scene, this.camera); inp.endFrame(); return; }
+    if ((this.ui.craftOpen || this.paused) && !this.battle.on) { w.update(0, t); this.sky.update(0, t, this.camera); this.renderer.render(this.scene, this.camera); inp.endFrame(); return; }
 
     // 仕掛けの選択
     // 仕掛けは12種あるので、1〜9 と 0 でえらべるようにする
@@ -933,13 +933,15 @@ class Game {
     // メニュー中も勝負と人間は進めるが、操作は止める。
     p.update(dt, menuOpen?{mouseDX:0,mouseDY:0,axisX:0,axisZ:0,k:()=>false}:inp, this.camera, t);
     w.update(dt, t);
-    this.sky.update(dt, t);
+    this.sky.update(dt, t, this.camera);
 
     // --- 材料の自動回収 ------------------------------------
     for (let i = this.pickups.length - 1; i >= 0; i--) {
       const it = this.pickups[i];
       it.update(dt, t);
-      if (dist(it.x, it.z, p.x, p.z) < 1.35 && Math.abs(it.y - p.y) < 1.8) {
+      const collected = this.summons.some(s => s.def.collect && !s.dead && s.life > 0
+        && Math.abs(it.y - (s.baseY + .55)) <= 1.2 && dist(it.x, it.z, s.x, s.z) < 1.35);
+      if (collected || (dist(it.x, it.z, p.x, p.z) < 1.35 && Math.abs(it.y - p.y) < 1.8)) {
         // ともだちにも「これを 拾った」と 知らせる。
         //  むこうの画面からも 消えて、材料は むこうも もらえる
         if (this.net.on && it.pid) {
@@ -1079,7 +1081,7 @@ class Game {
     // --- 召喚したおばけ -------------------------------------
     for (let i = this.summons.length - 1; i >= 0; i--) {
       const s = this.summons[i];
-      const res = s.update(dt, t, this.humans);
+      const res = s.update(dt, t, this.humans, this.pickups);
       if (res) {
         const eff = this.applyFear(res.human, res.amount, s.x, s.z, "summon:" + s.id, s.def.name);
         if(this.net.on)this.net.reportScare(res.human.hid,res.amount,"summon:"+s.id,this.battle.id);

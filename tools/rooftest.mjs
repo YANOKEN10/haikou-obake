@@ -78,3 +78,9 @@ for (const [id, x, z, ceiling] of [["school", -32, 52, 8.2], ["branch", -24, -8,
   assert.ok(inside.y <= ceiling + 1e-6, `${id}: 室内の天井を抜けない`);
 }
 console.log(`roof test: ${checks + 7} checks passed (着地・進入・斜面・上下操作・屋内と屋外)`);
+// 天井付近でも、入力なしに上階へ吸い上げられない。
+for (const floor of [0, 1, 2]) {
+  const p = player(worlds.school, 0, -10, floor * 3.6 + 2.95);
+  run(p, [], 3);
+  assert.ok(Math.abs(p.y - (floor * 3.6 + 1.02)) < .15, `天井から元の階へ戻る: ${floor}, y=${p.y}`);
+}

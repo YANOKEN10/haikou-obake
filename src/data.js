@@ -365,6 +365,13 @@ export const TRAPS = {
 
 // --- 召喚できるおばけ ----------------------------------------
 export const GHOSTS = {
+  collector: {
+    name: "ひろいものおばけ", icon: "🧺",
+    cost: { onnen: 8, hokori: 6, kami: 4 }, unlockAt: 0,
+    collect: true, fear: 0, radius: 22, speed: 3.6, life: 180,
+    desc: "同じ階の近くの材料を探し、近づいて自動回収。レアなかけらも持ち物に届く。3分間おてつだい！",
+    lines: [],
+  },
   hitotsume: {
     name: "ひとつめ小僧", icon: "👁",
     cost: { onnen: 5, hokori: 5 },
@@ -486,14 +493,14 @@ export const RANKS = [
 //   「はやさ」「ダッシュ」「こわさ」「とどく」「すりぬけ」を
 //   1レベルずつ 上げていく。
 //   1レベルで +0.02。たとえば はやさ ×1.28 → ×1.30。
-//   レベル30まで 上げると +0.60 になり、めちゃくちゃ強くなる。
+//   レベル100まで 上げると +2.00 になり、めちゃくちゃ強くなる。
 //
 //   ・きょうかは すがたごと。河童を上げても 天狗は 上がらない
 //   ・上げるほど 材料も かけらも たくさん いる
 //   ・つかう かけらの色は、レベルが上がるほど よい色になる
 // ============================================================
 export const UPG_STEP = 0.02;      // 1レベルで ふえる ぶん
-export const UPG_MAX = 30;         // ここまで 上げられる
+export const UPG_MAX = 100;         // ここまで 上げられる
 
 export const UPGRADES = {
   speed: { name: "はやさ",   icon: "💨", desc: "あるく・とぶ はやさ",       mats: ["nurunuru", "wax"] },

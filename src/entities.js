@@ -228,15 +228,16 @@ export class Summon {
     this.scene = scene;
   }
 
-  update(dt, t, humans) {
+  update(dt, t, humans, pickups = []) {
     this.life -= dt;
     this.cool = Math.max(0, this.cool - dt);
     if (this.life <= 0) { this.dead = true; return null; }
 
     // いちばん近い人間を探す
     let best = null, bd = 1e9;
-    for (const h of humans) {
-      if (h.out) continue;
+    for (const h of (this.def.collect ? pickups : humans)) {
+      if (h.out || h.taken) continue;
+      if (this.def.collect && Math.abs(h.y - (this.baseY + .55)) > 1.2) continue;
       if (Math.abs(h.y - this.baseY) > 2.4) continue;    // ちがう階の人は 追わない
       const d = dist(this.x, this.z, h.x, h.z);
       if (d < bd) { bd = d; best = h; }
@@ -245,7 +246,7 @@ export class Summon {
     const spd = this.def.speed;
     if (spd > 0) {
       let tx, tz;
-      if (best && bd < 26) { tx = best.x; tz = best.z; }
+      if (best && bd < (this.def.collect ? this.def.radius : 26)) { tx = best.x; tz = best.z; }
       else {
         this.wanderT -= dt;
         if (this.wanderT <= 0) {
@@ -296,7 +297,7 @@ export class Summon {
     this.group.rotation.z = Math.sin(t * 3 + this.phase) * 0.06;
 
     // 射程内の人間を驚かす
-    if (best && bd < this.def.radius && this.cool <= 0) {
+    if (!this.def.collect && best && bd < this.def.radius && this.cool <= 0) {
       if (this.world.colliders.lineOfSight(this.x, this.z, best.x, best.z, 1.3, 0.7)) {
         this.cool = 4.5;
         return { human: best, amount: this.def.fear, line: choice(this.def.lines) };
@@ -309,7 +310,20 @@ export class Summon {
 }
 
 function buildSummonMesh(g, id) {
-  if (id === "hitotsume") {
+  if (id === "collector") {
+    const mint=new THREE.MeshLambertMaterial({color:0x92eadb,emissive:0x275c57,emissiveIntensity:.4});
+    const add=(geo,mat,x,y,z)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);g.add(m);return m;};
+    add(new THREE.SphereGeometry(.38,20,16),mint,0,.1,0);
+    add(new THREE.ConeGeometry(.4,.65,20),mint,0,-.18,0).rotation.z=Math.PI;
+    const white=new THREE.MeshBasicMaterial({color:0xffffff}),ink=new THREE.MeshBasicMaterial({color:0x162e40});
+    for(const x of [-.14,.14]){add(new THREE.SphereGeometry(.09,12,10),white,x,.16,.33);add(new THREE.SphereGeometry(.04,10,8),ink,x,.16,.408);add(new THREE.SphereGeometry(.12,12,10),mint,x*3,-.2,.19);}
+    add(new THREE.SphereGeometry(.06,12,10),ink,0,-.04,.365).scale.set(1,.55,.4);
+    const basket=new THREE.MeshLambertMaterial({color:0xc39450});
+    add(new THREE.CylinderGeometry(.3,.23,.3,16),basket,0,-.4,.35);
+    const rim=add(new THREE.TorusGeometry(.3,.025,8,24),basket,0,-.24,.35);rim.rotation.x=Math.PI/2;
+    const handle=add(new THREE.TorusGeometry(.25,.022,8,24,Math.PI),basket,0,-.22,.35);
+    add(new THREE.OctahedronGeometry(.09),new THREE.MeshBasicMaterial({color:0xffe78d}),.04,-.18,.37);
+  } else if (id === "hitotsume") {
     const m = new THREE.MeshLambertMaterial({ color: 0xa8e6a3, emissive: 0x3d7a48, emissiveIntensity: 0.5 });
     const b = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 12), m); g.add(b);
     const eye = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 12), new THREE.MeshBasicMaterial({ color: 0xfdfdf5 }));

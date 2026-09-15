@@ -5,6 +5,7 @@ import { rand } from "./util.js";
 //  夜空（グラデーションのドーム＋星＋月）
 // ============================================================
 export function buildSky(scene) {
+  const skyRoot = new THREE.Group(); scene.add(skyRoot);
   const geo = new THREE.SphereGeometry(170, 28, 18);
   const pos = geo.attributes.position;
   const col = new Float32Array(pos.count * 3);
@@ -28,7 +29,7 @@ export function buildSky(scene) {
   geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
   const dome = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
   dome.renderOrder = -10;
-  scene.add(dome);
+  skyRoot.add(dome);
 
   // 星
   const N = 420;
@@ -48,7 +49,7 @@ export function buildSky(scene) {
   sg.setAttribute("color", new THREE.BufferAttribute(sc, 3));
   const stars = new THREE.Points(sg, new THREE.PointsMaterial({ size: 1.5, vertexColors: true, fog: false, transparent: true, opacity: 0.9, sizeAttenuation: true }));
   stars.renderOrder = -9;
-  scene.add(stars);
+  skyRoot.add(stars);
 
   // 月
   const moon = new THREE.Mesh(
@@ -57,14 +58,18 @@ export function buildSky(scene) {
   );
   moon.position.set(-72, 96, 96);
   moon.renderOrder = -8;
-  scene.add(moon);
+  skyRoot.add(moon);
 
   const halo = new THREE.Mesh(
     new THREE.SphereGeometry(15, 16, 12),
     new THREE.MeshBasicMaterial({ color: 0xc06a4a, transparent: true, opacity: 0.16, fog: false, depthWrite: false })
   );
   halo.position.copy(moon.position);
-  scene.add(halo);
+  skyRoot.add(halo);
 
-  return { dome, stars, moon, update(dt, t) { stars.rotation.y = t * 0.004; } };
+  return { dome, stars, moon, root: skyRoot, update(dt, t, camera) {
+    // 空は常にカメラを包む。移動・上昇で球の端が遠方クリップに切られるのを防ぐ。
+    if (camera) skyRoot.position.copy(camera.position);
+    stars.rotation.y = t * 0.004;
+  } };
 }

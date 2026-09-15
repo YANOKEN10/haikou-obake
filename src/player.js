@@ -655,12 +655,12 @@ export class Player {
     const up = input.k("Space") ? 1 : input.k("KeyC") ? -1 : 0;
     const indoors = w.isIndoors(this.x, this.z, this.y);
     const inShaft = indoors && w.inStairShaft(this.x, this.z);
-    // いま何階にいるか（階段の途中では、近いほうの階に落ち着く）
+    // 足元が床を越えるまでは元の階。四捨五入すると天井付近で上階へ吸い上げられる。
     const floorH = w.floorHeight || 3.6;
     const floors = w.floors === undefined ? 4 : w.floors;
     const roofHere = w.roofSurfaceAt ? w.roofSurfaceAt(this.x, this.z) : (indoors ? w.roofY : null);
     const localFloors = indoors && roofHere !== null ? Math.min(floors, Math.max(1, Math.round(roofHere / floorH))) : floors;
-    this.floor = clamp(Math.round((this.y - 1.02) / floorH), 0, localFloors);
+    this.floor = clamp(Math.floor((this.y - 0.38 + 0.001) / floorH), 0, localFloors);
     const base = indoors ? Math.min(this.floor, localFloors) * floorH : 0;
     let hover = base + 1.02 + Math.sin(t * 1.9) * 0.05;
     if (inShaft) {
