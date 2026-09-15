@@ -448,12 +448,15 @@ export class UI {
   //  b … {left, score, rows:[{name,score}]}。null で 消す
   setBattle(b) {
     const bar = $("#battleBar");
+    document.body.classList.toggle("battle-active", !!b);
     if (!b) { bar.hidden = true; return; }
     bar.hidden = false;
     const sec = Math.max(0, Math.ceil(b.left));
     const txt = Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
     if (txt !== this._bClock) { this._bClock = txt; $("#bClock").textContent = txt; }
+    bar.classList.toggle("warning", sec <= 30 && sec > 10);
     bar.classList.toggle("hurry", sec <= 10);
+    $("#bTimeLabel").textContent = sec <= 10 ? "あと少し" : "のこり";
     if (b.score !== this._bScore) { this._bScore = b.score; $("#bCount").textContent = b.score; }
     const key = (b.rows || []).map((r) => r.name + ":" + r.score).join("|");
     if (key !== this._bRows) {

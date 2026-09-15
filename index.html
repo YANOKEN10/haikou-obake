@@ -319,20 +319,25 @@ body.touch #hotbar{left:154px;right:148px;bottom:16px;transform:none;max-width:n
 .ucard.no .ubtn{opacity:.45;cursor:not-allowed}
 
 /* 追い出しバトル */
-#battleBar{position:absolute;left:50%;transform:translateX(-50%);top:56px;z-index:7;
-  display:flex;align-items:center;gap:10px;background:rgba(24,14,32,.88);
-  border:1px solid #ff8ac4;border-radius:14px;padding:6px 14px;
-  box-shadow:0 0 24px rgba(255,138,196,.35)}
+#battleBar{--timer:#79eced;position:absolute;left:50%;transform:translateX(-50%);top:58px;z-index:7;
+  display:grid;grid-template-columns:auto 1fr;align-items:center;gap:5px 12px;width:270px;box-sizing:border-box;
+  background:rgba(10,19,30,.94);border:1px solid var(--timer);border-radius:12px;padding:7px 11px;
+  box-shadow:0 3px 12px #0005;pointer-events:none}
 #battleBar[hidden]{display:none}
-#bClock{font:700 22px/1 'DotGothic16',monospace;color:#ffd45e;letter-spacing:.06em;min-width:74px;text-align:center}
-#battleBar.hurry #bClock{color:#ff7a8a;animation:bpulse .7s ease-in-out infinite}
-@keyframes bpulse{0%,100%{opacity:1}50%{opacity:.45}}
-#bMine{font-size:12.5px;color:var(--muted);white-space:nowrap}
-#bMine b{font:700 21px/1 'DotGothic16',monospace;color:#9dffe0;margin-right:2px}
-#bList{display:flex;gap:7px;border-left:1px solid var(--edge2);padding-left:10px;font-size:11.5px}
-#bList span{color:var(--muted);white-space:nowrap}
-#bList span b{color:#f2f0e8;font-weight:700}
+#bTimer{display:flex;align-items:center;gap:8px}
+#bTimeLabel{font-size:10px;line-height:1.4;color:var(--timer);white-space:nowrap}
+#bClock{font:700 29px/1 ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums;color:var(--timer);letter-spacing:.01em;min-width:76px;text-align:center}
+#battleBar.warning{--timer:#ffda70}
+#battleBar.hurry{--timer:#ff9b88;border-width:2px;padding:6px 10px}
+#battleBar.hurry #bClock{animation:none}
+#bMine{font-size:10px;color:#d0dbe8;white-space:nowrap;text-align:right}
+#bMine b{font:700 20px/1 ui-monospace,Consolas,monospace;color:#fff;margin-right:2px}
+#bList{grid-column:1/-1;display:flex;gap:9px;border-top:1px solid #ffffff24;padding-top:4px;font-size:10px;overflow:hidden}
+#bList span{flex:1;min-width:0;color:#c7cddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#bList span b{color:#fff;font-weight:700}
 #bList:empty{display:none}
+body.battle-active #roomChip{display:none}
+@media(max-width:700px){#battleBar{top:94px;width:232px}#bList{display:none}}
 
 #count3{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
   flex-direction:column;gap:6px;pointer-events:none;background:rgba(6,4,12,.45)}
@@ -363,8 +368,8 @@ body.touch #hotbar{left:154px;right:148px;bottom:16px;transform:none;max-width:n
   .rsbox{padding:12px 15px} .rsbox h3{font-size:16px;margin-bottom:7px}
   .rsrow{padding:4px 9px;font-size:12px} #rsRank{gap:4px;margin:6px 0 9px}
   #rsGift{padding:7px 10px;font-size:11.5px;line-height:1.6;margin-bottom:8px}
-  #battleBar{top:46px;padding:4px 10px;gap:7px}
-  #bClock{font-size:18px;min-width:60px} #bMine b{font-size:17px}
+  #battleBar{top:52px;width:250px}
+  #bClock{font-size:27px}
 }
 .bmin{flex:1;margin:0 !important;font-size:13px !important;padding:7px 4px !important;opacity:.5}
 .bmin.on{opacity:1;border-color:var(--gold);color:var(--gold)}
@@ -909,7 +914,7 @@ body.touch #viewControls .sysbtn{font-size:9px;padding:4px;min-height:40px}
   <div id="hint"></div>
   <div id="roomChip" hidden></div>
   <div id="battleBar" hidden>
-    <div id="bClock">3:00</div>
+    <div id="bTimer"><span id="bTimeLabel">のこり</span><div id="bClock" role="timer" aria-label="残り時間">3:00</div></div>
     <div id="bMine">追い出し <b id="bCount">0</b>人</div>
     <div id="bList"></div>
   </div>
