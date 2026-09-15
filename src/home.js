@@ -249,6 +249,8 @@ export class Home {
 
   drawFriends() {
     const d = this.fr || { friends: [], reqIn: [], reqOut: [] };
+    this.inviteSelection ||= new Set();
+    for (const id of this.inviteSelection) if (!(d.friends || []).some(c => c.id === id)) this.inviteSelection.delete(id);
     const body = $("#frBody");
     const row = (c, kind) => {
       const sm = c.has
@@ -256,7 +258,8 @@ export class Home {
         : "まだ 記録がありません";
       let btns = "";
       if (kind === "friend") {
-        btns = "<button class='go' data-act='invite' data-id=\"" + esc(c.id) + "\">🎮 いっしょに あそぶ</button>" +
+        btns = "<label class='frpick'><input type='checkbox' data-invite-id=\"" + esc(c.id) + "\"" + (this.inviteSelection.has(c.id) ? " checked" : "") + "> いっしょに遊ぶ人に選ぶ</label>" +
+               "<button class='go' data-act='invite' data-id=\"" + esc(c.id) + "\">🎮 いっしょに あそぶ</button>" +
                "<button class='yes' data-act='trade' data-id=\"" + esc(c.id) + "\" data-name=\"" + esc(c.display) + "\">🔄 材料を交換</button>" +
                "<button data-act='detail' data-id=\"" + esc(c.id) + "\">📋 くわしく</button>" +
                "<button class='no' data-act='remove' data-id=\"" + esc(c.id) + "\">やめる</button>";
@@ -300,6 +303,7 @@ export class Home {
         "下の「いっしょに あそぶ」を おすと、部屋を つくって さそえます。</div>";
     }
 
+    if ((d.friends || []).length) html += "<div class='frroom'><div class='t'>👥 いっしょに遊ぶ人をまとめて選ぶ</div><div class='frnote'>下の友だちにチェックを入れてね（自分をふくめて4人まで）。<br>さそわれた人は「入る」を押すだけ。あいことばの入力はいりません。</div><button class='pbtn' id='frInviteSelected'>選んだ友だちをさそう（" + this.inviteSelection.size + "人）</button><div id='frInviteStatus' role='status'></div></div>";
     if (d.invite) {
       html += "<div class='frinvite'><div class='t'>🎮 <b>" + esc(d.invite.display) +
         "</b> が いっしょに あそぼうと さそっています</div>" +
@@ -424,6 +428,16 @@ export class Home {
       catch (e) { this.frMsg("長おしで コピーしてね", true); }
       this.game.audio.click();
     });
+    document.querySelector('#frBody').querySelectorAll('input[data-invite-id]').forEach(input => input.addEventListener('change', () => {
+      if (input.checked && this.inviteSelection.size >= Math.max(0, 3 - (this.game.net.on ? this.game.net.peers.size : 0))) {
+        input.checked = false; this.frMsg("自分をふくめて4人までです"); return;
+      }
+      if (input.checked) this.inviteSelection.add(input.dataset.inviteId); else this.inviteSelection.delete(input.dataset.inviteId);
+      this.updateInviteSelection();
+    }));
+    const selected = $("#frInviteSelected");
+    if (selected) selected.addEventListener('click', () => this.inviteSelected());
+    this.updateInviteSelection();
     // ともだち みんなを いっぺんに さそう
     const all = $("#frAll");
     if (all) all.addEventListener("click", () => this.inviteAll());
@@ -535,6 +549,30 @@ export class Home {
 
   // ともだち ぜんいんを、いまの 部屋に さそう。
   //  ひとりずつ おさなくても、みんなで あそべる
+  updateInviteSelection() {
+    const button = $("#frInviteSelected");
+    if (button) { button.disabled = this.inviteBusy || !this.inviteSelection?.size; button.textContent = this.inviteBusy ? "さそっています…" : "選んだ友だちをさそう（" + this.inviteSelection.size + "人）"; }
+    document.querySelectorAll('input[data-invite-id]').forEach(input => input.disabled = !!this.inviteBusy);
+    const status = $("#frInviteStatus"); if (status) status.textContent = this.inviteStatus || "";
+  }
+
+  async inviteSelected() {
+    if (this.inviteBusy || !this.inviteSelection?.size) return;
+    const g = this.game, ids = [...this.inviteSelection];
+    if (ids.length > Math.max(0, 3 - (g.net.on ? g.net.peers.size : 0))) { this.frMsg("部屋の空き人数より多く選ばれています"); return; }
+    this.inviteBusy = true; this.inviteStatus = "部屋を用意しています…"; this.updateInviteSelection();
+    try {
+      if (!g.started) g.startGame(true);
+      if (!g.net.on) { const r = await g.roomCreate(this.playerName()); if (!r.ok) throw Error(r.why); }
+      let sent = 0;
+      for (const id of ids) {
+        try { const r = await g.cloud.inviteFriend(id, g.net.code); if (r.ok) { sent++; this.inviteSelection.delete(id); } } catch (_) { /* 届かなかった人は選択を残して再送できる */ }
+      }
+      this.inviteStatus = sent + "人をさそいました。相手は「ともだち」画面の「入る」を押すだけです（5分以内）。" + (sent < ids.length ? " 届かなかった人は、もう一度さそってください。" : "");
+    } catch (e) { this.inviteStatus = e.message || "さそえませんでした。もう一度試してください。"; }
+    finally { this.inviteBusy = false; this.drawFriends(); }
+  }
+
   async inviteAll() {
     const g = this.game;
     const list = (this.fr && this.fr.friends) || [];
