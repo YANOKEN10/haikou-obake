@@ -915,7 +915,7 @@ export class PeerGhost {
     if (this.shell) {
       animateReferenceCharacter(this.shell, t, Math.hypot(p.vx || 0, p.vz || 0), p.scaring || 0);
       this.shell.animateMane(t, 0);
-      if (this.shell.tekekeRig || this.shell.yukiRig || this.shell.riderRig || this.shell.kyubiRig || this.shell.raimeiRig || this.shell.unkoRig || this.shell.charId === "amanojaku") {
+      if (this.shell.tekekeRig || this.shell.yukiRig || this.shell.riderRig || this.shell.kyubiRig || this.shell.raimeiRig || this.shell.unkoRig || this.shell.classicRig || this.shell.charId === "amanojaku") {
         for (const mesh of this.shell.extras) mesh.material.opacity = p.phasing ? 0.4 : 0.9;
       }
     }

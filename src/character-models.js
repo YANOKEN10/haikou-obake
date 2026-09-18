@@ -221,6 +221,7 @@ export function buildYukionna(owner) {
 }
 
 export function animateReferenceCharacter(owner, t, moving, scare) {
+  if(owner.classicRig) owner.classicRig.update(t,moving,scare);
   if(owner.unkoRig) owner.unkoRig.update(t,moving,scare);
   if(owner.raimeiRig) owner.raimeiRig.update(t,moving,scare);
   if(owner.kyubiRig) owner.kyubiRig.update(t,moving,scare);

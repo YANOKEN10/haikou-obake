@@ -1,3 +1,4 @@
+import { buildClassicReference } from "./classic-reference-models.js";
 import { buildUnko } from "./unko-model.js";
 import * as THREE from "../lib/three.module.js";
 import { buildRaimei } from "./raimei-model.js";
@@ -266,7 +267,7 @@ export class Player {
     this.tails = null;
     this.foot = null;
     this.extras = [];
-    this.tekekeRig = null; this.yukiRig = null; this.riderRig = null; this.amanoRig = null; this.kyubiRig = null; this.raimeiRig = null; this.unkoRig = null;
+    this.tekekeRig = null; this.yukiRig = null; this.riderRig = null; this.amanoRig = null; this.kyubiRig = null; this.raimeiRig = null; this.unkoRig = null; this.classicRig = null;
     const M = (c, opt) => new THREE.MeshLambertMaterial({ color: c, emissive: opt && opt.e !== undefined ? opt.e : c,
       emissiveIntensity: opt && opt.i !== undefined ? opt.i : 0.35 });
     const B = (c) => new THREE.MeshBasicMaterial({ color: c });
@@ -413,6 +414,9 @@ export class Player {
       const vest = add(new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.66, 0.5, 16), M(0x2a7a4a, { i: 0.2 })));
       vest.position.y = 0.94;
 
+    } else if (["kuchisake","oni","jinmenken","rokuro","zashiki"].includes(id)) {
+      for(const m of [this.head,this.skirt,this.handL,this.handR,this.eyeL,this.eyeR,this.mouth]) m.visible=false;
+      buildClassicReference(this,id);
     } else if (id === "unko") {
       for(const m of [this.head,this.skirt,this.handL,this.handR,this.eyeL,this.eyeR,this.mouth]) m.visible=false;
       buildUnko(this);
@@ -820,7 +824,7 @@ export class Player {
     this.light.intensity = 1.6 + p * 3.6 + Math.sin(t * 3.1) * 0.12;
 
     animateReferenceCharacter(this, t, moving, p);
-    if (this.tekekeRig || this.yukiRig || this.riderRig || this.kyubiRig || this.raimeiRig || this.unkoRig || this.charId === "amanojaku") {
+    if (this.tekekeRig || this.yukiRig || this.riderRig || this.kyubiRig || this.raimeiRig || this.unkoRig || this.classicRig || this.charId === "amanojaku") {
       // すりぬけ中は、新しいモデルも本体と同じ透明度にする。
       for (const mesh of this.extras) mesh.material.opacity = this.bodyMat.opacity;
     }
