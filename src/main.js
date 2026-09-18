@@ -1,3 +1,4 @@
+import { RoomChat } from "./chat.js";
 import * as THREE from "../lib/three.module.js";
 import { buildWorld, clampPlay, inPlay } from "./world.js";
 import { buildStageWorld } from "./stageworld.js";
@@ -921,7 +922,7 @@ class Game {
     // 仕掛けの選択
     // 仕掛けは12種あるので、1〜9 と 0 でえらべるようにする
     if(inp.once("KeyV"))this.cycleCamera();
-    const menuOpen=this.ui.craftOpen||this.paused;
+    const menuOpen=this.ui.craftOpen||this.paused||this.chat?.opened;
     if(!menuOpen){
       const nTrap = Object.keys(TRAPS).length;
       for (let i = 0; i < 9 && i < nTrap; i++) {
@@ -1727,6 +1728,7 @@ class Game {
       sc: this.battle.score,                       // ホストが確定した追い出し人数
       h: this.net.isHost ? 1 : 0,                  // この人が おや か
       bt: this.net.isHost ? this.battle.netState() : undefined,
+      ch: this.chat?.outgoing || [],
       got: this.gotOut.slice(),                    // 拾ったものの 番号
     };
     const placed = [];
@@ -1911,6 +1913,7 @@ game.resize();
 game.cloud = new Cloud();
 game.cloud.onTradeLedger=(ledger,version)=>game.applyTradeLedger(ledger,version);
 game.home = new Home(game);
+game.chat = new RoomChat(game);
 game.cloud.restore().then((ok) => {
   if (ok && game.home.tab === "login" && game.home.sub === "mail") game.home.renderLogin();
   if (ok) game.home.pollFriends(true);

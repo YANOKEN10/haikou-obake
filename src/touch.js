@@ -160,7 +160,7 @@ export class TouchControls {
 
   // --- 画面をなぞって視点を回す ------------------------------
   bindLook() {
-    const isControl = (el) => el && el.closest && el.closest("#stick,#hotbar,.tbtn,#sysbar,#cameraZoom,#viewControls,#pause,#room,#craft,#screen,#rotate");
+    const isControl = (el) => el && el.closest && el.closest("#roomChat,#chatToggle,#stick,#hotbar,.tbtn,#sysbar,#cameraZoom,#viewControls,#pause,#room,#craft,#screen,#rotate");
     addEventListener("touchstart", (e) => {
       if (this.lookId !== null) return;
       for (const t of e.changedTouches) {

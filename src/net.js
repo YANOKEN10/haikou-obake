@@ -301,6 +301,7 @@ export class Net {
         if (this.onEvent) this.onEvent("join", o.name);
       }
       p.name = o.name;
+      if (Array.isArray(o.g?.ch)) p.chat = o.g.ch;
       p.placed = o.placed || [];
       // 直接つながっている人の ようすは、そちらの ほうが ずっと 新しい。
       //  サーバーごしの 古いもので 上書きしない
@@ -355,6 +356,7 @@ export class Net {
     p.fastT = Date.now();
     if (msg.g) {
       const g = msg.g;
+      if (Array.isArray(g.ch)) p.chat = g.ch;
       if (g.vx !== undefined) { p.vx = g.vx; p.vy = g.vy || 0; p.vz = g.vz; }
       p.tx = g.x; p.ty = g.y; p.tz = g.z; p.tyaw = g.yaw;
       p.age = 0;
