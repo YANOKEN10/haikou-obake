@@ -686,6 +686,10 @@ class Game {
       * (mate ? 2.1 : 1.0);
     if (best.seenGhostT > 0.2) amount *= 0.7;      // 見られていると効きが悪い
 
+    // 正面から同じ手を3回続けると見慣れて笑う。強化レベルに左右されない。
+    // ふいうち・はさみうち・別の仕掛けを挟むと数え直す。
+    best.frontScares = !behind && !mate ? (best.lastKey === "direct" ? best.frontScares || 0 : 0) + 1 : 0;
+    if (best.frontScares >= 3) { amount = 0; best.frontScares = 0; }
     const eff = this.applyFear(best, amount, p.x, p.z, "direct", "おどかし");
     if (this.net.on) { this.net.reportScare(best.hid, amount, "direct", this.battle.id); this.myScareT.set(best.hid, Date.now()); }
     this.texts.push(new FloatText(this.scene, "わっ！", p.x, p.y + 2.1, p.z, "#ffe27a", 2.3));

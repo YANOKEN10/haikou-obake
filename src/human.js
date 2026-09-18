@@ -607,7 +607,9 @@ export class Human {
     if (eff < 3.5) {
       this.speak(choice(HABITUATED_LINES), 3.0);
       this.fear = Math.max(this.fearFloor || 0, this.fear - 3);
-      this.state = "spooked"; this.stateT = 1.0;
+      this.lastCombo = false;
+      // 笑う反応だけで、すでに逃げている人を引き止めない。
+      if (this.state !== "flee" && this.fear < this.maxFear) { this.state = "spooked"; this.stateT = 1.0; }
       this.fearSrc = { x: sx, z: sz };
       return 0;
     }
