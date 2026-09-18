@@ -20,6 +20,7 @@ export class TouchControls {
     this.stick = document.getElementById("stick");
     this.knob = document.getElementById("stickKnob");
 
+    this.bindStickPosition();
     this.bindStick();
     this.bindLook();
     this.bindButton("bScare", () => game.doScare());
@@ -53,6 +54,7 @@ export class TouchControls {
   }
 
   checkOrientation() {
+    this.applyStickPosition?.();
     const portrait = innerHeight > innerWidth;
     document.body.classList.toggle("portrait", portrait);
     if (portrait) this.release();
@@ -66,6 +68,55 @@ export class TouchControls {
     this.stickId = null; this.lookId = null;
     this.knob.style.transform = "";
     this.stick.classList.remove("dash");
+  }
+
+  // 位置はこの端末に保存。画面の大きさが変わったら、操作できる範囲へ収める。
+  bindStickPosition() {
+    this.stickPosition = { x: 40, y: 24 };
+    try {
+      const saved = JSON.parse(localStorage.getItem("obake-stick-position") || "null");
+      if (Number.isFinite(saved?.x) && Number.isFinite(saved?.y)) this.stickPosition = saved;
+    } catch (_) {}
+    const settings = document.createElement("details");
+    settings.id = "stickSettings";
+    settings.innerHTML = `<summary>🎮 移動スティックの位置</summary>
+      <p>左右・上下の位置を調整できます。この端末に自動保存されます。</p>
+      <label>左右 <output id="stickXValue"></output><input id="stickX" type="range" min="8" step="1" aria-label="移動スティックの左右位置"></label>
+      <label>上下 <output id="stickYValue"></output><input id="stickY" type="range" min="8" step="1" aria-label="移動スティックの上下位置"></label>
+      <div class="stickPreview" aria-hidden="true"><i></i><span>画面内の位置</span></div>
+      <button class="pbtn" id="stickReset" type="button">標準の位置にもどす</button><small id="stickPositionStatus" role="status"></small>`;
+    document.querySelector("#pause .pbox").insertBefore(settings, document.getElementById("pHome"));
+    const style = document.createElement("style");
+    style.textContent = `#stickSettings{border:1px solid #9d80da;border-radius:10px;padding:9px 12px;margin:8px 0;color:#ede6ff;text-align:left}#stickSettings summary{cursor:pointer;font-size:14px}#stickSettings p,#stickSettings small{font-size:11px;line-height:1.5}#stickSettings label{display:block;font-size:13px;margin:8px 0}#stickSettings output{float:right;color:#8ff0d8}#stickSettings input{display:block;width:100%;height:30px;accent-color:#a587f4;touch-action:pan-x}#stickSettings .stickPreview{height:70px;position:relative;border:1px solid #685685;background:#100d20;border-radius:6px;overflow:hidden}#stickSettings .stickPreview i{position:absolute;width:20px;height:20px;border:2px solid #c3a5ff;background:#9f73dd66;border-radius:50%;transform:translate(-50%,50%)}#stickSettings .stickPreview span{position:absolute;right:8px;top:5px;font-size:10px;color:#aba1ba}#pause .pbox{max-height:calc(100dvh - 24px);overflow-y:auto}`;
+    document.head.appendChild(style);
+    const save = () => {
+      this.release(); this.applyStickPosition();
+      try { localStorage.setItem("obake-stick-position", JSON.stringify(this.stickPosition)); document.getElementById("stickPositionStatus").textContent="位置を保存しました"; }
+      catch (_) { document.getElementById("stickPositionStatus").textContent="このブラウザでは保存できません。今回のプレイには反映しています。"; }
+    };
+    for (const axis of ["x", "y"]) document.getElementById("stick" + axis.toUpperCase()).addEventListener("input", e => { this.stickPosition[axis] = Number(e.target.value); save(); });
+    document.getElementById("stickReset").addEventListener("click", () => { this.stickPosition={x:40,y:24}; save(); });
+    settings.addEventListener("toggle", () => this.release());
+    this.applyStickPosition();
+  }
+
+  applyStickPosition() {
+    if (!this.stickPosition) return;
+    const size = this.stick.offsetWidth || 126;
+    const limits = { x: Math.max(8, Math.min(220, innerWidth * .48 - size)), y: Math.max(8, Math.min(160, innerHeight - 230)) };
+    const values = {};
+    for (const axis of ["x", "y"]) {
+      values[axis] = Math.round(Math.max(8, Math.min(limits[axis], this.stickPosition[axis])));
+      const slider = document.getElementById("stick" + axis.toUpperCase());
+      if (slider) { slider.max = Math.floor(limits[axis]); slider.value = values[axis]; }
+      const label=document.getElementById("stick" + axis.toUpperCase() + "Value");
+      if(label)label.textContent=(axis === "x" ? "左から " : "下から ")+values[axis]+"px";
+    }
+    this.stick.style.left = `max(env(safe-area-inset-left, 0px), ${values.x}px)`;
+    this.stick.style.bottom = `max(env(safe-area-inset-bottom, 0px), ${values.y}px)`;
+    document.getElementById("hotbar").style.left = (values.x + size + 12) + "px";
+    const dot=document.querySelector(".stickPreview i");
+    if(dot){dot.style.left=(values.x+size/2)/innerWidth*100+"%";dot.style.bottom=(values.y+size/2)/innerHeight*100+"%";}
   }
 
   // --- 左下のスティック -------------------------------------
