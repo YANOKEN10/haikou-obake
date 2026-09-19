@@ -84,3 +84,21 @@ for (const floor of [0, 1, 2]) {
   run(p, [], 3);
   assert.ok(Math.abs(p.y - (floor * 3.6 + 1.02)) < .15, `天井から元の階へ戻る: ${floor}, y=${p.y}`);
 }
+// 分校の資料室は階段ではない。旧版で埋まった位置からも元の床へ戻る。
+for(const x of [-3,0,3])for(const z of [-25,-20,-15]){
+ const p=player(worlds.branch,x,z,2.9);run(p,[],4);
+ assert.equal(p.inShaft,false);assert.ok(Math.abs(p.y-1.02)<.15,`資料室 ${x},${z}: ${p.y}`);
+}
+// 実際の階段を1階から屋上へ、同じ道を逆向きにたどって1階まで戻る。
+const stair=player(worlds.branch,6.5,-14,1.02);
+function trace(x1,z1,x2,z2){for(let i=0;i<=120;i++){stair.x=x1+(x2-x1)*i/120;stair.z=z1+(z2-z1)*i/120;run(stair,[],.05);}}
+for(let f=0;f<4;f++){
+ trace(6.5,-14,6.5,-24);trace(6.5,-24,8.5,-24);trace(8.5,-24,8.5,-14);run(stair,[],1);
+ assert.ok(Math.abs(stair.y-((f+1)*3.6+1.02))<.18,`階段上り ${f}: ${stair.y}`);
+ trace(8.5,-14,6.5,-14);
+}
+for(let f=4;f>0;f--){
+ trace(6.5,-14,8.5,-14);trace(8.5,-14,8.5,-24);trace(8.5,-24,6.5,-24);trace(6.5,-24,6.5,-14);run(stair,[],1);
+ assert.ok(Math.abs(stair.y-((f-1)*3.6+1.02))<.18,`階段下り ${f}: ${stair.y}`);
+}
+console.log('branch archive: 9 no-rise cases and 8 stair ascent/descent cases passed');

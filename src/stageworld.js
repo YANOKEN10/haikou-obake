@@ -128,6 +128,16 @@ function buildBranch(scene, opts) {
   const bounds = { x1: -54, x2: 54, z1: -42, z2: 74 };
   const roofSurfaces = [];
   const SCHOOL_TOP = FLOOR_H * 4;
+  // 資料室中央を階段扱いにしない。東端の実際の段・床の開口と同じ範囲を使う。
+  const stairs = { x1:5.5, x2:9.5, z1:-25, z2:-13, cx:7.5, north:-24, south:-14 };
+  const stairOpening = (x,z) => x>stairs.x1 && x<stairs.x2 && z>stairs.z1 && z<stairs.z2;
+  const schoolSlab = (w,y,thick,color,open) => {
+    if(!open || w.x1!==-10){mb.slab(w.x1,w.z1,w.x2,w.z2,y,thick,color);return;}
+    mb.slab(w.x1,w.z1,stairs.x1,w.z2,y,thick,color);
+    mb.slab(stairs.x2,w.z1,w.x2,w.z2,y,thick,color);
+    mb.slab(stairs.x1,w.z1,stairs.x2,stairs.z1,y,thick,color);
+    mb.slab(stairs.x1,stairs.z2,stairs.x2,w.z2,y,thick,color);
+  };
   const gates = [
     { id: "s", name: "さびた正門", in: { x: 0, z: 68 }, out: { x: 0, z: 79 }, axis: "x", at: bounds.z2, w: 6 },
     { id: "e", name: "給食門", in: { x: 49, z: 18 }, out: { x: 60, z: 18 }, axis: "z", at: bounds.x2, w: 4 },
@@ -147,10 +157,14 @@ function buildBranch(scene, opts) {
     { x1: -10, x2: 10, z1: -28, z2: -12, c: 0x354a50 },
   ];
   for (const w of wings) {
-    roofSurfaces.push({ id:`school-${roofSurfaces.length}`, x1:w.x1, x2:w.x2, z1:w.z1, z2:w.z2, y:SCHOOL_TOP });
+    const roofRects=w.x1===-10?[
+      {x1:w.x1,x2:stairs.x1,z1:w.z1,z2:w.z2}, {x1:stairs.x2,x2:w.x2,z1:w.z1,z2:w.z2},
+      {x1:stairs.x1,x2:stairs.x2,z1:w.z1,z2:stairs.z1}, {x1:stairs.x1,x2:stairs.x2,z1:stairs.z2,z2:w.z2}
+    ]:[w];
+    for(const r of roofRects)roofSurfaces.push({id:`school-${roofSurfaces.length}`,x1:r.x1,x2:r.x2,z1:r.z1,z2:r.z2,y:SCHOOL_TOP});
     for (let floor = 0; floor < 4; floor++) {
       const y1 = floor * FLOOR_H, y2 = y1 + FLOOR_H;
-      mb.slab(w.x1, w.z1, w.x2, w.z2, y1 + 0.12, 0.24, floor ? 0x27383c : 0x33474c);
+      schoolSlab(w,y1+.12,.24,floor?0x27383c:0x33474c,floor>0);
       for (const [axis, fixed, from, to] of [["x",w.z1,w.x1,w.x2],["x",w.z2,w.x1,w.x2],
         ["z",w.x1,w.z1,w.z2],["z",w.x2,w.z1,w.z2]]) {
         const mid = (from + to) / 2;
@@ -165,10 +179,22 @@ function buildBranch(scene, opts) {
       // 各階の窓帯・梁・傷んだ床縁で、4層の高さを遠くからも読めるようにする。
       for (let x = w.x1 + 2.5; x < w.x2 - 1; x += 5)
         mb.box(x,y1+2.05,w.z2+.15,2.7,1.05,.08,(floor+Math.round(x))%3===0?0x7daab8:0x456d78);
-      mb.box((w.x1+w.x2)/2,y2-.18,(w.z1+w.z2)/2,w.x2-w.x1,.14,.26,0x9a8d79);
+      const beamEnd=w.x1===-10?stairs.x1:w.x2;
+      mb.box((w.x1+beamEnd)/2,y2-.18,(w.z1+w.z2)/2,beamEnd-w.x1,.14,.26,0x9a8d79);
     }
-    mb.slab(w.x1, w.z1, w.x2, w.z2, SCHOOL_TOP, 0.34, 0x202b31);
+    schoolSlab(w,SCHOOL_TOP,.34,0x202b31,true);
     for (const z of [w.z1+.35,w.z2-.35]) mb.box((w.x1+w.x2)/2,SCHOOL_TOP+.42,z,w.x2-w.x1,.84,.28,0x74675a);
+  }
+  // 折り返し階段。左側を奥へ進み、踊り場から右側を手前へ戻ると一階上がる。
+  for(let f=0;f<4;f++){
+    const y=f*FLOOR_H;
+    for(let i=0;i<20;i++){
+      const z=stairs.south-(i+.5)*.5, rise=(i+1)*FLOOR_H/40;
+      mb.box(6.5,y+rise-.08,z,1.9,.16,.5,0x87918d);
+      mb.box(8.5,y+FLOOR_H-rise-.08,z,1.9,.16,.5,0x87918d);
+    }
+    mb.slab(stairs.x1,stairs.z1,stairs.x2,stairs.north,y+FLOOR_H/2,.16,0x87918d);
+    mb.slab(stairs.x1,stairs.south,stairs.x2,stairs.z2,y+FLOOR_H,.16,0x87918d);
   }
   const indoorRects = wings;
   addRoom(rooms, spawnSpots, "toilet", "青ざめた旧トイレ", "toilet", -36, -25, -12, -7, 0.7);
@@ -209,13 +235,13 @@ function buildBranch(scene, opts) {
   }
 
   // 古い図書室：背の高い両面書架、閲覧机、木格子の天井。
-  for(const x of [-6.4,-3.2,3.2,6.4]) {
+  for(const x of [-6.4,-3.2,3.2]) {
     mb.box(x,1.35,-20,1.1,2.7,8.8,0x4e352b);
     for(let z=-23.5;z<=-16.5;z+=1.25)
       mb.box(x+(x<0?.57:-.57),1.35,z,.08,1.8,.88,(Math.round(z*4)%3)?0x8a6044:0x5e4637);
   }
   for(const z of [-24,-20,-16]) tableSet(mb,0,z,0x694832);
-  for(let z=-25;z<=-15;z+=2.5) mb.box(0,3.28,z,15,.16,.22,0x4b322a);
+  for(let z=-25;z<=-15;z+=2.5) mb.box(-1.05,3.28,z,12.9,.16,.22,0x4b322a);
 
   // 芝生の運動場。走路・コート線・ゴールを置き、中央は人が通れる。
   mb.slab(-17,32,17,63,.1,.08,0x315f38);
@@ -375,8 +401,9 @@ function buildBranch(scene, opts) {
   return finalize(scene, "branch", mb, col, nav, rooms, spawnSpots, lightSpots, gates, ways, bounds,
     indoorRects, { x: 0, z: 56 }, {
       floors:4, roofY:SCHOOL_TOP, roofSurfaces,
-      inStairShaft:(x,z)=>x>-4&&x<4&&z>-27&&z<-12,
-      stairSurface:(x,z)=>Math.max(0,Math.min(FLOOR_H,(z+27)/15*FLOOR_H)),
+      inStairShaft:stairOpening,
+      stairCenterX:()=>stairs.cx,
+      stairSurface:(x,z)=>{const t=Math.max(0,Math.min(1,(stairs.south-z)/(stairs.south-stairs.north)));return x<stairs.cx?FLOOR_H/2*t:FLOOR_H-FLOOR_H/2*t;},
     });
 }
 

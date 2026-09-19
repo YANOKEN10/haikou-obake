@@ -671,7 +671,7 @@ export class Player {
       // 階段では、段の高さに沿って自然に上り下りする（奥へ進むと上へ）
       const rel = w.stairSurface(this.x, this.z, w.stairCenterX(this.x));
       let best = null;
-      for (let f = 0; f <= localFloors; f++) {
+      for (let f = -1; f <= localFloors; f++) {
         const cand = f * floorH + rel + 1.02;
         if (best === null || Math.abs(cand - this.y) < Math.abs(best - this.y)) best = cand;
       }

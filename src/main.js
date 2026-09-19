@@ -1240,7 +1240,7 @@ class Game {
     }
     if (this.nearPlaced) hint = this.touch ? "「もどす」で回収できる" : "R キーで回収できる";
     if (w.inStairShaft && w.isIndoors(p.x, p.z, p.y) && w.inStairShaft(p.x, p.z)) {
-      hint = "階段：おくへ進むと上の階、てまえへ戻ると下の階";
+      hint = "階段：段にそって進み、踊り場で折り返して上り下り";
     }
     for (const b of w.colliders.near(p.x, p.z, 2.2)) {
       if (b.tag === "barrier") hint = "上の階へ続く結界。まだ力が足りない…";
