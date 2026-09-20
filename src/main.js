@@ -1,3 +1,4 @@
+import { Music } from "./music.js";
 import { RoomChat } from "./chat.js";
 import * as THREE from "../lib/three.module.js";
 import { buildWorld, clampPlay, inPlay } from "./world.js";
@@ -1433,6 +1434,7 @@ class Game {
     this.started = true;
     this.setPaused(false);
     this.audio.start();
+    this.music?.sync();
     this.ui.hideScreen();
     if (this.touch) goFullscreen(); else this.input.lock();
     this._last = performance.now();
@@ -1805,6 +1807,7 @@ class Game {
 
   setPaused(on) {
     this.paused = on;
+    this.music?.sync();
     document.getElementById("pause").classList.toggle("on", on);
     if (on) this.input.unlock();
     else if (!this.touch && this.started) this.input.lock();
@@ -1913,6 +1916,7 @@ game.resize();
 game.cloud = new Cloud();
 game.cloud.onTradeLedger=(ledger,version)=>game.applyTradeLedger(ledger,version);
 game.home = new Home(game);
+game.music = new Music(game);
 game.chat = new RoomChat(game);
 game.cloud.restore().then((ok) => {
   if (ok && game.home.tab === "login" && game.home.sub === "mail") game.home.renderLogin();
