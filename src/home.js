@@ -2,6 +2,7 @@
 //  ホーム画面（ゲームを始める / ログイン / プロフィール）
 // ============================================================
 import * as S from "./save.js";
+import { Onboarding } from "./onboarding.js";
 import { mountSupport } from "./support.js";
 import { TRAPS, GHOSTS, MATERIALS, RANKS } from "./data.js";
 import { STAGES, stageUnlocked, stageUrl } from "./stages.js";
@@ -13,6 +14,7 @@ export class Home {
   constructor(game) {
     this.game = game;
     this.tab = "play";
+    setTimeout(() => { if (!game.started) this.onboarding = new Onboarding(this); }, 0);
 
     document.querySelectorAll(".htab").forEach((el) => {
       el.addEventListener("click", () => this.show(el.dataset.tab));
@@ -834,6 +836,7 @@ export class Home {
       if (!r.ok) { msg(r.why, false); this.game.audio.deny(); return; }
       this.game.audio.pickup();
       this.renderMail();
+      if (this.onboarding?.waitingLogin) this.onboarding.show(2);
     };
     $("#btnIn").addEventListener("click", () => go("login"));
     $("#btnUp").addEventListener("click", () => go("signup"));
